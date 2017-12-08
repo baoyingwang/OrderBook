@@ -22,62 +22,148 @@
       
    </head>
    <body>
-      <h2>Order Book</h2>
-      <div ng-controller = "order_book_table">
+        <h2>Order Book</h2>
+
+        <table>
+            <tr>
+                <td  align="middle" valign="top">
+                    <div ng-controller = "order_book_table_USDJPY">
+                        <table>
+                            <tr colspan="2">Symbol:{{order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._bidBookMap">
+                                            <!--
+                                            https://docs.angularjs.org/api/ng/filter/number
+                                            https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                                            -->
+                                            <td>{{ qty | number : 0}}</td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td>{{ qty | number : 0}}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
 
 
+                <td align="middle" valign="top">
+                    <!-- TODO remove duplicate code with order_book_table_USDJPY -->
+                    <div ng-controller = "order_book_table_USDHKD">
+                        <table>
+                            <tr colspan="2">Symbol:{{order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._bidBookMap">
+                                            <!--
+                                            https://docs.angularjs.org/api/ng/filter/number
+                                            https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                                            -->
+                                            <td>{{ qty | number : 0}}</td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td>{{ qty | number : 0}}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+
+            </tr>
+
+        </table>
+
+
+
+        <br>
+        <br>
+        <br>
+      <div ng-controller="placeOrderDiv">
+          TODO : support to input the order by clicking related orderbook<BR>
+          Act as
+          <select ng-init="selectedName = clientEntityNames[0]" ng-model="selectedName" ng-options="x for x in clientEntityNames">
+          </select>
           <table>
-              <tr colspan="2">Symbol:<input type = "text" ng-model = "order_book.symbol"></tr>
               <tr>
-                  <td>Buy</td><td>Sell</td>
+                  <td>ccy pair</td>
+                  <td>
+                    <select ng-init="ccypair = ccypair_list[0]" ng-model="ccypair" ng-options="x for x in ccypair_list">
+                  </td>
               </tr>
               <tr>
-                  <td align="right" valign="top">
-                      <table>
-                          <tr ng-repeat = "(price, qty) in order_book.order_book._bidBookMap">
-                              <!--
-                              https://docs.angularjs.org/api/ng/filter/number
-                              https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
-                              -->
-                              <td>{{ qty | number : 0}}</td>
-                              <td>{{ price }}</td>
+                  <td>price</td><td>120</td>
+              </tr>
+              <tr>
+                  <td>qty</td><td>1000000</td>
+              </tr>
+              <tr>
+                  <td>side</td>
+                  <td>
+                      <!-- https://docs.angularjs.org/api/ng/directive/select -->
+                      <select name="singleSelect" ng-model="data.singleSelect">
+                        <option value="Bid">Bid</option>
+                        <option value="Offer">Offer</option>
+                      </select>
+                  </td>
+              </tr>
 
-                          </tr>
-                      </table>
-                  </td>
-                  <td align="left" valign="top">
-                      <table>
-                          <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
-                              <td>{{ price }}</td>
-                              <td>{{ qty | number : 0}}</td>
-                          </tr>
-                      </table>
-                  </td>
-              </tr>
+
           </table>
-
 
       </div>
 
       <div ng-controller="order_book_plain">
-          <p>The symbol is {{order_book.symbol}}</p>
-          <p>The order book is {{order_book.order_book}}</p>
+          <p>The order book is: {{order_book}}</p>
       </div>
       <script>
 
-        //https://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
-        const numberWithCommas = (x) => {
-          return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        }
          var mainApp = angular.module("mainApp", []);
 
-        mainApp.controller('order_book_table', function($scope, $http) {
+        //http://www.runoob.com/angularjs/angularjs-select.html
+         mainApp.controller('placeOrderDiv', function($scope) {
+            $scope.clientEntityNames = ["BankA", "BankB", "BankC"];
+            $scope.ccypair_list = ["USDJPY", "USDHKD"];
+        });
+
+        mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
             $http.get('/matching/query_order_book').
                 then(function(response) {
                     $scope.order_book = response.data;
                 });
         });
-
+        mainApp.controller('order_book_table_USDHKD', function($scope, $http) {
+            $http.get('/matching/query_order_book?symbol=USDHKD').
+                then(function(response) {
+                    $scope.order_book = response.data;
+                });
+        });
 
         mainApp.controller('order_book_plain', function($scope, $http) {
             $http.get('/matching/query_order_book').

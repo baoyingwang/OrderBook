@@ -138,7 +138,7 @@ public class MatchingEngineWebWrapper {
     }
 
     @RequestMapping("/test_build_order_book")
-    public String placeOrderBookForTest(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol) {
+    public String placeOrderBookForTest(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol) {
 
         MatchingEngine engine = getMatchingEngine(symbol);
         CommonMessage.Side side = CommonMessage.Side.BID;
@@ -149,13 +149,14 @@ public class MatchingEngineWebWrapper {
         ordList.add(new TradeMessage.OriginalOrder(symbol, side, 160.1, 2000_000,  "orderID", "clientOrdID3", "clientEntityID3"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, side, 160.1, 3000_000,  "orderID", "clientOrdID4", "clientEntityID4"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, side, 170.1, 1500_000,  "orderID", "clientOrdID5", "clientEntityID5"));
-
-
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 180.1, 1000_000,  "orderID", "clientOrdID1", "clientEntityID7"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 180.2, 1500_000,  "orderID", "clientOrdID2", "clientEntityID8"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.3, 2000_000,  "orderID", "clientOrdID3", "clientEntityID9"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.4, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.5, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
+
+        ordList.add(new TradeMessage.OriginalOrder("USDHKD", side, 11, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
+        ordList.add(new TradeMessage.OriginalOrder("USDHKD", oSide, 12, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
 
         for(TradeMessage.OriginalOrder o : ordList){
             engine.addOrder(o);
@@ -325,7 +326,7 @@ public class MatchingEngineWebWrapper {
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
                 for(MatchingEngine engine: _engines){
-                    engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 10));
+                    engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
                 }
 
                 try {
