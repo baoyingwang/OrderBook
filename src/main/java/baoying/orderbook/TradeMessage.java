@@ -7,11 +7,27 @@ import baoying.orderbook.MatchingEngine.MatchingEngineInputMessageFlag;
 public class TradeMessage {
     public static class OriginalOrder implements MatchingEngineInputMessageFlag {
 
-		public OriginalOrder(String symbol, Side side, double price, int qty,  String orderID,
+		/**
+		 * price is ignored, if orderType is Market.
+         */
+		public OriginalOrder(String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
 		        String clientOrdID, String clientEntityID) {
 
 			_symbol = symbol;
 			_side = side;
+			_type = type;
+			_price = price;
+			_qty = qty;
+			_orderID = orderID;
+			_clientOrdID = clientOrdID;
+			_clientEntityID = clientEntityID;
+		}
+		public OriginalOrder(String symbol, Side side, double price, int qty,  String orderID,
+							 String clientOrdID, String clientEntityID) {
+
+			_symbol = symbol;
+			_side = side;
+			_type = CommonMessage.OrderType.LIMIT;
 			_price = price;
 			_qty = qty;
 			_orderID = orderID;
@@ -26,7 +42,7 @@ public class TradeMessage {
         public final String _symbol;
 
         public final Side _side;
-		//final OrderType _type;
+		public final CommonMessage.OrderType _type;
         public final double _price; //required for LIMIT order
         public final int _qty;
         public long _enteringEngineSysNanoTime;
@@ -43,13 +59,17 @@ public class TradeMessage {
     public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _msgID;
+		public final long _msgSysNanoTime;
+		public final long _msgEpochMS;
         public final SingleSideExecutionType _type;
         public final OriginalOrder _originOrder;
         public final int _leavesQty;
         public final String _description;
 
-        public SingleSideExecutionReport(long msgID, OriginalOrder originOrder, SingleSideExecutionType type, int leavesQty, String description){
+        public SingleSideExecutionReport(long msgID,long msgSysNanoTime,long msgEpochMS, OriginalOrder originOrder, SingleSideExecutionType type, int leavesQty, String description){
 			_msgID = msgID;
+			_msgSysNanoTime = msgSysNanoTime;
+			_msgEpochMS = msgEpochMS;
 			_originOrder = originOrder;
 			_type = type;
 			_leavesQty = leavesQty;
@@ -60,7 +80,8 @@ public class TradeMessage {
     public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _matchID;
-
+		public final long _matchingSysNanoTime;
+		public final long _matchingEpochMS;
         public final double _lastPrice;
         public final int _lastQty;
 
@@ -70,10 +91,12 @@ public class TradeMessage {
         public final int _makerLeavesQty;
         public final int _takerLeavesQty;
 
-		public MatchedExecutionReport(long matchID, double lastPrice, int lastQty, OriginalOrder makerOriginOrder, int makerLeavesQty,
+		public MatchedExecutionReport(long matchID, long matchingSysNanoTime,long matchingEpochMS, double lastPrice, int lastQty, OriginalOrder makerOriginOrder, int makerLeavesQty,
 		        OriginalOrder takerOriginOrder, int takerLeavesQty) {
 
 			_matchID = matchID;
+			_matchingSysNanoTime = matchingSysNanoTime;
+			_matchingEpochMS = matchingEpochMS;
 			_lastPrice = lastPrice;
 			_lastQty = lastQty;
 

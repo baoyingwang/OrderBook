@@ -16,7 +16,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import javax.annotation.PostConstruct;
 import java.util.*;
@@ -61,7 +60,7 @@ public class MatchingEngineWebWrapper {
         _mdUSDJPYThread = new EngineMDConsumingThread("EngineMDConsumingThread-USDJPY", "USDJPY",_matchingEngine_USDJPY._outputQueueForAggBookAndBookDelta );
 
         _execUSDHKDThread = new EngineExecConsumingThread("EngineExecConsumingThread-HKD", _matchingEngine_USDHKD._outputQueueForExecRpt );
-        _mdUSDHKDThread = new EngineMDConsumingThread("EngineMDConsumingThread-HKD", "HKD",_matchingEngine_USDHKD._outputQueueForAggBookAndBookDelta );
+        _mdUSDHKDThread = new EngineMDConsumingThread("EngineMDConsumingThread-HKD", "USDHKD",_matchingEngine_USDHKD._outputQueueForAggBookAndBookDelta );
 
         List<MatchingEngine> engines = new ArrayList<>();
         engines.add(_matchingEngine_USDJPY);
@@ -85,7 +84,7 @@ public class MatchingEngineWebWrapper {
 
         _internalTriggerOrderBookThread.start();
 
-        placeOrderBookForTest("USDJPY");
+        placeOrderBookForTest();
     }
 
     private MatchingEngine getMatchingEngine(String symbol){
@@ -138,9 +137,10 @@ public class MatchingEngineWebWrapper {
     }
 
     @RequestMapping("/test_build_order_book")
-    public String placeOrderBookForTest(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol) {
+    public String placeOrderBookForTest() {
 
-        MatchingEngine engine = getMatchingEngine(symbol);
+        String symbol="USDJPY";
+        MatchingEngine engine = _matchingEngine_USDJPY;
         CommonMessage.Side side = CommonMessage.Side.BID;
         CommonMessage.Side oSide = CommonMessage.Side.OFFER;
         List<TradeMessage.OriginalOrder> ordList = new ArrayList<>();
@@ -154,12 +154,15 @@ public class MatchingEngineWebWrapper {
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.3, 2000_000,  "orderID", "clientOrdID3", "clientEntityID9"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.4, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
         ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.5, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
-
-        ordList.add(new TradeMessage.OriginalOrder("USDHKD", side, 11, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
-        ordList.add(new TradeMessage.OriginalOrder("USDHKD", oSide, 12, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
-
         for(TradeMessage.OriginalOrder o : ordList){
             engine.addOrder(o);
+        }
+
+        List<TradeMessage.OriginalOrder> hdkOrdList = new ArrayList<>();
+        hdkOrdList.add(new TradeMessage.OriginalOrder("USDHKD", side, 11, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
+        hdkOrdList.add(new TradeMessage.OriginalOrder("USDHKD", oSide, 12, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
+        for(TradeMessage.OriginalOrder o : hdkOrdList){
+            _matchingEngine_USDHKD.addOrder(o);
         }
         return "";
     }
@@ -210,37 +213,29 @@ public class MatchingEngineWebWrapper {
                         continue;
                     }
 
+
                     if(matchER_or_singleSideER instanceof TradeMessage.MatchedExecutionReport){
                         TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)matchER_or_singleSideER;
 
                         //this is the only thread to modify the executionReportsByOrderID
-                        List<Map<String, String>> makerOriginalReport = executionReportsByOrderID.get(matchedExecutionReport._makerOriginOrder._orderID);
-
-                        List<Map<String, String>> makerOriginalReportNew = new ArrayList<>(makerOriginalReport);
-                        makerOriginalReportNew.add(buildERforClient(matchedExecutionReport, MAKER_TAKER.MAKER));
-
-                        //TODO refactor to remove duplicate codes
-                        List<Map<String, String>> takerOriginalReport = executionReportsByOrderID.get(matchedExecutionReport._takerOriginOrder._orderID);
-                        List<Map<String, String>> takerOriginalReportNew = new ArrayList<>();
-                        if(takerOriginalReport != null){
-                            takerOriginalReportNew.addAll(takerOriginalReport);
+                        if(!matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith("ROBOT")) {
+                            processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.MAKER);
                         }
-                        takerOriginalReportNew.add(buildERforClient(matchedExecutionReport, MAKER_TAKER.TAKER));
-
-                        executionReportsByOrderID.put(matchedExecutionReport._makerOriginOrder._orderID, makerOriginalReportNew);
-                        executionReportsByOrderID.put(matchedExecutionReport._takerOriginOrder._orderID, takerOriginalReportNew);
-
+                        if(!matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith("ROBOT")) {
+                            processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.TAKER);
+                        }
                     }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
 
-                        TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport)matchER_or_singleSideER;
-                        List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
-                        List<Map<String, String>> originalReportsNew = new ArrayList<>();
-                        if(originalReports != null) {
-                            originalReportsNew.addAll(originalReports);
+                        TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport) matchER_or_singleSideER;
+                        if(!singleSideExecutionReport._originOrder._clientEntityID.startsWith("ROBOT")) {
+                            List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
+                            List<Map<String, String>> originalReportsNew = new ArrayList<>();
+                            if (originalReports != null) {
+                                originalReportsNew.addAll(originalReports);
+                            }
+                            originalReportsNew.add(buildExternalERfromInternalER(singleSideExecutionReport));
+                            executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
                         }
-                        originalReportsNew.add(buildERforClient(singleSideExecutionReport));
-                        executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
-
                     }else{
 
                         log.error("unknown type: {}", matchER_or_singleSideER);
@@ -251,15 +246,41 @@ public class MatchingEngineWebWrapper {
                     log.info("matching thread " + Thread.currentThread().getName() + " is interruped", e);
                 }
             }
-
             _stopFlag = true;
-
         }
+
+        private void processOneSideOfMatchedER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker){
+            long outputConsumingNanoTime = System.nanoTime();
+            final TradeMessage.OriginalOrder originalOrder ;
+            switch(maker_taker){
+                case MAKER :
+                    originalOrder = matchedExecutionReport._makerOriginOrder;
+                    break;
+                case TAKER :
+                    originalOrder = matchedExecutionReport._takerOriginOrder;
+                    break;
+                default :
+                    throw new RuntimeException("unknown side : "+maker_taker);
+            }
+            List<Map<String, String>> makerOriginalReport = executionReportsByOrderID.get(originalOrder._orderID);
+            List<Map<String, String>> makerOriginalReportNew = new ArrayList<>(makerOriginalReport);
+            makerOriginalReportNew.add(buildExternalERfromInternalER(matchedExecutionReport, maker_taker));
+            //replace with a new List, rather than update the exists List, to avoid concurrent modification issue.WHY not use copy on write?
+            executionReportsByOrderID.put(originalOrder._orderID, makerOriginalReportNew);
+
+            log.info("performance:{},{},{},{},{}", new Object[]{
+                    originalOrder._clientEntityID,
+                    originalOrder._clientOrdID,
+                    originalOrder._enteringEngineSysNanoTime,
+                    matchedExecutionReport._matchingSysNanoTime,
+                    outputConsumingNanoTime});
+            }
 
         public void stopIt() {
             this._stopFlag = true;
         }
     }
+
 
     class EngineMDConsumingThread extends Thread {
 
@@ -289,9 +310,9 @@ public class MatchingEngineWebWrapper {
 
                     }else if(aggBook_or_bookDelta instanceof MarketDataMessage.OrderBookDelta){
                         MarketDataMessage.OrderBookDelta matchedExecutionReport = (MarketDataMessage.OrderBookDelta)aggBook_or_bookDelta;
+                        //TODO i am going to write a standalone MarketEngine to build a FULL orderbook(full depth)
                         //IGNORE in this example. We will send agg book request periodically & internally.
                     }else{
-
                         log.error("unknown type: {}", aggBook_or_bookDelta);
                     }
 
@@ -349,7 +370,7 @@ public class MatchingEngineWebWrapper {
         MAKER, TAKER;
     }
 
-    private Map<String, String> buildERforClient(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker ){
+    private Map<String, String> buildExternalERfromInternalER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker ){
 
         Map<String, String> erMap = new HashMap<>();
         erMap.put("lastPx", String.valueOf(matchedExecutionReport._lastPrice));
@@ -383,7 +404,8 @@ public class MatchingEngineWebWrapper {
         return erMap;
     }
 
-     private Map<String, String> buildERforClient(TradeMessage.SingleSideExecutionReport singleSideExecutionReport){
+
+     private Map<String, String> buildExternalERfromInternalER(TradeMessage.SingleSideExecutionReport singleSideExecutionReport){
 
         Map<String, String> erMap = new HashMap<>();
         final TradeMessage.OriginalOrder originalOrder = singleSideExecutionReport._originOrder;

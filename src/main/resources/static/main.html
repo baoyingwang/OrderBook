@@ -2,8 +2,10 @@
    
    <head>
       <title>Angular JS Table</title>
-      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
-      
+       <!-- why not https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js?
+       google is blocked by great wall
+       -->
+       <script src = "/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
       <style>
          table, th , td {
             border: 1px solid grey;
@@ -106,7 +108,7 @@
         <br>
         <br>
       <div ng-controller="placeOrderDiv">
-          TODO : support to input the order by clicking related orderbook<BR>
+
           Act as
           <select ng-init="selectedName = clientEntityNames[0]" ng-model="selectedName" ng-options="x for x in clientEntityNames">
           </select>
@@ -136,7 +138,8 @@
 
 
           </table>
-
+          <br>
+          TODO : support to input the order by clicking related orderbook<BR>
       </div>
 
       <div ng-controller="order_book_plain">

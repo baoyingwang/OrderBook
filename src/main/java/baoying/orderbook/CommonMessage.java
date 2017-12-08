@@ -6,7 +6,8 @@ public interface CommonMessage {
 	static enum Side {
 		BID, OFFER;
 	}
-	
+
+	//https://www.onixs.biz/fix-dictionary/4.4/tagNum_40.html
 	static enum OrderType {
 		MARKET, LIMIT;
 	}

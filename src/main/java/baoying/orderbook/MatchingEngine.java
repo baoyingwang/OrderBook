@@ -26,8 +26,6 @@ import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
  * A matching engine for a specific symbol.
  * 
  * note: the /*- prevent the eclipse to format the below TODO list with '-' as prefix
-	- //TODO support market order
-	- //TODO avoid execution with himself
 	- //TODO consider use other data structure(instead of simply priority queue) for book, to 1) simplify dump order book. 2) for FX, support match 2nd best price, if no relationship with 1st one(should this be supported?).
 	- //TODO consider to apply LMAX DISRUPTOR to improve the performance, if required.
 	- //note: for FX swap, we could use same logic, symbol like USDJPY_1W. But only support Spot+Fwd as standard way.
@@ -162,8 +160,8 @@ public class MatchingEngine {
 		List<MatchingEnginOutputMessageFlag> executionReportsAsResult = new ArrayList<MatchingEnginOutputMessageFlag>();
 		List<OrderBookDelta> orderbookDeltasAsResult = new ArrayList<OrderBookDelta>();
 
-        _outputQueueForExecRpt.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),order,
-                TradeMessage.SingleSideExecutionType.PENDING_NEW, executingOrder._leavesQty,"Cannot trade with yourself"));
+        _outputQueueForExecRpt.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),System.nanoTime(), System.currentTimeMillis(), order,
+                TradeMessage.SingleSideExecutionType.PENDING_NEW, executingOrder._leavesQty,"Entered Order Book"));
 
         match(executingOrder, contraSideBook, sameSideBook, executionReportsAsResult, orderbookDeltasAsResult);
 
@@ -180,7 +178,7 @@ public class MatchingEngine {
 	        PriorityQueue<ExecutingOrder> sameSideBook, List<MatchingEnginOutputMessageFlag> execReportsAsResult,
 	        List<OrderBookDelta> orderbookDeltasAsResult) {
 
-		boolean enterBook = true;
+		boolean rejected = false;
 		while (true) {
 
 			ExecutingOrder peekedContraBestPriceOrder = contraSideBook.peek();
@@ -189,17 +187,27 @@ public class MatchingEngine {
 			}
 
 			final boolean isExecutablePrice;
-			switch (executingOrder._origOrder._side) {
-			case BID:
-				isExecutablePrice = executingOrder._origOrder._price
-				        + MIN_DIFF_FOR_PRICE > peekedContraBestPriceOrder._origOrder._price;
-				break;
-			case OFFER:
-				isExecutablePrice = executingOrder._origOrder._price
-				        - MIN_DIFF_FOR_PRICE < peekedContraBestPriceOrder._origOrder._price;
-				break;
-			default:
-				throw new RuntimeException("unknown side : " + executingOrder._origOrder._side);
+			switch(executingOrder._origOrder._type) {
+				case MARKET :
+					isExecutablePrice= true;
+					break;
+				case LIMIT :
+					switch (executingOrder._origOrder._side) {
+						case BID:
+							isExecutablePrice = executingOrder._origOrder._price
+									+ MIN_DIFF_FOR_PRICE > peekedContraBestPriceOrder._origOrder._price;
+							break;
+						case OFFER:
+							isExecutablePrice = executingOrder._origOrder._price
+									- MIN_DIFF_FOR_PRICE < peekedContraBestPriceOrder._origOrder._price;
+							break;
+						default:
+							throw new RuntimeException("unknown side : " + executingOrder._origOrder._side);
+					}
+					break;
+				default :
+					//TODO reject this deal while process problem. Maybe by the outter exception catch.
+					throw new RuntimeException("unknown order type");
 			}
 			if (!isExecutablePrice) {
 				break;
@@ -207,9 +215,9 @@ public class MatchingEngine {
 
 			if (peekedContraBestPriceOrder._origOrder._clientEntityID
 			        .equals(executingOrder._origOrder._clientEntityID)) {
-				execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),peekedContraBestPriceOrder._origOrder,
+				execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(),executingOrder._origOrder,
 				        TradeMessage.SingleSideExecutionType.REJECTED, executingOrder._leavesQty,"Cannot trade with yourself"));
-				enterBook = false;
+				rejected = true;
 				break;
 			}
 
@@ -221,8 +229,7 @@ public class MatchingEngine {
 			peekedContraBestPriceOrder._leavesQty = peekedContraBestPriceOrder._leavesQty - lastQty;
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
-
-			execReportsAsResult.add(new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), lastPrice, lastQty,
+			execReportsAsResult.add(new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(), lastPrice, lastQty,
 			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
 			        executingOrder._origOrder, executingOrder._leavesQty));
 			orderbookDeltasAsResult.add(
@@ -238,12 +245,21 @@ public class MatchingEngine {
 			}
 		}
 
-		if (enterBook && executingOrder._leavesQty > 0) {
-			sameSideBook.add(executingOrder);
-			orderbookDeltasAsResult.add(new OrderBookDelta(_symbol, executingOrder._origOrder._side,
-			        executingOrder._origOrder._price, executingOrder._leavesQty));
-		}
+		if (!rejected  && executingOrder._leavesQty > 0) {
+                switch(executingOrder._origOrder._type) {
+                    case MARKET :
+                        execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(),executingOrder._origOrder,
+                            TradeMessage.SingleSideExecutionType.CANCELLED, executingOrder._leavesQty,"No available liquidity for this market order"));
+                        break;
+                    case LIMIT :
+                        sameSideBook.add(executingOrder);
+                        orderbookDeltasAsResult.add(new OrderBookDelta(_symbol, executingOrder._origOrder._side,
+                                executingOrder._origOrder._price, executingOrder._leavesQty));
 
+                        break;
+                    default:
+            }
+		}
 	}
 
 	AggregatedOrderBook buildAggregatedOrderBook(int depth) {
