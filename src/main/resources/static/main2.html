@@ -1,0 +1,26 @@
+<!doctype html>
+<html ng-app="demo">
+<head>
+    <title>Hello AngularJS</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+    <script>
+
+angular.module('demo', [])
+.controller('Hello', function($scope, $http) {
+    $http.get('/matching/query_order_book').
+        then(function(response) {
+            $scope.greeting = response.data;
+        });
+});
+      </script>
+</head>
+
+<body>
+<div ng-controller="Hello">
+    <p>The symbol is {{greeting.symbol}}</p>
+    <p>The order book is {{greeting.order_book}}</p>
+</div>
+</body>
+</html>
+
+

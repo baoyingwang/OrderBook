@@ -1,0 +1,92 @@
+<html ng-app = "mainApp">
+   
+   <head>
+      <title>Angular JS Table</title>
+      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+      
+      <style>
+         table, th , td {
+            border: 1px solid grey;
+            border-collapse: collapse;
+            padding: 5px;
+         }
+         
+         table tr:nth-child(odd) {
+            background-color: #f2f2f2;
+         }
+         
+         table tr:nth-child(even) {
+            background-color: #ffffff;
+         }
+      </style>
+      
+   </head>
+   <body>
+      <h2>Order Book</h2>
+      <div ng-controller = "order_book_table">
+
+
+          <table>
+              <tr colspan="2">Symbol:<input type = "text" ng-model = "order_book.symbol"></tr>
+              <tr>
+                  <td>Buy</td><td>Sell</td>
+              </tr>
+              <tr>
+                  <td align="right" valign="top">
+                      <table>
+                          <tr ng-repeat = "(price, qty) in order_book.order_book._bidBookMap">
+                              <!--
+                              https://docs.angularjs.org/api/ng/filter/number
+                              https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                              -->
+                              <td>{{ qty | number : 0}}</td>
+                              <td>{{ price }}</td>
+
+                          </tr>
+                      </table>
+                  </td>
+                  <td align="left" valign="top">
+                      <table>
+                          <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
+                              <td>{{ price }}</td>
+                              <td>{{ qty | number : 0}}</td>
+                          </tr>
+                      </table>
+                  </td>
+              </tr>
+          </table>
+
+
+      </div>
+
+      <div ng-controller="order_book_plain">
+          <p>The symbol is {{order_book.symbol}}</p>
+          <p>The order book is {{order_book.order_book}}</p>
+      </div>
+      <script>
+
+        //https://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
+        const numberWithCommas = (x) => {
+          return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+         var mainApp = angular.module("mainApp", []);
+
+        mainApp.controller('order_book_table', function($scope, $http) {
+            $http.get('/matching/query_order_book').
+                then(function(response) {
+                    $scope.order_book = response.data;
+                });
+        });
+
+
+        mainApp.controller('order_book_plain', function($scope, $http) {
+            $http.get('/matching/query_order_book').
+                then(function(response) {
+                    $scope.order_book = response.data;
+                });
+        });
+
+      </script>
+      
+   </body>
+</html>
