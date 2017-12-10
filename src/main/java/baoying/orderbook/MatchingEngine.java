@@ -42,7 +42,7 @@ public class MatchingEngine {
 	private final long _msgIDBase = System.nanoTime();
 	private final AtomicLong _msgIDIncreament = new  AtomicLong(0);
 
-	private BlockingQueue<MatchingEngineInputMessageFlag> _inputOriginalOrderORAggOrdBookRequests;
+	private BlockingQueue<MatchingEngineInputMessageFlag> _inputInitialExecutingOrderORAggOrdBookRequests;
 
     //TODO how to promise the consumer will only consume?
 	public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForExecRpt;
@@ -66,7 +66,7 @@ public class MatchingEngine {
 		_bidBook = createBidBook();
 		_offerBook = createAskBook();
 
-		_inputOriginalOrderORAggOrdBookRequests = new LinkedBlockingQueue<MatchingEngineInputMessageFlag>();
+		_inputInitialExecutingOrderORAggOrdBookRequests = new LinkedBlockingQueue<MatchingEngineInputMessageFlag>();
 		_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 		_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 
@@ -74,20 +74,32 @@ public class MatchingEngine {
 	}
 
 	// check matching result(ExecutionReport) from _processResult
-	public void addOrder(OriginalOrder order) {
+	public SingleSideExecutionReport addOrder(OriginalOrder order) {
 
 		if (!_symbol.equals(order._symbol)) {
 			// it should never reach here
 			// TODO log error, and throw exception
-			return;
+			throw new RuntimeException("not the expected symbol, expect:"+_symbol+", by it is:"+order._symbol+", client_entity:"+order._clientEntityID+" client ord id:"+order._clientOrdID);
 		}
 
-        order.setEnterEngineSysNanoTime(System.nanoTime());
-		_inputOriginalOrderORAggOrdBookRequests.add(order);
-	}
+        //TODO this is bad design. The enteringEngineTime should be put on ExecutingOrder, rather than OriginalOrder
+        //ExecutingOrder should be generated here, rather then while try matching.
+        //It should be refactored as soon as possible.
+        long nowInNano = System.nanoTime();
+        ExecutingOrder initialExecutingOrder = new ExecutingOrder(order, nowInNano, System.currentTimeMillis());
+		_inputInitialExecutingOrderORAggOrdBookRequests.add(initialExecutingOrder);
+
+        return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
+                nowInNano,
+                System.currentTimeMillis(),
+                order,
+                TradeMessage.SingleSideExecutionType.NEW,
+                order._qty,
+                "Entered Order Book");
+    }
 
     public void addAggOrdBookRequest(AggregatedOrderBookRequest aggregatedOrderBookRequest) {
-        _inputOriginalOrderORAggOrdBookRequests.add(aggregatedOrderBookRequest);
+        _inputInitialExecutingOrderORAggOrdBookRequests.add(aggregatedOrderBookRequest);
     }
 
 	class MatchingThread extends Thread {
@@ -103,15 +115,15 @@ public class MatchingEngine {
 			while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 				try {
 
-					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = _inputOriginalOrderORAggOrdBookRequests
+					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = _inputInitialExecutingOrderORAggOrdBookRequests
 					        .poll(5, TimeUnit.SECONDS);
 					if (originalOrderORAggBookRequest == null) {
 						continue;
 					}
 
-					if (originalOrderORAggBookRequest instanceof OriginalOrder) {
-						OriginalOrder originalOrder = (OriginalOrder) originalOrderORAggBookRequest;
-						processInputOrder(originalOrder);
+					if (originalOrderORAggBookRequest instanceof ExecutingOrder) {
+                        ExecutingOrder executingOrder = (ExecutingOrder) originalOrderORAggBookRequest;
+						processInputOrder(executingOrder);
 					} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
 						AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
 						AggregatedOrderBook aggOrderBook = buildAggregatedOrderBook(aggOrdBookRequest._depth);
@@ -128,7 +140,6 @@ public class MatchingEngine {
 			}
 
 			_stopFlag = true;
-
 		}
 
 		public void stopIt() {
@@ -136,9 +147,7 @@ public class MatchingEngine {
 		}
 	}
 
-	void processInputOrder(OriginalOrder order) {
-
-		ExecutingOrder executingOrder = new ExecutingOrder(order);
+	void processInputOrder(ExecutingOrder executingOrder) {
 
 		final PriorityQueue<ExecutingOrder> contraSideBook;
 		final PriorityQueue<ExecutingOrder> sameSideBook;
@@ -159,9 +168,6 @@ public class MatchingEngine {
 
 		List<MatchingEnginOutputMessageFlag> executionReportsAsResult = new ArrayList<MatchingEnginOutputMessageFlag>();
 		List<OrderBookDelta> orderbookDeltasAsResult = new ArrayList<OrderBookDelta>();
-
-        _outputQueueForExecRpt.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),System.nanoTime(), System.currentTimeMillis(), order,
-                TradeMessage.SingleSideExecutionType.PENDING_NEW, executingOrder._leavesQty,"Entered Order Book"));
 
         match(executingOrder, contraSideBook, sameSideBook, executionReportsAsResult, orderbookDeltasAsResult);
 
@@ -230,8 +236,8 @@ public class MatchingEngine {
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
 			execReportsAsResult.add(new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(), lastPrice, lastQty,
-			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
-			        executingOrder._origOrder, executingOrder._leavesQty));
+			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,peekedContraBestPriceOrder._originOrdEnteringEngineSysNanoTime, peekedContraBestPriceOrder._originOrdEnteringEngineEpochMS,
+			        executingOrder._origOrder, executingOrder._leavesQty,executingOrder._originOrdEnteringEngineSysNanoTime,executingOrder._originOrdEnteringEngineEpochMS));
 			orderbookDeltasAsResult.add(
 			        new OrderBookDelta(_symbol, peekedContraBestPriceOrder._origOrder._side, lastPrice, 0 - lastQty));
 
@@ -341,15 +347,21 @@ public class MatchingEngine {
     public static interface MatchingEnginOutputMessageFlag {
 	}
 
-	static class ExecutingOrder {
+	static class ExecutingOrder implements MatchingEngineInputMessageFlag{
 
 		// this value will change on each matching
 		int _leavesQty;
 
 		final OriginalOrder _origOrder;
 
-		ExecutingOrder(OriginalOrder originalOrder) {
+        final long _originOrdEnteringEngineSysNanoTime;
+        final long _originOrdEnteringEngineEpochMS;
+
+		ExecutingOrder(OriginalOrder originalOrder, long enteringEngineSysNanoTime, long enteringEngineEpochMS) {
 			_origOrder = originalOrder;
+            _originOrdEnteringEngineSysNanoTime = enteringEngineSysNanoTime;
+            _originOrdEnteringEngineEpochMS = enteringEngineEpochMS;
+
 			_leavesQty = originalOrder._qty;
 		}
 
@@ -376,7 +388,7 @@ public class MatchingEngine {
 				// note: not required, it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._origOrder._enteringEngineSysNanoTime - o2._origOrder._enteringEngineSysNanoTime);
+					return (int) (o1._originOrdEnteringEngineSysNanoTime - o2._originOrdEnteringEngineSysNanoTime);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
@@ -398,7 +410,7 @@ public class MatchingEngine {
 				// TODO it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._origOrder._enteringEngineSysNanoTime - o2._origOrder._enteringEngineSysNanoTime);
+					return (int) (o1._originOrdEnteringEngineSysNanoTime - o2._originOrdEnteringEngineSysNanoTime);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {

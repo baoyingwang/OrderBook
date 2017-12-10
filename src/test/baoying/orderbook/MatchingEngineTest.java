@@ -21,7 +21,6 @@ public class MatchingEngineTest {
 
 	MatchingEngine _exchange = new MatchingEngine("USDJPY");
 	
-	
 	@Test
 	public void testCreateBidBook(){
 		

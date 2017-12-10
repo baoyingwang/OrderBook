@@ -10,9 +10,10 @@ public class TradeMessage {
 		/**
 		 * price is ignored, if orderType is Market.
          */
-		public OriginalOrder(String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+		public OriginalOrder(long recvFromClientSysNanoTime, long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
 		        String clientOrdID, String clientEntityID) {
-
+            _recvFromClientSysNanoTime = recvFromClientSysNanoTime;
+            _recvFromClientEpochMS = recvFromClientEpochMS;
 			_symbol = symbol;
 			_side = side;
 			_type = type;
@@ -22,9 +23,10 @@ public class TradeMessage {
 			_clientOrdID = clientOrdID;
 			_clientEntityID = clientEntityID;
 		}
-		public OriginalOrder(String symbol, Side side, double price, int qty,  String orderID,
+		public OriginalOrder(long recvFromClientSysNanoTime, long recvFromClientEpochMS, String symbol, Side side, double price, int qty,  String orderID,
 							 String clientOrdID, String clientEntityID) {
-
+            _recvFromClientSysNanoTime = recvFromClientSysNanoTime;
+            _recvFromClientEpochMS = recvFromClientEpochMS;
 			_symbol = symbol;
 			_side = side;
 			_type = CommonMessage.OrderType.LIMIT;
@@ -35,17 +37,14 @@ public class TradeMessage {
 			_clientEntityID = clientEntityID;
 		}
 
-		void setEnterEngineSysNanoTime(long enteringSystemNanoTime){
-			_enteringEngineSysNanoTime = enteringSystemNanoTime;
-		}
-
         public final String _symbol;
 
         public final Side _side;
 		public final CommonMessage.OrderType _type;
         public final double _price; //required for LIMIT order
         public final int _qty;
-        public long _enteringEngineSysNanoTime;
+        public final long _recvFromClientSysNanoTime;
+		public final long _recvFromClientEpochMS;
         public final String _orderID;
         public final String _clientOrdID;
         public final String _clientEntityID; // to avoid execution with himself
@@ -53,7 +52,7 @@ public class TradeMessage {
 
     public enum SingleSideExecutionType{
 
-		PENDING_NEW,CANCELLED, REJECTED;
+		NEW,CANCELLED, REJECTED;
 	}
 	// maker: who sit in the book
     public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
@@ -80,8 +79,10 @@ public class TradeMessage {
     public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _matchID;
+
 		public final long _matchingSysNanoTime;
 		public final long _matchingEpochMS;
+
         public final double _lastPrice;
         public final int _lastQty;
 
@@ -91,12 +92,22 @@ public class TradeMessage {
         public final int _makerLeavesQty;
         public final int _takerLeavesQty;
 
-		public MatchedExecutionReport(long matchID, long matchingSysNanoTime,long matchingEpochMS, double lastPrice, int lastQty, OriginalOrder makerOriginOrder, int makerLeavesQty,
-		        OriginalOrder takerOriginOrder, int takerLeavesQty) {
+        public final long _makerOriginOrdEnteringEngineSysNanoTime;
+        public final long _makerOriginOrdEnteringEngineEpochMS;
+        public final long _takerOriginOrdEnteringEngineSysNanoTime;
+        public final long _takerOriginOrdEnteringEngineEpochMS;
+
+
+		public MatchedExecutionReport(long matchID,
+                                      long matchingSysNanoTime,long matchingEpochMS,
+                                      double lastPrice, int lastQty,
+                                      OriginalOrder makerOriginOrder, int makerLeavesQty, long makerOriginOrdEnteringEngineSysNanoTime, long makerOriginOrdEnteringEngineEpochMS,
+                                      OriginalOrder takerOriginOrder, int takerLeavesQty, long takerOriginOrdEnteringEngineSysNanoTime, long takerOriginOrdEnteringEngineEpochMS) {
 
 			_matchID = matchID;
 			_matchingSysNanoTime = matchingSysNanoTime;
 			_matchingEpochMS = matchingEpochMS;
+
 			_lastPrice = lastPrice;
 			_lastQty = lastQty;
 
@@ -104,6 +115,10 @@ public class TradeMessage {
 			_takerOriginOrder = takerOriginOrder;
 			_makerLeavesQty = makerLeavesQty;
 			_takerLeavesQty = takerLeavesQty;
+            _makerOriginOrdEnteringEngineSysNanoTime=makerOriginOrdEnteringEngineSysNanoTime;
+            _makerOriginOrdEnteringEngineEpochMS=makerOriginOrdEnteringEngineEpochMS;
+            _takerOriginOrdEnteringEngineSysNanoTime=takerOriginOrdEnteringEngineSysNanoTime;
+            _takerOriginOrdEnteringEngineEpochMS=takerOriginOrdEnteringEngineEpochMS;
 		}
 
 	}

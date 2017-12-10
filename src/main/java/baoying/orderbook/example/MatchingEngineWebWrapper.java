@@ -18,21 +18,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
+import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
 @Configuration
 @ComponentScan
 @EnableAutoConfiguration
-
 @SpringBootApplication
-
 @RestController
 @RequestMapping("/matching")
 public class MatchingEngineWebWrapper {
+
+    private String IGNORE_ENTITY_PREFIX = "ROBOT";
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
@@ -45,7 +45,7 @@ public class MatchingEngineWebWrapper {
     private final EngineMDConsumingThread _mdUSDHKDThread;
 
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
-    //value: list of er(as Map<String, String)
+    //value: list of execution report(as Map<String, String)
     private Map<String, List<Map<String, String>>> executionReportsByOrderID;
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
 
@@ -69,6 +69,64 @@ public class MatchingEngineWebWrapper {
 
     }
 
+    private AtomicLong _placedOrderCounter = new AtomicLong(0);
+    private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
+    private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
+    private BlockingQueue<long[]> testTimeDataQueue = new LinkedBlockingQueue<long[]>();
+
+    @RequestMapping("/reset_before_test")
+    public void resetBeforeTest(){
+        _placedOrderCounter.set(0);
+        _firstOriginalOrderSinceTest = null;
+        _lastOriginalOrderSinceTest = null;
+        testTimeDataQueue.clear();
+    }
+
+    @RequestMapping("/end_test")
+    public String endTest(){
+
+        long allOrderCount = _placedOrderCounter.get();
+        if(_firstOriginalOrderSinceTest == null || allOrderCount == 0){
+            return "ERROR - no order during the test";
+        }
+        long startTimeInNano = _firstOriginalOrderSinceTest._recvFromClientSysNanoTime;
+        long startTimeInEpochMS = _firstOriginalOrderSinceTest._recvFromClientEpochMS;
+        Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
+
+        final long endTimeInNano;
+        final Instant instantEnd ;
+        {
+            final long endTimeInEpochMS;
+            if(_lastOriginalOrderSinceTest == null){
+                endTimeInNano = System.nanoTime();
+                endTimeInEpochMS = System.currentTimeMillis();
+            }else {
+                endTimeInNano=_lastOriginalOrderSinceTest._recvFromClientSysNanoTime;
+                endTimeInEpochMS = _lastOriginalOrderSinceTest._recvFromClientEpochMS;
+            }
+            instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
+        }
+        long durationInSecond = (endTimeInNano - startTimeInNano)/1000_000_000;
+
+        log.info("temp: testTimeDataQueue.size() : {}", testTimeDataQueue.size());
+        List<long[]> latencyData = new ArrayList<>();
+        int latencyDataCount = testTimeDataQueue.drainTo(latencyData);
+
+        double ratePerSecond = allOrderCount/durationInSecond;
+        Map<String, Object> data = new HashMap<>();
+        data.put("duration_in_second",durationInSecond);
+        data.put("start_time",instantStart.toString());
+        data.put("end_time",instantEnd.toString());
+        data.put("order_count",allOrderCount);
+        data.put("rate_per_second", ratePerSecond);
+        data.put("latency_data_count", latencyDataCount);
+        data.put("latency_data", latencyData);
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(data);
+        return jsonString;
+    }
+
     @PostConstruct
     public void start(){
 
@@ -90,17 +148,13 @@ public class MatchingEngineWebWrapper {
     private MatchingEngine getMatchingEngine(String symbol){
 
         if("USDJPY".equals(symbol)){
-
             return _matchingEngine_USDJPY;
-
         }else if("USDHKD".equals(symbol)){
             return _matchingEngine_USDHKD;
         } else{
             String errorInfo = "ERROR - Only USDJPY and USDHKD is supported. Unknown symbol:"+ symbol;
             log.error(errorInfo);
-
-            //TODO return Optional
-            return null;
+            throw new RuntimeException(errorInfo);
         }
     }
 
@@ -108,13 +162,14 @@ public class MatchingEngineWebWrapper {
     public String placeOrder(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol,
                              @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
                              @RequestParam(value = "side", defaultValue="Bid") String side,
-                             @RequestParam(value = "price", defaultValue="124.0") double price,
-                             @RequestParam(value = "qty", defaultValue = "1000000") int qty){
+                             @RequestParam(value = "price", defaultValue="126.0") double price,
+                             @RequestParam(value = "qty", defaultValue = "5000") int qty){
 
         String clientOrdID = clientEntity+"_"+System.nanoTime();
         String orderID = symbol+"_"+clientEntity+"_"+System.nanoTime();
 
-        CommonMessage.Side orderSide;
+        log.info("order request - symbol:{}, price:{}, qty:{}", symbol, price, qty);
+        final CommonMessage.Side orderSide;
         if("Bid".equalsIgnoreCase(side)){
             orderSide = CommonMessage.Side.BID;
         }else if("Offer".equalsIgnoreCase(side)){
@@ -124,16 +179,22 @@ public class MatchingEngineWebWrapper {
             return "ERROR - unknown side : " + side;
         }
 
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder(symbol,orderSide , price, qty, orderID, clientOrdID, clientEntity);
+        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol,orderSide , price, qty, orderID, clientOrdID, clientEntity);
         MatchingEngine engine = getMatchingEngine(originalOrder._symbol);
         if(engine != null) {
-            log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new String[]{symbol,clientOrdID,orderID });
-            engine.addOrder(originalOrder);
-            return orderID;
+            log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
+            TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+
+            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
+            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
+            else{_lastOriginalOrderSinceTest = originalOrder;}
+
+            Gson gson = new GsonBuilder().create();
+            String jsonString = gson.toJson(erNew);
+            return jsonString;
         }else{
             return "ERROR - not supported symbol:" + originalOrder._symbol;
         }
-
     }
 
     @RequestMapping("/test_build_order_book")
@@ -144,23 +205,23 @@ public class MatchingEngineWebWrapper {
         CommonMessage.Side side = CommonMessage.Side.BID;
         CommonMessage.Side oSide = CommonMessage.Side.OFFER;
         List<TradeMessage.OriginalOrder> ordList = new ArrayList<>();
-        ordList.add(new TradeMessage.OriginalOrder(symbol, side, 140.1, 1000_000,  "orderID", "clientOrdID1", "clientEntityID1"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, side, 150.1, 1500_000,  "orderID", "clientOrdID2", "clientEntityID2"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, side, 160.1, 2000_000,  "orderID", "clientOrdID3", "clientEntityID3"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, side, 160.1, 3000_000,  "orderID", "clientOrdID4", "clientEntityID4"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, side, 170.1, 1500_000,  "orderID", "clientOrdID5", "clientEntityID5"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 180.1, 1000_000,  "orderID", "clientOrdID1", "clientEntityID7"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 180.2, 1500_000,  "orderID", "clientOrdID2", "clientEntityID8"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.3, 2000_000,  "orderID", "clientOrdID3", "clientEntityID9"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.4, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
-        ordList.add(new TradeMessage.OriginalOrder(symbol, oSide, 190.5, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 120.1, 1000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID1", IGNORE_ENTITY_PREFIX+"clientEntityID1"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 121.1, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID2", IGNORE_ENTITY_PREFIX+"clientEntityID2"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 122.1, 2000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID3", IGNORE_ENTITY_PREFIX+"clientEntityID3"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 123.1, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", IGNORE_ENTITY_PREFIX+"clientEntityID4"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 124.1, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", IGNORE_ENTITY_PREFIX+"clientEntityID5"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 125.1, 1000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID1", IGNORE_ENTITY_PREFIX+"clientEntityID7"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 126.2, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID2", IGNORE_ENTITY_PREFIX+"clientEntityID8"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 127.3, 2000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID3", IGNORE_ENTITY_PREFIX+"clientEntityID9"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 128.4, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", IGNORE_ENTITY_PREFIX+"clientEntityID10"));
+        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 129.5, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", IGNORE_ENTITY_PREFIX+"clientEntityID11"));
         for(TradeMessage.OriginalOrder o : ordList){
             engine.addOrder(o);
         }
 
         List<TradeMessage.OriginalOrder> hdkOrdList = new ArrayList<>();
-        hdkOrdList.add(new TradeMessage.OriginalOrder("USDHKD", side, 11, 3000_000,  "orderID", "clientOrdID4", "clientEntityID10"));
-        hdkOrdList.add(new TradeMessage.OriginalOrder("USDHKD", oSide, 12, 1500_000,  "orderID", "clientOrdID5", "clientEntityID11"));
+        hdkOrdList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),"USDHKD", side, 11, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", "clientEntityID10"));
+        hdkOrdList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),"USDHKD", oSide, 12, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", "clientEntityID11"));
         for(TradeMessage.OriginalOrder o : hdkOrdList){
             _matchingEngine_USDHKD.addOrder(o);
         }
@@ -213,21 +274,20 @@ public class MatchingEngineWebWrapper {
                         continue;
                     }
 
-
                     if(matchER_or_singleSideER instanceof TradeMessage.MatchedExecutionReport){
                         TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)matchER_or_singleSideER;
 
                         //this is the only thread to modify the executionReportsByOrderID
-                        if(!matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith("ROBOT")) {
+                        if(!matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
                             processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.MAKER);
                         }
-                        if(!matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith("ROBOT")) {
+                        if(!matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
                             processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.TAKER);
                         }
                     }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
 
                         TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport) matchER_or_singleSideER;
-                        if(!singleSideExecutionReport._originOrder._clientEntityID.startsWith("ROBOT")) {
+                        if(!singleSideExecutionReport._originOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
                             List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
                             List<Map<String, String>> originalReportsNew = new ArrayList<>();
                             if (originalReports != null) {
@@ -250,31 +310,44 @@ public class MatchingEngineWebWrapper {
         }
 
         private void processOneSideOfMatchedER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker){
+
             long outputConsumingNanoTime = System.nanoTime();
+            final long originOrdEnteringEngineSysNanoTime;
+            final long originOrdEnteringEngineEpochMS;
             final TradeMessage.OriginalOrder originalOrder ;
             switch(maker_taker){
                 case MAKER :
                     originalOrder = matchedExecutionReport._makerOriginOrder;
+                    originOrdEnteringEngineSysNanoTime = matchedExecutionReport._makerOriginOrdEnteringEngineSysNanoTime;
+                    originOrdEnteringEngineEpochMS = matchedExecutionReport._makerOriginOrdEnteringEngineEpochMS;
                     break;
                 case TAKER :
                     originalOrder = matchedExecutionReport._takerOriginOrder;
+                    originOrdEnteringEngineSysNanoTime = matchedExecutionReport._takerOriginOrdEnteringEngineSysNanoTime;
+                    originOrdEnteringEngineEpochMS = matchedExecutionReport._takerOriginOrdEnteringEngineEpochMS;
                     break;
                 default :
                     throw new RuntimeException("unknown side : "+maker_taker);
             }
             List<Map<String, String>> makerOriginalReport = executionReportsByOrderID.get(originalOrder._orderID);
-            List<Map<String, String>> makerOriginalReportNew = new ArrayList<>(makerOriginalReport);
+            List<Map<String, String>> makerOriginalReportNew = makerOriginalReport==null?new ArrayList<>():new ArrayList<>(makerOriginalReport);
             makerOriginalReportNew.add(buildExternalERfromInternalER(matchedExecutionReport, maker_taker));
             //replace with a new List, rather than update the exists List, to avoid concurrent modification issue.WHY not use copy on write?
             executionReportsByOrderID.put(originalOrder._orderID, makerOriginalReportNew);
 
-            log.info("performance:{},{},{},{},{}", new Object[]{
-                    originalOrder._clientEntityID,
-                    originalOrder._clientOrdID,
-                    originalOrder._enteringEngineSysNanoTime,
-                    matchedExecutionReport._matchingSysNanoTime,
-                    outputConsumingNanoTime});
-            }
+//           testTimeDataQueue.add(new long[]{
+//                   originOrdEnteringEngineEpochMS,
+//                   0,
+//                   originOrdEnteringEngineSysNanoTime - originalOrder._recvFromClientSysNanoTime,
+//                    matchedExecutionReport._matchingSysNanoTime - originalOrder._recvFromClientSysNanoTime,
+//                    outputConsumingNanoTime - originalOrder._recvFromClientSysNanoTime});
+
+            testTimeDataQueue.add(new long[]{
+                    originOrdEnteringEngineEpochMS,
+                    originOrdEnteringEngineSysNanoTime - originalOrder._recvFromClientSysNanoTime,
+                    matchedExecutionReport._matchingSysNanoTime - originOrdEnteringEngineSysNanoTime,
+                    outputConsumingNanoTime - matchedExecutionReport._matchingSysNanoTime});
+        }
 
         public void stopIt() {
             this._stopFlag = true;
@@ -318,7 +391,7 @@ public class MatchingEngineWebWrapper {
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    log.info("matching thread " + Thread.currentThread().getName() + " is interruped", e);
+                    log.info("matching thread " + Thread.currentThread().getName() + " is interrupted", e);
                 }
             }
 
@@ -376,7 +449,6 @@ public class MatchingEngineWebWrapper {
         erMap.put("lastPx", String.valueOf(matchedExecutionReport._lastPrice));
         erMap.put("lastQty", String.valueOf(matchedExecutionReport._lastQty));
 
-
         final int leavesQty ;
         final String executionID ;
         final TradeMessage.OriginalOrder originalOrder ;
@@ -400,7 +472,6 @@ public class MatchingEngineWebWrapper {
         erMap.put("execType", "Trade"); //150 - F - http://www.onixs.biz/fix-dictionary/4.4/tagNum_150.html
         erMap.put("ordSatus", leavesQty==0?"Filled":"Partially filled");//39 - 1 - http://www.onixs.biz/fix-dictionary/4.4/tagNum_39.html
 
-
         return erMap;
     }
 
@@ -419,7 +490,7 @@ public class MatchingEngineWebWrapper {
         return erMap;
     }
 
-     public static void main(String[] args) {
-        SpringApplication.run(MatchingEngineWebWrapper.class);
+    public static void main(String[] args) {
+         SpringApplication.run(MatchingEngineWebWrapper.class);
     }
 }

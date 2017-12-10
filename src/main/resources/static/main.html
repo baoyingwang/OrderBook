@@ -43,7 +43,7 @@
                                             https://docs.angularjs.org/api/ng/filter/number
                                             https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
                                             -->
-                                            <td>{{ qty | number : 0}}</td>
+                                            <td align="right">{{ qty | number : 0}}</td>
                                             <td>{{ price }}</td>
 
                                         </tr>
@@ -53,7 +53,7 @@
                                     <table>
                                         <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
                                             <td>{{ price }}</td>
-                                            <td>{{ qty | number : 0}}</td>
+                                            <td align="right">{{ qty | number : 0}}</td>
                                         </tr>
                                     </table>
                                 </td>
@@ -79,7 +79,7 @@
                                             https://docs.angularjs.org/api/ng/filter/number
                                             https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
                                             -->
-                                            <td>{{ qty | number : 0}}</td>
+                                            <td align="right">{{ qty | number : 0}}</td>
                                             <td>{{ price }}</td>
 
                                         </tr>
@@ -89,7 +89,7 @@
                                     <table>
                                         <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
                                             <td>{{ price }}</td>
-                                            <td>{{ qty | number : 0}}</td>
+                                            <td  align="right">{{ qty | number : 0}}</td>
                                         </tr>
                                     </table>
                                 </td>

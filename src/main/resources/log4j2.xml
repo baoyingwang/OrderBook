@@ -1,20 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-This is a console only logger as default. It is helpful to avoid same log files for multi tutorial applications.
-
-You could setup your own log4j2 file, by e.g.-Dlog4j.configurationFile=log4j2_config_file_sys_path_or_class_path
-
--->
 <Configuration status="WARN">
-  <Appenders>
-    <Console name="Console" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
-    </Console>
-  </Appenders>
-  
-  <Loggers>
-    <Root level="info">
-      <AppenderRef ref="Console"/>
-    </Root>
-  </Loggers>
+    <Properties>
+        <Property name="app_name">orderbook</Property>
+    </Properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+        <RollingFile name="RollingFile" fileName="log/${app_name}.log" filePattern="logarchive/${app_name}-%d{MM-dd-yyyy}.log.gz"
+                     ignoreExceptions="false" bufferSize="81920">
+            <PatternLayout>
+                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+            </PatternLayout>
+            <TimeBasedTriggeringPolicy />
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Logger name="com.foo.Bar" level="trace">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Root level="info">
+<!--
+            <AppenderRef ref="Console"/>
+-->
+            <AppenderRef ref="RollingFile"/>
+        </Root>
+    </Loggers>
 </Configuration>
