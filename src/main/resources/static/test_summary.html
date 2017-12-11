@@ -1,0 +1,101 @@
+<html ng-app = "mainApp">
+   
+   <head>
+      <title>Angular JS Table</title>
+       <!-- why not https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js?
+       google is blocked by great wall
+       -->
+       <script src = "/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+      <style>
+         table, th , td {
+            border: 1px solid grey;
+            border-collapse: collapse;
+            padding: 5px;
+         }
+         
+         table tr:nth-child(odd) {
+            background-color: #f2f2f2;
+         }
+         
+         table tr:nth-child(even) {
+            background-color: #ffffff;
+         }
+      </style>
+      
+   </head>
+   <body>
+        <h2>Test Summary</h2>
+    <div ng-controller = "order_book_table_USDJPY">
+
+        <table>
+            <!--
+                ////https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
+            -->
+            <tr ng-repeat = "(item, value) in filterOutLatencyDataFromMap(test_summary)  ">
+                <!--
+                https://docs.angularjs.org/api/ng/filter/number
+                https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                -->
+                <td align="right">{{ item }}</td>
+                <td>{{ value }}</td>
+
+            </tr>
+        </table>
+
+        Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="checked" aria-label="Toggle ngShow"><br />
+
+        <div ng-show="checked">
+            <table>
+
+                <tr>
+                    <td>time in epoc MS</td>
+                    <td>T1: recv, T2:put to engine - nano</td>
+                    <td>T1: put to engin, T2: match - nano </td>
+                    <td>T1: match, T2: consumed - nano</td>
+                </tr>
+                <tr ng-repeat = "one_record in test_summary.latency_data ">
+                    <!--
+                    https://docs.angularjs.org/api/ng/filter/number
+                    https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                    -->
+                    <td align="right">{{ one_record[0] }}</td>
+                    <td align="right">{{ one_record[1] }}</td>
+                    <td align="right">{{ one_record[2] }}</td>
+                    <td align="right">{{ one_record[3] }}</td>
+
+                </tr>
+            </table>
+        </div>
+
+    </div>
+
+
+
+      <script>
+
+         var mainApp = angular.module("mainApp", []);
+
+        mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
+            $http.get('/matching/get_test_summary').
+                then(function(response) {
+                    $scope.test_summary = response.data;
+                });
+
+            //https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
+            //it is not easy to filter map(but easy to filter a plain value - http://docs.angularjs.org/api/ng.filter:filter)
+            $scope.filterOutLatencyDataFromMap = function(items) {
+                var result = {};
+                angular.forEach(items, function(value, key) {
+                    if (key !== 'latency_data' ) {
+                        result[key] = value;
+                    }
+                });
+                return result;
+            }
+
+        });
+
+      </script>
+      
+   </body>
+</html>
