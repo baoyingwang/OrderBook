@@ -32,9 +32,9 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequestMapping("/matching")
 public class MatchingEngineWebWrapper {
 
-    private String IGNORE_ENTITY_PREFIX = "ROBOT";
+    private String IGNORE_ENTITY_PREFIX = "BACKGROUND";
 
-    private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
+    private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
     private final MatchingEngine _matchingEngine_USDJPY;
     private final MatchingEngine _matchingEngine_USDHKD;
@@ -107,12 +107,15 @@ public class MatchingEngineWebWrapper {
             instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
         }
         long durationInSecond = (endTimeInNano - startTimeInNano)/1000_000_000;
+        if(durationInSecond < 1){
+            return "ERROR - not proceed calculation for test within 1 second";
+        }
 
         log.info("temp: testTimeDataQueue.size() : {}", testTimeDataQueue.size());
         List<long[]> latencyData = new ArrayList<>();
         int latencyDataCount = testTimeDataQueue.drainTo(latencyData);
 
-        double ratePerSecond = allOrderCount/durationInSecond;
+        double ratePerSecond = allOrderCount*1.0/durationInSecond;
         Map<String, Object> data = new HashMap<>();
         data.put("duration_in_second",durationInSecond);
         data.put("start_time",instantStart.toString());
@@ -121,6 +124,8 @@ public class MatchingEngineWebWrapper {
         data.put("rate_per_second", ratePerSecond);
         data.put("latency_data_count", latencyDataCount);
         data.put("latency_data", latencyData);
+
+        resetBeforeTest();
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(data);
@@ -142,7 +147,7 @@ public class MatchingEngineWebWrapper {
 
         _internalTriggerOrderBookThread.start();
 
-        placeOrderBookForTest();
+        //placeOrderBookForTest();
     }
 
     private MatchingEngine getMatchingEngine(String symbol){
@@ -168,7 +173,7 @@ public class MatchingEngineWebWrapper {
         String clientOrdID = clientEntity+"_"+System.nanoTime();
         String orderID = symbol+"_"+clientEntity+"_"+System.nanoTime();
 
-        log.info("order request - symbol:{}, price:{}, qty:{}", symbol, price, qty);
+        log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
         final CommonMessage.Side orderSide;
         if("Bid".equalsIgnoreCase(side)){
             orderSide = CommonMessage.Side.BID;
@@ -182,7 +187,7 @@ public class MatchingEngineWebWrapper {
         TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol,orderSide , price, qty, orderID, clientOrdID, clientEntity);
         MatchingEngine engine = getMatchingEngine(originalOrder._symbol);
         if(engine != null) {
-            log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
+
             TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
 
             long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
@@ -197,36 +202,6 @@ public class MatchingEngineWebWrapper {
         }
     }
 
-    @RequestMapping("/test_build_order_book")
-    public String placeOrderBookForTest() {
-
-        String symbol="USDJPY";
-        MatchingEngine engine = _matchingEngine_USDJPY;
-        CommonMessage.Side side = CommonMessage.Side.BID;
-        CommonMessage.Side oSide = CommonMessage.Side.OFFER;
-        List<TradeMessage.OriginalOrder> ordList = new ArrayList<>();
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 120.1, 1000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID1", IGNORE_ENTITY_PREFIX+"clientEntityID1"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 121.1, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID2", IGNORE_ENTITY_PREFIX+"clientEntityID2"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 122.1, 2000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID3", IGNORE_ENTITY_PREFIX+"clientEntityID3"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 123.1, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", IGNORE_ENTITY_PREFIX+"clientEntityID4"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 124.1, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", IGNORE_ENTITY_PREFIX+"clientEntityID5"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 125.1, 1000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID1", IGNORE_ENTITY_PREFIX+"clientEntityID7"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 126.2, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID2", IGNORE_ENTITY_PREFIX+"clientEntityID8"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 127.3, 2000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID3", IGNORE_ENTITY_PREFIX+"clientEntityID9"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 128.4, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", IGNORE_ENTITY_PREFIX+"clientEntityID10"));
-        ordList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, oSide, 129.5, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", IGNORE_ENTITY_PREFIX+"clientEntityID11"));
-        for(TradeMessage.OriginalOrder o : ordList){
-            engine.addOrder(o);
-        }
-
-        List<TradeMessage.OriginalOrder> hdkOrdList = new ArrayList<>();
-        hdkOrdList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),"USDHKD", side, 11, 3000_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID4", "clientEntityID10"));
-        hdkOrdList.add(new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),"USDHKD", oSide, 12, 1500_000,  "orderID", IGNORE_ENTITY_PREFIX+"clientOrdID5", "clientEntityID11"));
-        for(TradeMessage.OriginalOrder o : hdkOrdList){
-            _matchingEngine_USDHKD.addOrder(o);
-        }
-        return "";
-    }
     @RequestMapping("/query_exec_reports")
     public String requestExecReport(@RequestParam(value = "order_id", defaultValue = "") String orderID){
 
