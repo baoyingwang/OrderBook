@@ -1,4 +1,21 @@
+import com.github.jengelman.gradle.plugins.shadow.transformers.*
+
 apply plugin: 'java'
+
+//plugin-shadow for building fat-jar see : https://plugins.gradle.org/plugin/com.github.johnrengelman.shadow
+// intestingly, repositories {jcenter()} cannot work - from http://imperceptiblethoughts.com/shadow/
+buildscript {
+    repositories {
+        maven {
+
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
+    }
+}
+apply plugin: "com.github.johnrengelman.shadow"
 
 repositories {
 	 mavenCentral()
@@ -30,12 +47,15 @@ dependencies {
 	</dependency>
 */
 	testCompile 'junit:junit:4.8.2'
- } 
- 
- 
- task taskA{
- 	println "i am task A, and do nothing but print this line"
  }
+
+
+
+
+
+task taskA{
+ 	println "i am task A, and do nothing but print this line"
+}
  
  
  //https://docs.gradle.org/current/javadoc/org/gradle/api/tasks/testing/Test.html
@@ -72,34 +92,42 @@ dependencies {
 		logger.lifecycle("Test: " + descriptor + " produced standard out/err: " + event.message )
 	 }
    }
- 
- //make sure test cases are executed - DONE
- //search 'test' as key word, you will find all test related tasks/sections
- //https://discuss.gradle.org/t/how-to-configure-test-src-dir/6829/2
- 
 
- //sourceCompatibility and version cannot be defined in settings.gradle, because it will complain > No such property: version for class: org.gradle.initialization.DefaultSettings_Decorated
- //TODO support to read from jenkins
-sourceCompatibility = 1.8
 
 version = new Date().format('yyyy-MM-dd_HHmmss.S')
+
+
+
 jar {
 	 manifest {
-		 attributes 'Implementation-Title': 'Baoying QuickfixJ Tutorial',
-					'Implementation-Version': version
+		 attributes 'Implementation-Title': 'Baoying OrderBook/MatchingEngine'
+		 attributes 'Implementation-Version': version
+		 attributes "Main-Class": "baoying.orderbook.example.MatchingEngineWebWrapper"
 	 }
  }
 
-task sourcesJar(type: Jar, dependsOn: classes) {
-	classifier = 'sources'
-	from sourceSets.main.allSource
+
+//add buildscript and apply related plugin - see the header part
+shadowJar {
+
+    baseName = 'BaoyingOrderBookFat'
+
+    // Required for Spring -- https://github.com/spring-projects/spring-boot/issues/1828
+    //add import com.github.jengelman.gradle.plugins.shadow.transformers.* at header
+    mergeServiceFiles()
+    append 'META-INF/spring.handlers'
+    append 'META-INF/spring.schemas'
+    append 'META-INF/spring.tooling'
+    transform(PropertiesFileTransformer) {
+        paths = ['META-INF/spring.factories' ]
+        mergeStrategy = "append"
+    }
 }
 
-//http://stackoverflow.com/questions/11474729/how-to-build-sources-jar-with-gradle
-artifacts {
-	//NOTE that java class jar would be build by default. Not required to add anything here
-	//NOT easy to build javadoc, too.. refer the link.
-	archives sourcesJar
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+	options.compilerArgs << '-Xlint:unchecked' << '-Xlint:deprecation'
 }
+
 
 

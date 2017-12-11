@@ -74,7 +74,7 @@ public class MatchingEngineWebWrapper {
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
     private BlockingQueue<long[]> testTimeDataQueue = new LinkedBlockingQueue<long[]>();
 
-    @RequestMapping("/reset_before_test")
+    @RequestMapping("/reset_test_data")
     public void resetBeforeTest(){
         _placedOrderCounter.set(0);
         _firstOriginalOrderSinceTest = null;
@@ -82,7 +82,7 @@ public class MatchingEngineWebWrapper {
         testTimeDataQueue.clear();
     }
 
-    @RequestMapping("/end_test")
+    @RequestMapping("/get_test_summary")
     public String endTest(){
 
         long allOrderCount = _placedOrderCounter.get();
@@ -112,8 +112,7 @@ public class MatchingEngineWebWrapper {
         }
 
         log.info("temp: testTimeDataQueue.size() : {}", testTimeDataQueue.size());
-        List<long[]> latencyData = new ArrayList<>();
-        int latencyDataCount = testTimeDataQueue.drainTo(latencyData);
+        List<long[]> latencyData = new ArrayList<>(testTimeDataQueue);
 
         double ratePerSecond = allOrderCount*1.0/durationInSecond;
         Map<String, Object> data = new HashMap<>();
@@ -122,10 +121,8 @@ public class MatchingEngineWebWrapper {
         data.put("end_time",instantEnd.toString());
         data.put("order_count",allOrderCount);
         data.put("rate_per_second", ratePerSecond);
-        data.put("latency_data_count", latencyDataCount);
+        data.put("latency_data_count", latencyData.size());
         data.put("latency_data", latencyData);
-
-        resetBeforeTest();
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(data);
@@ -294,12 +291,10 @@ public class MatchingEngineWebWrapper {
                 case MAKER :
                     originalOrder = matchedExecutionReport._makerOriginOrder;
                     originOrdEnteringEngineSysNanoTime = matchedExecutionReport._makerOriginOrdEnteringEngineSysNanoTime;
-                    originOrdEnteringEngineEpochMS = matchedExecutionReport._makerOriginOrdEnteringEngineEpochMS;
                     break;
                 case TAKER :
                     originalOrder = matchedExecutionReport._takerOriginOrder;
                     originOrdEnteringEngineSysNanoTime = matchedExecutionReport._takerOriginOrdEnteringEngineSysNanoTime;
-                    originOrdEnteringEngineEpochMS = matchedExecutionReport._takerOriginOrdEnteringEngineEpochMS;
                     break;
                 default :
                     throw new RuntimeException("unknown side : "+maker_taker);
@@ -318,7 +313,7 @@ public class MatchingEngineWebWrapper {
 //                    outputConsumingNanoTime - originalOrder._recvFromClientSysNanoTime});
 
             testTimeDataQueue.add(new long[]{
-                    originOrdEnteringEngineEpochMS,
+                    originalOrder._recvFromClientEpochMS,
                     originOrdEnteringEngineSysNanoTime - originalOrder._recvFromClientSysNanoTime,
                     matchedExecutionReport._matchingSysNanoTime - originOrdEnteringEngineSysNanoTime,
                     outputConsumingNanoTime - matchedExecutionReport._matchingSysNanoTime});

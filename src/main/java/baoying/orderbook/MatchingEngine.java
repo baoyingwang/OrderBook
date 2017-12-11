@@ -86,7 +86,7 @@ public class MatchingEngine {
         //ExecutingOrder should be generated here, rather then while try matching.
         //It should be refactored as soon as possible.
         long nowInNano = System.nanoTime();
-        ExecutingOrder initialExecutingOrder = new ExecutingOrder(order, nowInNano, System.currentTimeMillis());
+        ExecutingOrder initialExecutingOrder = new ExecutingOrder(order, nowInNano);
 		_inputInitialExecutingOrderORAggOrdBookRequests.add(initialExecutingOrder);
 
         return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
@@ -236,8 +236,8 @@ public class MatchingEngine {
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
 			execReportsAsResult.add(new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(), lastPrice, lastQty,
-			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,peekedContraBestPriceOrder._originOrdEnteringEngineSysNanoTime, peekedContraBestPriceOrder._originOrdEnteringEngineEpochMS,
-			        executingOrder._origOrder, executingOrder._leavesQty,executingOrder._originOrdEnteringEngineSysNanoTime,executingOrder._originOrdEnteringEngineEpochMS));
+			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,peekedContraBestPriceOrder._originOrdEnteringEngineSysNanoTime,
+			        executingOrder._origOrder, executingOrder._leavesQty,executingOrder._originOrdEnteringEngineSysNanoTime));
 			orderbookDeltasAsResult.add(
 			        new OrderBookDelta(_symbol, peekedContraBestPriceOrder._origOrder._side, lastPrice, 0 - lastQty));
 
@@ -355,16 +355,12 @@ public class MatchingEngine {
 		final OriginalOrder _origOrder;
 
         final long _originOrdEnteringEngineSysNanoTime;
-        final long _originOrdEnteringEngineEpochMS;
 
-		ExecutingOrder(OriginalOrder originalOrder, long enteringEngineSysNanoTime, long enteringEngineEpochMS) {
+		ExecutingOrder(OriginalOrder originalOrder, long enteringEngineSysNanoTime) {
 			_origOrder = originalOrder;
             _originOrdEnteringEngineSysNanoTime = enteringEngineSysNanoTime;
-            _originOrdEnteringEngineEpochMS = enteringEngineEpochMS;
-
 			_leavesQty = originalOrder._qty;
 		}
-
 	}
 
 	public void start() {

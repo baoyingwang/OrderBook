@@ -93,16 +93,14 @@ public class TradeMessage {
         public final int _takerLeavesQty;
 
         public final long _makerOriginOrdEnteringEngineSysNanoTime;
-        public final long _makerOriginOrdEnteringEngineEpochMS;
         public final long _takerOriginOrdEnteringEngineSysNanoTime;
-        public final long _takerOriginOrdEnteringEngineEpochMS;
 
 
 		public MatchedExecutionReport(long matchID,
                                       long matchingSysNanoTime,long matchingEpochMS,
                                       double lastPrice, int lastQty,
-                                      OriginalOrder makerOriginOrder, int makerLeavesQty, long makerOriginOrdEnteringEngineSysNanoTime, long makerOriginOrdEnteringEngineEpochMS,
-                                      OriginalOrder takerOriginOrder, int takerLeavesQty, long takerOriginOrdEnteringEngineSysNanoTime, long takerOriginOrdEnteringEngineEpochMS) {
+                                      OriginalOrder makerOriginOrder, int makerLeavesQty, long makerOriginOrdEnteringEngineSysNanoTime,
+                                      OriginalOrder takerOriginOrder, int takerLeavesQty, long takerOriginOrdEnteringEngineSysNanoTime) {
 
 			_matchID = matchID;
 			_matchingSysNanoTime = matchingSysNanoTime;
@@ -116,9 +114,7 @@ public class TradeMessage {
 			_makerLeavesQty = makerLeavesQty;
 			_takerLeavesQty = takerLeavesQty;
             _makerOriginOrdEnteringEngineSysNanoTime=makerOriginOrdEnteringEngineSysNanoTime;
-            _makerOriginOrdEnteringEngineEpochMS=makerOriginOrdEnteringEngineEpochMS;
             _takerOriginOrdEnteringEngineSysNanoTime=takerOriginOrdEnteringEngineSysNanoTime;
-            _takerOriginOrdEnteringEngineEpochMS=takerOriginOrdEnteringEngineEpochMS;
 		}
 
 	}
