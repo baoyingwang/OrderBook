@@ -109,7 +109,6 @@ jar {
 
 //add buildscript and apply related plugin - see the header part
 shadowJar {
-
     baseName = 'BaoyingOrderBookFat'
 
     // Required for Spring -- https://github.com/spring-projects/spring-boot/issues/1828

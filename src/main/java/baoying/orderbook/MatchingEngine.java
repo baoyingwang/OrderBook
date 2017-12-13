@@ -84,9 +84,6 @@ public class MatchingEngine {
 			throw new RuntimeException("not the expected symbol, expect:"+_symbol+", by it is:"+order._symbol+", client_entity:"+order._clientEntityID+" client ord id:"+order._clientOrdID);
 		}
 
-        //TODO this is bad design. The enteringEngineTime should be put on ExecutingOrder, rather than OriginalOrder
-        //ExecutingOrder should be generated here, rather then while try matching.
-        //It should be refactored as soon as possible.
         long nowInNano = System.nanoTime();
         ExecutingOrder initialExecutingOrder = new ExecutingOrder(order, nowInNano);
 		_inputInitialExecutingOrderORAggOrdBookRequests.add(initialExecutingOrder);
@@ -363,6 +360,7 @@ public class MatchingEngine {
             _originOrdEnteringEngineSysNanoTime = enteringEngineSysNanoTime;
 			_leavesQty = originalOrder._qty;
 		}
+
 	}
 
 	public void start() {

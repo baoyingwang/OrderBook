@@ -148,7 +148,10 @@ public class MatchingEngineWebWrapper {
         List<String> latencyDataCSVLines = latencyData.stream()
                 .map( it -> Util.toCsvString(it) ).collect(Collectors.toList());
         try {
-            if(!Files.exists(latencyDataFile)) Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
+            if(!Files.exists(latencyDataFile)) {
+                Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
+                Files.write(latencyDataFile, ("recvEpochMS,put2ReqQ,pickANDmatch,addANDpickOutput"+"\n").getBytes(), APPEND, CREATE);
+            }
             latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
             Files.write(latencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
             Files.write( latencySummaryFile, (jsonString+"\n").getBytes(),  APPEND, CREATE);
