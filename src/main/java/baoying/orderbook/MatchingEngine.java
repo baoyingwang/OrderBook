@@ -32,6 +32,8 @@ import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 */
 public class MatchingEngine {
 
+	public static String LATENCY_ENTITY_PREFIX = "LTC$$";
+
 	// e.g. USDJPY for FX, or BABA for security exchange
 	private final String _symbol;
 

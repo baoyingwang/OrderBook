@@ -18,10 +18,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
 @Configuration
@@ -32,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequestMapping("/matching")
 public class MatchingEngineWebWrapper {
 
-    private String IGNORE_ENTITY_PREFIX = "BACKGROUND";
+
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
@@ -82,6 +93,8 @@ public class MatchingEngineWebWrapper {
         testTimeDataQueue.clear();
     }
 
+    DateTimeFormatter formatter =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.S'Z'").withZone( ZoneId.of("UTC") );
     @RequestMapping("/get_test_summary")
     public String endTest(){
 
@@ -112,7 +125,8 @@ public class MatchingEngineWebWrapper {
         }
 
         log.info("temp: testTimeDataQueue.size() : {}", testTimeDataQueue.size());
-        List<long[]> latencyData = new ArrayList<>(testTimeDataQueue);
+        List<long[]> latencyData = new ArrayList<>();
+        testTimeDataQueue.drainTo(latencyData);
 
         double ratePerSecond = allOrderCount*1.0/durationInSecond;
         Map<String, Object> data = new HashMap<>();
@@ -120,12 +134,31 @@ public class MatchingEngineWebWrapper {
         data.put("start_time",instantStart.toString());
         data.put("end_time",instantEnd.toString());
         data.put("order_count",allOrderCount);
-        data.put("rate_per_second", ratePerSecond);
-        data.put("latency_data_count", latencyData.size());
-        data.put("latency_data", latencyData);
+        data.put("rate_per_second", String.format("%.2f",ratePerSecond));
+        data.put("un-purged_latency_data_count", latencyData.size()); //latencyData maybe has been purged to file periodically
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(data);
+
+        //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
+        Path latencyDataFile = Paths.get("log/LatencyData_OverallStart_"+formatter.format(instantStart)+".csv");
+        Path latencySummaryFile = Paths.get("log/LatencySummary_OverallStart_"+formatter.format(instantStart)+".json.txt");
+        long latency_data_count = -1;
+        //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
+        List<String> latencyDataCSVLines = latencyData.stream()
+                .map( it -> Util.toCsvString(it) ).collect(Collectors.toList());
+        try {
+            if(!Files.exists(latencyDataFile)) Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
+            latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
+            Files.write(latencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
+            Files.write( latencySummaryFile, (jsonString+"\n").getBytes(),  APPEND, CREATE);
+        }catch (Exception e){
+            log.error("exception while writing latency data to "+latencyDataFile.toString(), e);
+        }
+        data.put("latency_data_count", latency_data_count);
+
+
+
         return jsonString;
     }
 
@@ -135,16 +168,11 @@ public class MatchingEngineWebWrapper {
         log.info("start the MatchingEngineWebWrapper");
         _matchingEngine_USDJPY.start();
         _matchingEngine_USDHKD.start();
-
         _execUSDJPYThread.start();
         _mdUSDJPYThread.start();
-
         _execUSDHKDThread.start();
         _mdUSDHKDThread.start();
-
         _internalTriggerOrderBookThread.start();
-
-        //placeOrderBookForTest();
     }
 
     private MatchingEngine getMatchingEngine(String symbol){
@@ -250,16 +278,16 @@ public class MatchingEngineWebWrapper {
                         TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)matchER_or_singleSideER;
 
                         //this is the only thread to modify the executionReportsByOrderID
-                        if(!matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
+                        if(matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
                             processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.MAKER);
                         }
-                        if(!matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
+                        if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
                             processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.TAKER);
                         }
                     }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
 
                         TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport) matchER_or_singleSideER;
-                        if(!singleSideExecutionReport._originOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
+                        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
                             List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
                             List<Map<String, String>> originalReportsNew = new ArrayList<>();
                             if (originalReports != null) {
