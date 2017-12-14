@@ -10,26 +10,12 @@ public class TradeMessage {
 		/**
 		 * price is ignored, if orderType is Market.
          */
-		public OriginalOrder(long recvFromClientSysNanoTime, long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+		public OriginalOrder(long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
 		        String clientOrdID, String clientEntityID) {
-            _recvFromClientSysNanoTime = recvFromClientSysNanoTime;
             _recvFromClientEpochMS = recvFromClientEpochMS;
 			_symbol = symbol;
 			_side = side;
 			_type = type;
-			_price = price;
-			_qty = qty;
-			_orderID = orderID;
-			_clientOrdID = clientOrdID;
-			_clientEntityID = clientEntityID;
-		}
-		public OriginalOrder(long recvFromClientSysNanoTime, long recvFromClientEpochMS, String symbol, Side side, double price, int qty,  String orderID,
-							 String clientOrdID, String clientEntityID) {
-            _recvFromClientSysNanoTime = recvFromClientSysNanoTime;
-            _recvFromClientEpochMS = recvFromClientEpochMS;
-			_symbol = symbol;
-			_side = side;
-			_type = CommonMessage.OrderType.LIMIT;
 			_price = price;
 			_qty = qty;
 			_orderID = orderID;
@@ -43,7 +29,7 @@ public class TradeMessage {
 		public final CommonMessage.OrderType _type;
         public final double _price; //required for LIMIT order
         public final int _qty;
-        public final long _recvFromClientSysNanoTime;
+        public long _recvFromClientSysNanoTime;
 		public final long _recvFromClientEpochMS;
         public final String _orderID;
         public final String _clientOrdID;

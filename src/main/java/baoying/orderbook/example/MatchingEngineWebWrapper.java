@@ -152,6 +152,7 @@ public class MatchingEngineWebWrapper {
 
         latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
         data.put("latency_data_count", latency_data_count);
+        data.put("latency_data", latencyData);
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(data);
@@ -207,9 +208,14 @@ public class MatchingEngineWebWrapper {
             return "ERROR - unknown side : " + side;
         }
 
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol,orderSide , price, qty, orderID, clientOrdID, clientEntity);
+
+        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
+        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+            originalOrder._recvFromClientSysNanoTime = System.nanoTime();
+        }
         MatchingEngine engine = getMatchingEngine(originalOrder._symbol);
         if(engine != null) {
+
 
             TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
 

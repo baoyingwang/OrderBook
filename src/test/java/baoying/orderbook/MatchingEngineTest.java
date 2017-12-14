@@ -29,10 +29,10 @@ public class MatchingEngineTest {
 		
 		PriorityQueue<ExecutingOrder> book = _exchange.createBidBook();
 		
-		OriginalOrder o_100_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_120_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_100_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT, 100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_120_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_130_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_130_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 		
 		book.add(new ExecutingOrder(o_100_1mio));
 		book.add(new ExecutingOrder(o_130_1mio_sysT1));
@@ -56,10 +56,10 @@ public class MatchingEngineTest {
 		CommonMessage.Side side = CommonMessage.Side.OFFER;
 		
 		
-		OriginalOrder o_140_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 140.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_150_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 150.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_160_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-		OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_140_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 140.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_150_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 150.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_160_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder o_160_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 		
 		PriorityQueue<ExecutingOrder> book = _exchange.createAskBook();
 		book.add(new ExecutingOrder(o_140_1mio));
@@ -88,10 +88,10 @@ public class MatchingEngineTest {
 		PriorityQueue<ExecutingOrder> bidBook = _exchange.createBidBook();
 		{
 			CommonMessage.Side side = CommonMessage.Side.BID;
-			OriginalOrder o_100_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_120_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,"orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_100_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_120_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 130.1, 1000_000,"orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
 			bidBook.add(new ExecutingOrder(o_100_1mio));
 			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1));
@@ -102,10 +102,10 @@ public class MatchingEngineTest {
 		PriorityQueue<ExecutingOrder> askBook = _exchange.createAskBook();
 		{
 			CommonMessage.Side side = CommonMessage.Side.OFFER;
-			OriginalOrder o_140_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 140.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID2");
-			OriginalOrder o_150_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 150.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID2");
-			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID2");
-			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID2");
+			OriginalOrder o_140_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,140.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID2");
+			OriginalOrder o_150_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,150.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID2");
+			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID2");
+			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID2");
 			
 			
 			askBook.add(new ExecutingOrder(o_140_1mio));
@@ -114,7 +114,7 @@ public class MatchingEngineTest {
 			askBook.add(new ExecutingOrder(o_160_1mio_sysT2));
 		}
 		
-		OriginalOrder bid_145_1point5Mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, CommonMessage.Side.BID, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
+		OriginalOrder bid_145_1point5Mio = new OriginalOrder( System.currentTimeMillis(),symbol, CommonMessage.Side.BID,CommonMessage.OrderType.LIMIT, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
 
 		MatchingEngine.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
 		List<MatchingEnginOutputMessageFlag> reports = result._1;
@@ -146,10 +146,10 @@ public class MatchingEngineTest {
 		PriorityQueue<ExecutingOrder> bidBook = _exchange.createBidBook();
 		{
 			CommonMessage.Side side = CommonMessage.Side.BID;
-			OriginalOrder o_100_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_120_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_100_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 100.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_120_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 120.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
 			bidBook.add(new ExecutingOrder(o_100_1mio));
 			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1));
@@ -160,11 +160,11 @@ public class MatchingEngineTest {
 		PriorityQueue<ExecutingOrder> askBook = _exchange.createAskBook();
 		{
 			CommonMessage.Side side = CommonMessage.Side.OFFER;
-			OriginalOrder o_140_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 140.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_150_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 150.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_170_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 170.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_140_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,140.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_150_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,150.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(),symbol, side,CommonMessage.OrderType.LIMIT, 160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_170_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, side, CommonMessage.OrderType.LIMIT,170.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
 			
 			askBook.add(new ExecutingOrder(o_140_1mio));

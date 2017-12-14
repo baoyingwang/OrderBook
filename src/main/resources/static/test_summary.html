@@ -1,11 +1,20 @@
-<html ng-app = "mainApp">
-   
-   <head>
-      <title>Angular JS Table</title>
+<!doctype html>
+<html lang="en" ng-app = "mainApp">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Graph</title>
        <!-- why not https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js?
        google is blocked by great wall
        -->
-       <script src = "/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+
+    <script src = "ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+
+    <link    href="c3/c3.min.0.4.14.css" rel="stylesheet">
+    <script type="text/javascript" src="c3/d3.v3.js"></script>
+    <script src = "c3/c3.min.0.4.14.js"></script>
+
+
       <style>
          table, th , td {
             border: 1px solid grey;
@@ -20,11 +29,21 @@
          table tr:nth-child(even) {
             background-color: #ffffff;
          }
+
+          #chart div {
+           display: inline-block;
+           background: #4285F4;
+           width: 20px;
+           margin-right: 3px;
+           }
       </style>
       
    </head>
    <body>
         <h2>Test Summary</h2>
+
+
+
     <div ng-controller = "order_book_table_USDJPY">
 
         <table>
@@ -48,10 +67,11 @@
             <table>
 
                 <tr>
-                    <td>time in epoc MS</td>
-                    <td>T1: recv, T2:put to engine - nano</td>
-                    <td>T1: put to engin, T2: match - nano </td>
-                    <td>T1: match, T2: consumed - nano</td>
+                    <td>recvTime</td>
+                    <td>put2InputQ</td>
+                    <td>pickFromInputQ</td>
+                    <td>match</td>
+                    <td>pickFromOutputQ</td>
                 </tr>
                 <tr ng-repeat = "one_record in test_summary.latency_data ">
                     <!--
@@ -62,6 +82,7 @@
                     <td align="right">{{ one_record[1] }}</td>
                     <td align="right">{{ one_record[2] }}</td>
                     <td align="right">{{ one_record[3] }}</td>
+                    <td align="right">{{ one_record[4] }}</td>
 
                 </tr>
             </table>
@@ -69,33 +90,71 @@
 
     </div>
 
+    <div id="chart"></div>
+    <p id="console_container"></p>
 
+        <script>
 
-      <script>
+            var chart = c3.generate({
+                data: {
+                    columns:  [['data1',1,2,3]  ]
+                }
+            });
+            chart.unload({
+				ids: ['data1']
+			});
 
-         var mainApp = angular.module("mainApp", []);
+            var mainApp = angular.module("mainApp", []);
 
-        mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
-            $http.get('/matching/get_test_summary').
-                then(function(response) {
-                    $scope.test_summary = response.data;
-                });
+            mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
+                $http.get('/matching/get_test_summary').
+                    then(function(response) {
+                        $scope.test_summary = response.data;
 
-            //https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
-            //it is not easy to filter map(but easy to filter a plain value - http://docs.angularjs.org/api/ng.filter:filter)
-            $scope.filterOutLatencyDataFromMap = function(items) {
-                var result = {};
-                angular.forEach(items, function(value, key) {
-                    if (key !== 'latency_data' ) {
-                        result[key] = value;
-                    }
-                });
-                return result;
-            }
+                        var myArray2 = new Array(response.data['latency_data'].length);
+                        //myArray2[0] = ['recvTime','put2InputQ','pickFromInputQ','match','pickFromOutputQ'];
+                        for(var i = 0; i < response.data['latency_data'].length; i++){	myArray2[i] = response.data['latency_data'][i].slice(0);}
+                        var columnLatencyData = myArray2[0].map((col, i) => myArray2.map(row => row[i]));
+                        columnLatencyData[1].unshift('put2InputQ');
+                            columnLatencyData[2].unshift('pickFromInputQ');
+                            columnLatencyData[3].unshift('match');
+                            columnLatencyData[4].unshift('pickFromOutputQ');
 
-        });
+                        addParagraph('console_container',myArray2.length);
+                        addParagraph('console_container',myArray2[0].length);
+                        chart.load({
+                            columns: [columnLatencyData[1],
+                            columnLatencyData[2],
+                            columnLatencyData[3],
+                            columnLatencyData[4]
+                            ]
+                        });
 
-      </script>
+                    });
+
+                //https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
+                //it is not easy to filter map(but easy to filter a plain value - http://docs.angularjs.org/api/ng.filter:filter)
+                $scope.filterOutLatencyDataFromMap = function(items) {
+                    var result = {};
+                    angular.forEach(items, function(value, key) {
+                        if (key !== 'latency_data' ) {
+                            result[key] = value;
+                        }
+                    });
+                    return result;
+                }
+
+            });
+
+    function addParagraph(containerName, text){
+
+	 	var container = document.getElementById(containerName);
+	 	var p = document.createElement('p');
+	 	p.innerHTML = text;
+	 	container.appendChild(p);
+
+    }
+        </script>
       
-   </body>
+    </body>
 </html>
