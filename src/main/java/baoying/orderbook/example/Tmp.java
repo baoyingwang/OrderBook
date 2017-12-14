@@ -17,7 +17,7 @@ public class Tmp {
 
     public static void main(String[] args) throws Exception{
         long[] data = new long[]{1,2,3};
-        System.out.println(String.format("%.2f", 1.1234567));
+        System.out.println(Util.toCsvString(data,1,data.length));
 
     }
 }

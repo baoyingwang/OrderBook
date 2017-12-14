@@ -72,24 +72,26 @@ public class MatchingEngine {
 		_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 		_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 
-		_matchingThread = new MatchingThread("matcing-thread-" + _symbol);
+		_matchingThread = new MatchingThread("matching-thread-" + _symbol);
 	}
 
 	// check matching result(ExecutionReport) from _processResult
 	public SingleSideExecutionReport addOrder(OriginalOrder order) {
 
-		if (!_symbol.equals(order._symbol)) {
-			// it should never reach here
-			// TODO log error, and throw exception
+		if (!_symbol.equals(order._symbol)) {	// it should never reach here
 			throw new RuntimeException("not the expected symbol, expect:"+_symbol+", by it is:"+order._symbol+", client_entity:"+order._clientEntityID+" client ord id:"+order._clientOrdID);
 		}
 
-        long nowInNano = System.nanoTime();
-        ExecutingOrder initialExecutingOrder = new ExecutingOrder(order, nowInNano);
+        final ExecutingOrder initialExecutingOrder;
+		if(order._clientEntityID.startsWith(LATENCY_ENTITY_PREFIX)){
+			initialExecutingOrder = new ExecutingOrder(order,System.nanoTime(), true);
+		}else {
+			initialExecutingOrder = new ExecutingOrder(order);
+		}
+
 		_inputInitialExecutingOrderORAggOrdBookRequests.add(initialExecutingOrder);
 
         return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-                nowInNano,
                 System.currentTimeMillis(),
                 order,
                 TradeMessage.SingleSideExecutionType.NEW,
@@ -113,7 +115,6 @@ public class MatchingEngine {
 		public void run() {
 			while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 				try {
-
 					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = _inputInitialExecutingOrderORAggOrdBookRequests
 					        .poll(5, TimeUnit.SECONDS);
 					if (originalOrderORAggBookRequest == null) {
@@ -121,8 +122,14 @@ public class MatchingEngine {
 					}
 
 					if (originalOrderORAggBookRequest instanceof ExecutingOrder) {
+
                         ExecutingOrder executingOrder = (ExecutingOrder) originalOrderORAggBookRequest;
+                        if(executingOrder._isLatencyTestOrder){
+                            executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder = System.nanoTime();
+                        }
+
 						processInputOrder(executingOrder);
+
 					} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
 						AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
 						AggregatedOrderBook aggOrderBook = buildAggregatedOrderBook(aggOrdBookRequest._depth);
@@ -134,7 +141,7 @@ public class MatchingEngine {
 
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
-					log.info("matching thread " + Thread.currentThread().getName() + " is interruped", e);
+					log.info("matching thread " + Thread.currentThread().getName() + " is interrupted", e);
 				}
 			}
 
@@ -165,13 +172,10 @@ public class MatchingEngine {
 			}
 		}
 
-		List<MatchingEnginOutputMessageFlag> executionReportsAsResult = new ArrayList<MatchingEnginOutputMessageFlag>();
-		List<OrderBookDelta> orderbookDeltasAsResult = new ArrayList<OrderBookDelta>();
+		Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
 
-        match(executingOrder, contraSideBook, sameSideBook, executionReportsAsResult, orderbookDeltasAsResult);
-
-		_outputQueueForExecRpt.addAll(executionReportsAsResult);
-		_outputQueueForAggBookAndBookDelta.addAll(orderbookDeltasAsResult);
+		_outputQueueForExecRpt.addAll(matchResult._1);
+		_outputQueueForAggBookAndBookDelta.addAll(matchResult._2);
 	}
 
 	/*-
@@ -179,9 +183,12 @@ public class MatchingEngine {
 	 * - TODO all clients could trade with each other. There is NO relationship/credit check. 
 	 * - not private, because of UT
 	 */
-	void match(ExecutingOrder executingOrder, PriorityQueue<ExecutingOrder> contraSideBook,
-	        PriorityQueue<ExecutingOrder> sameSideBook, List<MatchingEnginOutputMessageFlag> execReportsAsResult,
-	        List<OrderBookDelta> orderbookDeltasAsResult) {
+	Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> match(ExecutingOrder executingOrder,
+																			PriorityQueue<ExecutingOrder> contraSideBook,
+	        																PriorityQueue<ExecutingOrder> sameSideBook) {
+
+		List<MatchingEnginOutputMessageFlag> execReportsAsResult = new ArrayList<>();
+		List<OrderBookDelta> orderbookDeltasAsResult= new ArrayList<>();
 
 		boolean rejected = false;
 		while (true) {
@@ -220,7 +227,7 @@ public class MatchingEngine {
 
 			if (peekedContraBestPriceOrder._origOrder._clientEntityID
 			        .equals(executingOrder._origOrder._clientEntityID)) {
-				execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(),executingOrder._origOrder,
+				execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.currentTimeMillis(),executingOrder._origOrder,
 				        TradeMessage.SingleSideExecutionType.REJECTED, executingOrder._leavesQty,"Cannot trade with yourself"));
 				rejected = true;
 				break;
@@ -234,9 +241,33 @@ public class MatchingEngine {
 			peekedContraBestPriceOrder._leavesQty = peekedContraBestPriceOrder._leavesQty - lastQty;
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
-			execReportsAsResult.add(new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(), lastPrice, lastQty,
-			        peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,peekedContraBestPriceOrder._originOrdEnteringEngineSysNanoTime,
-			        executingOrder._origOrder, executingOrder._leavesQty,executingOrder._originOrdEnteringEngineSysNanoTime));
+			final MatchedExecutionReport executionReport ;
+
+			if(executingOrder._isLatencyTestOrder){
+                //only track taker side latency, since maker maybe has sit in orderbook long time
+
+				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
+						System.currentTimeMillis(),
+						lastPrice,
+						lastQty,
+
+						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
+						executingOrder._origOrder, executingOrder._leavesQty,
+
+						executingOrder._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder,
+                        executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder,
+                        System.nanoTime());
+			}else{
+				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
+						System.currentTimeMillis(),
+
+						lastPrice,
+						lastQty,
+
+						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
+						executingOrder._origOrder, executingOrder._leavesQty);
+			}
+			execReportsAsResult.add(executionReport);
 			orderbookDeltasAsResult.add(
 			        new OrderBookDelta(_symbol, peekedContraBestPriceOrder._origOrder._side, lastPrice, 0 - lastQty));
 
@@ -253,7 +284,7 @@ public class MatchingEngine {
 		if (!rejected  && executingOrder._leavesQty > 0) {
                 switch(executingOrder._origOrder._type) {
                     case MARKET :
-                        execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.nanoTime(), System.currentTimeMillis(),executingOrder._origOrder,
+                        execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),  System.currentTimeMillis(),executingOrder._origOrder,
                             TradeMessage.SingleSideExecutionType.CANCELLED, executingOrder._leavesQty,"No available liquidity for this market order"));
                         break;
                     case LIMIT :
@@ -265,8 +296,21 @@ public class MatchingEngine {
                     default:
             }
 		}
+
+		return new Tuple(execReportsAsResult,orderbookDeltasAsResult);
 	}
 
+	//https://dzone.com/articles/whats-wrong-java-8-part-v
+	//just internal use, don't public since it is NOT general for others.
+	static class Tuple<T, U> {
+		public final T _1;
+		public final U _2;
+		public Tuple(T arg1, U arg2) {
+			super();
+			this._1 = arg1;
+			this._2 = arg2;
+		}
+	}
 	AggregatedOrderBook buildAggregatedOrderBook(int depth) {
 
 		TreeMap<Double, Integer> bidBookMap = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
@@ -353,12 +397,20 @@ public class MatchingEngine {
 
 		final OriginalOrder _origOrder;
 
-        final long _originOrdEnteringEngineSysNanoTime;
+        final boolean _isLatencyTestOrder;
+        final long _sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder;
+        long _sysNanoTimeOfPickingFromInputQ4LatencyTestOrder;
 
-		ExecutingOrder(OriginalOrder originalOrder, long enteringEngineSysNanoTime) {
+		ExecutingOrder(OriginalOrder originalOrder) {
+			this(originalOrder, -1, false);
+		}
+
+		ExecutingOrder(OriginalOrder originalOrder, long nanoTime, boolean isLatencyTestOrder) {
 			_origOrder = originalOrder;
-            _originOrdEnteringEngineSysNanoTime = enteringEngineSysNanoTime;
 			_leavesQty = originalOrder._qty;
+
+            _isLatencyTestOrder = isLatencyTestOrder;
+			_sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder = nanoTime;
 		}
 
 	}
@@ -384,7 +436,7 @@ public class MatchingEngine {
 				// note: not required, it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._originOrdEnteringEngineSysNanoTime - o2._originOrdEnteringEngineSysNanoTime);
+					return (int) (o1._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder - o2._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
@@ -406,7 +458,7 @@ public class MatchingEngine {
 				// TODO it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._originOrdEnteringEngineSysNanoTime - o2._originOrdEnteringEngineSysNanoTime);
+					return (int) (o1._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder - o2._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {

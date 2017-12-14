@@ -58,16 +58,14 @@ public class TradeMessage {
     public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _msgID;
-		public final long _msgSysNanoTime;
 		public final long _msgEpochMS;
         public final SingleSideExecutionType _type;
         public final OriginalOrder _originOrder;
         public final int _leavesQty;
         public final String _description;
 
-        public SingleSideExecutionReport(long msgID,long msgSysNanoTime,long msgEpochMS, OriginalOrder originOrder, SingleSideExecutionType type, int leavesQty, String description){
+        public SingleSideExecutionReport(long msgID,long msgEpochMS, OriginalOrder originOrder, SingleSideExecutionType type, int leavesQty, String description){
 			_msgID = msgID;
-			_msgSysNanoTime = msgSysNanoTime;
 			_msgEpochMS = msgEpochMS;
 			_originOrder = originOrder;
 			_type = type;
@@ -79,8 +77,6 @@ public class TradeMessage {
     public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _matchID;
-
-		public final long _matchingSysNanoTime;
 		public final long _matchingEpochMS;
 
         public final double _lastPrice;
@@ -92,18 +88,36 @@ public class TradeMessage {
         public final int _makerLeavesQty;
         public final int _takerLeavesQty;
 
-        public final long _makerOriginOrdEnteringEngineSysNanoTime;
-        public final long _takerOriginOrdEnteringEngineSysNanoTime;
+		public final long _matchingSysNanoTime4LatencyTestOrder;
+        public final long _taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder;
+        public final long _taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder;
 
-
-		public MatchedExecutionReport(long matchID,
-                                      long matchingSysNanoTime,long matchingEpochMS,
+        public MatchedExecutionReport(long matchID,
+                                      long matchingEpochMS,
                                       double lastPrice, int lastQty,
-                                      OriginalOrder makerOriginOrder, int makerLeavesQty, long makerOriginOrdEnteringEngineSysNanoTime,
-                                      OriginalOrder takerOriginOrder, int takerLeavesQty, long takerOriginOrdEnteringEngineSysNanoTime) {
+                                      OriginalOrder makerOriginOrder, int makerLeavesQty,
+                                      OriginalOrder takerOriginOrder, int takerLeavesQty){
+            this(matchID,
+             matchingEpochMS,
+             lastPrice,  lastQty,
+             makerOriginOrder,  makerLeavesQty,
+             takerOriginOrder,  takerLeavesQty,
+                    -1,-1,-1);
+        }
+        public MatchedExecutionReport(long matchID,
+                                      long matchingEpochMS,
+                                      double lastPrice, int lastQty,
+
+                                      OriginalOrder makerOriginOrder, int makerLeavesQty,
+                                      OriginalOrder takerOriginOrder, int takerLeavesQty,
+
+                                      long taker_originOrdEnteringEngineSysNanoTime,
+                                      long taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder,
+                                      long matchingSysNanoTime
+                                      ) {
 
 			_matchID = matchID;
-			_matchingSysNanoTime = matchingSysNanoTime;
+
 			_matchingEpochMS = matchingEpochMS;
 
 			_lastPrice = lastPrice;
@@ -113,10 +127,11 @@ public class TradeMessage {
 			_takerOriginOrder = takerOriginOrder;
 			_makerLeavesQty = makerLeavesQty;
 			_takerLeavesQty = takerLeavesQty;
-            _makerOriginOrdEnteringEngineSysNanoTime=makerOriginOrdEnteringEngineSysNanoTime;
-            _takerOriginOrdEnteringEngineSysNanoTime=takerOriginOrdEnteringEngineSysNanoTime;
-		}
 
+            _taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder =taker_originOrdEnteringEngineSysNanoTime;
+            _taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder = taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder;
+            _matchingSysNanoTime4LatencyTestOrder = matchingSysNanoTime;
+		}
 	}
 
 }

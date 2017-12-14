@@ -27,10 +27,10 @@ public class MatchingEnginePerfTest {
 			OriginalOrder b_120_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, bid, 120.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder b_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, bid, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder b_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, bid, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-			bidBook.add(new ExecutingOrder(b_100_1mio, System.nanoTime()));
-			bidBook.add(new ExecutingOrder(b_130_1mio_sysT1, System.nanoTime()));
-			bidBook.add(new ExecutingOrder(b_120_1mio, System.nanoTime()));
-			bidBook.add(new ExecutingOrder(b_130_1mio_sysT2, System.nanoTime()));
+			bidBook.add(new ExecutingOrder(b_100_1mio));
+			bidBook.add(new ExecutingOrder(b_130_1mio_sysT1));
+			bidBook.add(new ExecutingOrder(b_120_1mio));
+			bidBook.add(new ExecutingOrder(b_130_1mio_sysT2));
 		}
 
 		return bidBook;
@@ -47,10 +47,10 @@ public class MatchingEnginePerfTest {
 			OriginalOrder o_150_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, offer, 150.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, offer, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(), symbol, offer, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-			offerBook.add(new ExecutingOrder(o_140_1mio, System.nanoTime()));
-			offerBook.add(new ExecutingOrder(o_150_1mio, System.nanoTime()));
-			offerBook.add(new ExecutingOrder(o_160_1mio_sysT1, System.nanoTime()));
-			offerBook.add(new ExecutingOrder(o_160_1mio_sysT2, System.nanoTime()));
+			offerBook.add(new ExecutingOrder(o_140_1mio));
+			offerBook.add(new ExecutingOrder(o_150_1mio));
+			offerBook.add(new ExecutingOrder(o_160_1mio_sysT1));
+			offerBook.add(new ExecutingOrder(o_160_1mio_sysT2));
 		}
 
 		return offerBook;

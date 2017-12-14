@@ -34,10 +34,10 @@ public class MatchingEngineTest {
 		OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 		OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 		
-		book.add(new ExecutingOrder(o_100_1mio,System.nanoTime()));
-		book.add(new ExecutingOrder(o_130_1mio_sysT1,System.nanoTime()));
-		book.add(new ExecutingOrder(o_120_1mio,System.nanoTime()));
-		book.add(new ExecutingOrder(o_130_1mio_sysT2,System.nanoTime()));
+		book.add(new ExecutingOrder(o_100_1mio));
+		book.add(new ExecutingOrder(o_130_1mio_sysT1));
+		book.add(new ExecutingOrder(o_120_1mio));
+		book.add(new ExecutingOrder(o_130_1mio_sysT2));
 		
 		//TODO add assert, rather than view by eyes!
 //		for(ExecutingOrder o : bidBook){
@@ -62,11 +62,11 @@ public class MatchingEngineTest {
 		OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 		
 		PriorityQueue<ExecutingOrder> book = _exchange.createAskBook();
-		book.add(new ExecutingOrder(o_140_1mio,System.nanoTime()));
-		book.add(new ExecutingOrder(o_160_1mio_sysT1,System.nanoTime()));
-		book.add(new ExecutingOrder(o_150_1mio,System.nanoTime()));
-		book.add(new ExecutingOrder(o_160_1mio_sysT1,System.nanoTime()));
-		book.add(new ExecutingOrder(o_160_1mio_sysT2,System.nanoTime()));
+		book.add(new ExecutingOrder(o_140_1mio));
+		book.add(new ExecutingOrder(o_160_1mio_sysT1));
+		book.add(new ExecutingOrder(o_150_1mio));
+		book.add(new ExecutingOrder(o_160_1mio_sysT1));
+		book.add(new ExecutingOrder(o_160_1mio_sysT2));
 		
 		while( !book.isEmpty() ){
 			ExecutingOrder o = book.poll();
@@ -93,10 +93,10 @@ public class MatchingEngineTest {
 			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,"orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
-			bidBook.add(new ExecutingOrder(o_100_1mio,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_120_1mio,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_130_1mio_sysT2,System.nanoTime()));
+			bidBook.add(new ExecutingOrder(o_100_1mio));
+			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1));
+			bidBook.add(new ExecutingOrder(o_120_1mio));
+			bidBook.add(new ExecutingOrder(o_130_1mio_sysT2));
 		}
 		
 		PriorityQueue<ExecutingOrder> askBook = _exchange.createAskBook();
@@ -108,16 +108,17 @@ public class MatchingEngineTest {
 			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID2");
 			
 			
-			askBook.add(new ExecutingOrder(o_140_1mio,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_160_1mio_sysT1,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_150_1mio,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_160_1mio_sysT2,System.nanoTime()));
+			askBook.add(new ExecutingOrder(o_140_1mio));
+			askBook.add(new ExecutingOrder(o_160_1mio_sysT1));
+			askBook.add(new ExecutingOrder(o_150_1mio));
+			askBook.add(new ExecutingOrder(o_160_1mio_sysT2));
 		}
 		
 		OriginalOrder bid_145_1point5Mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, CommonMessage.Side.BID, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
-		List<MatchingEnginOutputMessageFlag> reports = new ArrayList<MatchingEnginOutputMessageFlag>();
-		List<OrderBookDelta> orderbookDeltas = new ArrayList<OrderBookDelta>();
-		this._exchange.match(new ExecutingOrder(bid_145_1point5Mio,System.nanoTime()), askBook, bidBook, reports,orderbookDeltas);
+
+		MatchingEngine.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
+		List<MatchingEnginOutputMessageFlag> reports = result._1;
+		List<OrderBookDelta> orderbookDeltas = result._2;
 		for(MatchingEnginOutputMessageFlag r : reports){
 			
 			MatchedExecutionReport er = (MatchedExecutionReport)r;
@@ -150,10 +151,10 @@ public class MatchingEngineTest {
 			OriginalOrder o_130_1mio_sysT1 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_130_1mio_sysT2 = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 130.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
-			bidBook.add(new ExecutingOrder(o_100_1mio,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_120_1mio,System.nanoTime()));
-			bidBook.add(new ExecutingOrder(o_130_1mio_sysT2,System.nanoTime()));
+			bidBook.add(new ExecutingOrder(o_100_1mio));
+			bidBook.add(new ExecutingOrder(o_130_1mio_sysT1));
+			bidBook.add(new ExecutingOrder(o_120_1mio));
+			bidBook.add(new ExecutingOrder(o_130_1mio_sysT2));
 		}
 		
 		PriorityQueue<ExecutingOrder> askBook = _exchange.createAskBook();
@@ -166,11 +167,11 @@ public class MatchingEngineTest {
 			OriginalOrder o_170_1mio = new OriginalOrder(System.nanoTime(), System.currentTimeMillis(),symbol, side, 170.1, 1000_000,  "orderID", "clientOrdID", "clientEntityID");
 			
 			
-			askBook.add(new ExecutingOrder(o_140_1mio,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_160_1mio_sysT1,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_150_1mio,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_160_1mio_sysT2,System.nanoTime()));
-			askBook.add(new ExecutingOrder(o_170_1mio,System.nanoTime()));
+			askBook.add(new ExecutingOrder(o_140_1mio));
+			askBook.add(new ExecutingOrder(o_160_1mio_sysT1));
+			askBook.add(new ExecutingOrder(o_150_1mio));
+			askBook.add(new ExecutingOrder(o_160_1mio_sysT2));
+			askBook.add(new ExecutingOrder(o_170_1mio));
 		}
 		
 		TreeMap<Double, Integer> bidBookSnapshot = _exchange.buildOneSideAggOrdBook(3, Side.BID, bidBook);

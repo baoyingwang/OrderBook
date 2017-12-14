@@ -4,9 +4,15 @@ public class Util {
 
     static String toCsvString(long[] array){
 
+        return toCsvString(array, 0, array.length);
+
+    }
+
+    static String toCsvString(long[] array, int start, int endExclusive){
+
         StringBuilder csv = new StringBuilder();
-        for(long v : array){
-            csv.append(v).append(",");
+        for(int i = start; i<endExclusive; i++){
+            csv.append(array[i]).append(",");
         }
 
         if(csv.charAt(csv.length()-1) == ','){

@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -93,10 +92,10 @@ public class MatchingEngineWebWrapper {
         testTimeDataQueue.clear();
     }
 
-    DateTimeFormatter formatter =
-            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.S'Z'").withZone( ZoneId.of("UTC") );
+    DateTimeFormatter utcFormatter =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.SSS'Z'").withZone( ZoneId.of("UTC") );
     @RequestMapping("/get_test_summary")
-    public String endTest(){
+    public String endTest() throws Exception{
 
         long allOrderCount = _placedOrderCounter.get();
         if(_firstOriginalOrderSinceTest == null || allOrderCount == 0){
@@ -137,30 +136,26 @@ public class MatchingEngineWebWrapper {
         data.put("rate_per_second", String.format("%.2f",ratePerSecond));
         data.put("un-purged_latency_data_count", latencyData.size()); //latencyData maybe has been purged to file periodically
 
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(data);
-
         //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
-        Path latencyDataFile = Paths.get("log/LatencyData_OverallStart_"+formatter.format(instantStart)+".csv");
-        Path latencySummaryFile = Paths.get("log/LatencySummary_OverallStart_"+formatter.format(instantStart)+".json.txt");
+        Path latencyDataFile = Paths.get("log/LatencyData_OverallStart_"+ utcFormatter.format(instantStart)+".csv");
+        Path latencySummaryFile = Paths.get("log/LatencySummary_OverallStart_"+ utcFormatter.format(instantStart)+".json.txt");
         long latency_data_count = -1;
         //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
         List<String> latencyDataCSVLines = latencyData.stream()
-                .map( it -> Util.toCsvString(it) ).collect(Collectors.toList());
-        try {
-            if(!Files.exists(latencyDataFile)) {
-                Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
-                Files.write(latencyDataFile, ("recvEpochMS,put2ReqQ,pickANDmatch,addANDpickOutput"+"\n").getBytes(), APPEND, CREATE);
-            }
-            latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
-            Files.write(latencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
-            Files.write( latencySummaryFile, (jsonString+"\n").getBytes(),  APPEND, CREATE);
-        }catch (Exception e){
-            log.error("exception while writing latency data to "+latencyDataFile.toString(), e);
+                .map( it -> utcFormatter.format(Instant.ofEpochMilli(it[0])) +","+ Util.toCsvString(it,1,it.length) ).collect(Collectors.toList());
+
+        if(!Files.exists(latencyDataFile)) {
+            Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
+            Files.write(latencyDataFile, ("recvTime,put2InputQ,pickFromInputQ,match,pickFromOutputQ"+"\n").getBytes(), APPEND, CREATE);
         }
+        Files.write(latencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
+
+        latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
         data.put("latency_data_count", latency_data_count);
 
-
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(data);
+        Files.write( latencySummaryFile, (jsonString+"\n").getBytes(),  APPEND, CREATE);
 
         return jsonString;
     }
@@ -257,6 +252,10 @@ public class MatchingEngineWebWrapper {
         return jsonString;
     }
 
+    static enum MAKER_TAKER{
+        MAKER, TAKER;
+    }
+
     class EngineExecConsumingThread extends Thread {
 
         private final BlockingQueue<MatchingEngine.MatchingEnginOutputMessageFlag> _engineOutputQueueForExecRpt;
@@ -282,10 +281,24 @@ public class MatchingEngineWebWrapper {
 
                         //this is the only thread to modify the executionReportsByOrderID
                         if(matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-                            processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.MAKER);
+                            addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
                         }
                         if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-                            processOneSideOfMatchedER(matchedExecutionReport, MAKER_TAKER.TAKER);
+                            long outputConsumingNanoTime = System.nanoTime();
+                            addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
+
+                            testTimeDataQueue.add(new long[]{
+                                    matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
+                                    matchedExecutionReport._taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder
+                                            - matchedExecutionReport._takerOriginOrder._recvFromClientSysNanoTime,
+
+                                    matchedExecutionReport._taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder
+                                            - matchedExecutionReport._taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder,
+
+                                    matchedExecutionReport._matchingSysNanoTime4LatencyTestOrder
+                                            - matchedExecutionReport._taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder,
+
+                                    outputConsumingNanoTime - matchedExecutionReport._matchingSysNanoTime4LatencyTestOrder});
                         }
                     }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
 
@@ -300,7 +313,6 @@ public class MatchingEngineWebWrapper {
                             executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
                         }
                     }else{
-
                         log.error("unknown type: {}", matchER_or_singleSideER);
                     }
 
@@ -309,45 +321,65 @@ public class MatchingEngineWebWrapper {
                     log.info("matching thread " + Thread.currentThread().getName() + " is interruped", e);
                 }
             }
+
             _stopFlag = true;
         }
 
-        private void processOneSideOfMatchedER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker){
+        private void addERStore(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker, TradeMessage.OriginalOrder originalOrder){
 
             long outputConsumingNanoTime = System.nanoTime();
-            final long originOrdEnteringEngineSysNanoTime;
-            final long originOrdEnteringEngineEpochMS;
+            List<Map<String, String>> reportsBeforeUpdate = executionReportsByOrderID.get(originalOrder._orderID);
+            List<Map<String, String>> reportsNew = reportsBeforeUpdate==null?new ArrayList<>():new ArrayList<>(reportsBeforeUpdate);
+            reportsNew.add(buildExternalERfromInternalER(matchedExecutionReport, maker_taker));
+            //replace with a new List, rather than update the exists List, to avoid concurrent modification issue.WHY not use copy on write?
+            executionReportsByOrderID.put(originalOrder._orderID, reportsNew);
+        }
+
+        private Map<String, String> buildExternalERfromInternalER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker ){
+
+            Map<String, String> erMap = new HashMap<>();
+            erMap.put("lastPx", String.valueOf(matchedExecutionReport._lastPrice));
+            erMap.put("lastQty", String.valueOf(matchedExecutionReport._lastQty));
+
+            final int leavesQty ;
+            final String executionID ;
             final TradeMessage.OriginalOrder originalOrder ;
+            final TradeMessage.OriginalOrder contraOriginalOrder ;
             switch(maker_taker){
-                case MAKER :
+                case MAKER : leavesQty = matchedExecutionReport._makerLeavesQty;
+                    executionID = matchedExecutionReport._matchID + "_M";
                     originalOrder = matchedExecutionReport._makerOriginOrder;
-                    originOrdEnteringEngineSysNanoTime = matchedExecutionReport._makerOriginOrdEnteringEngineSysNanoTime;
+                    contraOriginalOrder= matchedExecutionReport._takerOriginOrder;
                     break;
-                case TAKER :
+                case TAKER : leavesQty = matchedExecutionReport._takerLeavesQty;
                     originalOrder = matchedExecutionReport._takerOriginOrder;
-                    originOrdEnteringEngineSysNanoTime = matchedExecutionReport._takerOriginOrdEnteringEngineSysNanoTime;
+                    executionID = matchedExecutionReport._matchID + "_T";
+                    contraOriginalOrder= matchedExecutionReport._makerOriginOrder;
                     break;
                 default :
                     throw new RuntimeException("unknown side : "+maker_taker);
             }
-            List<Map<String, String>> makerOriginalReport = executionReportsByOrderID.get(originalOrder._orderID);
-            List<Map<String, String>> makerOriginalReportNew = makerOriginalReport==null?new ArrayList<>():new ArrayList<>(makerOriginalReport);
-            makerOriginalReportNew.add(buildExternalERfromInternalER(matchedExecutionReport, maker_taker));
-            //replace with a new List, rather than update the exists List, to avoid concurrent modification issue.WHY not use copy on write?
-            executionReportsByOrderID.put(originalOrder._orderID, makerOriginalReportNew);
 
-//           testTimeDataQueue.add(new long[]{
-//                   originOrdEnteringEngineEpochMS,
-//                   0,
-//                   originOrdEnteringEngineSysNanoTime - originalOrder._recvFromClientSysNanoTime,
-//                    matchedExecutionReport._matchingSysNanoTime - originalOrder._recvFromClientSysNanoTime,
-//                    outputConsumingNanoTime - originalOrder._recvFromClientSysNanoTime});
+            erMap.put("cumQty", String.valueOf(originalOrder._qty - leavesQty));
+            erMap.put("execType", "Trade"); //150 - F - http://www.onixs.biz/fix-dictionary/4.4/tagNum_150.html
+            erMap.put("ordSatus", leavesQty==0?"Filled":"Partially filled");//39 - 1 - http://www.onixs.biz/fix-dictionary/4.4/tagNum_39.html
 
-            testTimeDataQueue.add(new long[]{
-                    originalOrder._recvFromClientEpochMS,
-                    originOrdEnteringEngineSysNanoTime - originalOrder._recvFromClientSysNanoTime,
-                    matchedExecutionReport._matchingSysNanoTime - originOrdEnteringEngineSysNanoTime,
-                    outputConsumingNanoTime - matchedExecutionReport._matchingSysNanoTime});
+            return erMap;
+        }
+
+
+        private Map<String, String> buildExternalERfromInternalER(TradeMessage.SingleSideExecutionReport singleSideExecutionReport){
+
+            Map<String, String> erMap = new HashMap<>();
+            final TradeMessage.OriginalOrder originalOrder = singleSideExecutionReport._originOrder;
+            erMap.put("leavesQty", String.valueOf(singleSideExecutionReport._leavesQty));
+            erMap.put("cumQty",singleSideExecutionReport._msgID + "_S");
+            erMap.put("cumQty", String.valueOf(originalOrder._qty - singleSideExecutionReport._leavesQty));
+            erMap.put("execType", singleSideExecutionReport._type.toString());
+            //TODO maybe this order status is NOT good/correct
+            erMap.put("ordSatus", singleSideExecutionReport._type.toString());
+
+            return erMap;
         }
 
         public void stopIt() {
@@ -438,57 +470,6 @@ public class MatchingEngineWebWrapper {
         public void stopIt() {
             this._stopFlag = true;
         }
-    }
-
-    enum MAKER_TAKER{
-        MAKER, TAKER;
-    }
-
-    private Map<String, String> buildExternalERfromInternalER(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker ){
-
-        Map<String, String> erMap = new HashMap<>();
-        erMap.put("lastPx", String.valueOf(matchedExecutionReport._lastPrice));
-        erMap.put("lastQty", String.valueOf(matchedExecutionReport._lastQty));
-
-        final int leavesQty ;
-        final String executionID ;
-        final TradeMessage.OriginalOrder originalOrder ;
-        final TradeMessage.OriginalOrder contraOriginalOrder ;
-        switch(maker_taker){
-            case MAKER : leavesQty = matchedExecutionReport._makerLeavesQty;
-                executionID = matchedExecutionReport._matchID + "_M";
-                originalOrder = matchedExecutionReport._makerOriginOrder;
-                contraOriginalOrder= matchedExecutionReport._takerOriginOrder;
-                break;
-            case TAKER : leavesQty = matchedExecutionReport._takerLeavesQty;
-                originalOrder = matchedExecutionReport._takerOriginOrder;
-                executionID = matchedExecutionReport._matchID + "_T";
-                contraOriginalOrder= matchedExecutionReport._makerOriginOrder;
-                break;
-            default :
-                throw new RuntimeException("unknown side : "+maker_taker);
-        }
-
-        erMap.put("cumQty", String.valueOf(originalOrder._qty - leavesQty));
-        erMap.put("execType", "Trade"); //150 - F - http://www.onixs.biz/fix-dictionary/4.4/tagNum_150.html
-        erMap.put("ordSatus", leavesQty==0?"Filled":"Partially filled");//39 - 1 - http://www.onixs.biz/fix-dictionary/4.4/tagNum_39.html
-
-        return erMap;
-    }
-
-
-     private Map<String, String> buildExternalERfromInternalER(TradeMessage.SingleSideExecutionReport singleSideExecutionReport){
-
-        Map<String, String> erMap = new HashMap<>();
-        final TradeMessage.OriginalOrder originalOrder = singleSideExecutionReport._originOrder;
-        erMap.put("leavesQty", String.valueOf(singleSideExecutionReport._leavesQty));
-        erMap.put("cumQty",singleSideExecutionReport._msgID + "_S");
-        erMap.put("cumQty", String.valueOf(originalOrder._qty - singleSideExecutionReport._leavesQty));
-        erMap.put("execType", singleSideExecutionReport._type.toString());
-        //TODO maybe this order status is NOT good/correct
-        erMap.put("ordSatus", singleSideExecutionReport._type.toString());
-
-        return erMap;
     }
 
     public static void main(String[] args) {
