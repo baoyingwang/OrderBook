@@ -92,71 +92,89 @@ public class MatchingEngineWebWrapper {
         testTimeDataQueue.clear();
     }
 
-    DateTimeFormatter utcFormatter =
+    DateTimeFormatter finalNameFormatter =
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.SSS'Z'").withZone( ZoneId.of("UTC") );
     @RequestMapping("/get_test_summary")
-    public String endTest() throws Exception{
+    public String endTest(){
 
-        long allOrderCount = _placedOrderCounter.get();
-        if(_firstOriginalOrderSinceTest == null || allOrderCount == 0){
-            return "ERROR - no order during the test";
-        }
-        long startTimeInNano = _firstOriginalOrderSinceTest._recvFromClientSysNanoTime;
-        long startTimeInEpochMS = _firstOriginalOrderSinceTest._recvFromClientEpochMS;
-        Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
+        String jsonString ="";
+        try {
+            log.info("get_test_summary enter");
+            Map<String, Object> data = new HashMap<>();
 
-        final long endTimeInNano;
-        final Instant instantEnd ;
-        {
-            final long endTimeInEpochMS;
-            if(_lastOriginalOrderSinceTest == null){
-                endTimeInNano = System.nanoTime();
-                endTimeInEpochMS = System.currentTimeMillis();
-            }else {
-                endTimeInNano=_lastOriginalOrderSinceTest._recvFromClientSysNanoTime;
-                endTimeInEpochMS = _lastOriginalOrderSinceTest._recvFromClientEpochMS;
+            long allOrderCount = _placedOrderCounter.get();
+            data.put("order_count", allOrderCount);
+
+
+            if (_firstOriginalOrderSinceTest == null || allOrderCount == 0) {
+                log.error("get_test_summary - ERROR - no order during the test");
+                return "ERROR - no order during the test";
             }
-            instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
+            long startTimeInEpochMS = _firstOriginalOrderSinceTest._recvFromClientEpochMS;
+            Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
+            data.put("start_time", instantStart.toString());
+            log.info("get_test_summary - start_time");
+
+            final Instant instantEnd;
+            final long endTimeInEpochMS;
+            {
+                if (_lastOriginalOrderSinceTest == null) {
+                    return "ERROR - get_test_summary - no summary since only single order for now";
+                }
+                endTimeInEpochMS = _lastOriginalOrderSinceTest._recvFromClientEpochMS;
+                instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
+            }
+            data.put("end_time", instantEnd.toString());
+            log.info("get_test_summary - end_time");
+
+            long durationInSecond = (endTimeInEpochMS - startTimeInEpochMS) / 1000; //TODO use Instant diff
+            if (durationInSecond < 1) {
+                log.error("get_test_summary - ERROR - not proceed calculation for test within 1 second");
+                return "ERROR - not proceed calculation for test within 1 second";
+            }
+            data.put("duration_in_second", durationInSecond);
+            log.info("get_test_summary - duration_in_second");
+
+            final double ratePerSecond = allOrderCount * 1.0 / durationInSecond;
+            data.put("rate_per_second", String.format("%.2f", ratePerSecond));
+
+            final List<long[]> deltaLatencyData = new ArrayList<>();
+            testTimeDataQueue.drainTo(deltaLatencyData);
+            data.put("latency_data", deltaLatencyData);
+            data.put("un-purged_latency_data_count", deltaLatencyData.size()); //latencyData maybe has been purged to file periodically
+            log.info("get_test_summary - latency_data");
+
+            //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
+            Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_OverallStart_" + finalNameFormatter.format(instantStart) + ".csv");
+            //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
+            List<String> latencyDataCSVLines = deltaLatencyData.stream()
+                    .map(it -> Instant.ofEpochMilli(it[0]) + "," + Util.toCsvString(it, 1, it.length)).collect(Collectors.toList());
+            if (!Files.exists(outputAppendingLatencyDataFile)) {
+                Files.createFile(outputAppendingLatencyDataFile); //need create in advance because the following check line count requires it.
+                Files.write(outputAppendingLatencyDataFile, ("recvTime,put2InputQ,pickFromInputQ,match,pickFromOutputQ" + "\n").getBytes(), APPEND, CREATE);
+            }
+            Files.write(outputAppendingLatencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
+            log.info("get_test_summary - outputAppendingLatencyDataFile");
+
+            final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
+            data.put("latency_data_count", latency_data_count_all);
+
+            //the last line is the latest information
+            Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_OverallStart_" + finalNameFormatter.format(instantStart) + ".json.txt");
+            Gson gson = new GsonBuilder().create();
+            jsonString = gson.toJson(data);
+            Files.write(outputAppendingLatencySummaryFile, (jsonString + "\n").getBytes(), APPEND, CREATE);
+
+
+            log.info("get_test_summary json generated");
+
+            //bad performance to process the same lines many times
+            GCLogUtil.main(new String[]{"log/GC.txt", "log/GC.summary.csv"});
+
+            log.info("get_test_summary end");
+        }catch(Exception e){
+            log.error("exception during get_test_summary", e);
         }
-        long durationInSecond = (endTimeInNano - startTimeInNano)/1000_000_000;
-        if(durationInSecond < 1){
-            return "ERROR - not proceed calculation for test within 1 second";
-        }
-
-        log.info("temp: testTimeDataQueue.size() : {}", testTimeDataQueue.size());
-        List<long[]> latencyData = new ArrayList<>();
-        testTimeDataQueue.drainTo(latencyData);
-
-        double ratePerSecond = allOrderCount*1.0/durationInSecond;
-        Map<String, Object> data = new HashMap<>();
-        data.put("duration_in_second",durationInSecond);
-        data.put("start_time",instantStart.toString());
-        data.put("end_time",instantEnd.toString());
-        data.put("order_count",allOrderCount);
-        data.put("rate_per_second", String.format("%.2f",ratePerSecond));
-        data.put("un-purged_latency_data_count", latencyData.size()); //latencyData maybe has been purged to file periodically
-
-        //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
-        Path latencyDataFile = Paths.get("log/LatencyData_OverallStart_"+ utcFormatter.format(instantStart)+".csv");
-        Path latencySummaryFile = Paths.get("log/LatencySummary_OverallStart_"+ utcFormatter.format(instantStart)+".json.txt");
-        long latency_data_count = -1;
-        //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
-        List<String> latencyDataCSVLines = latencyData.stream()
-                .map( it -> utcFormatter.format(Instant.ofEpochMilli(it[0])) +","+ Util.toCsvString(it,1,it.length) ).collect(Collectors.toList());
-
-        if(!Files.exists(latencyDataFile)) {
-            Files.createFile(latencyDataFile); //need create in advance because the following check line count requires it.
-            Files.write(latencyDataFile, ("recvTime,put2InputQ,pickFromInputQ,match,pickFromOutputQ"+"\n").getBytes(), APPEND, CREATE);
-        }
-        Files.write(latencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
-
-        latency_data_count = java.nio.file.Files.lines(latencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
-        data.put("latency_data_count", latency_data_count);
-        data.put("latency_data", latencyData);
-
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(data);
-        Files.write( latencySummaryFile, (jsonString+"\n").getBytes(),  APPEND, CREATE);
 
         return jsonString;
     }
@@ -215,8 +233,6 @@ public class MatchingEngineWebWrapper {
         }
         MatchingEngine engine = getMatchingEngine(originalOrder._symbol);
         if(engine != null) {
-
-
             TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
 
             long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();

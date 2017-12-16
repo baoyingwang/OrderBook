@@ -11,13 +11,12 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Tmp {
 
     public static void main(String[] args) throws Exception{
-        long[] data = new long[]{1,2,3};
-        System.out.println(Util.toCsvString(data,1,data.length));
 
     }
 }
