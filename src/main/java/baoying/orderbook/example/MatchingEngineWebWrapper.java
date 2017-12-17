@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -140,8 +142,8 @@ public class MatchingEngineWebWrapper {
 
             final List<long[]> deltaLatencyData = new ArrayList<>();
             testTimeDataQueue.drainTo(deltaLatencyData);
-            data.put("latency_data", deltaLatencyData);
-            data.put("un-purged_latency_data_count", deltaLatencyData.size()); //latencyData maybe has been purged to file periodically
+            //data.put("latency_data", deltaLatencyData);
+            //data.put("un-purged_latency_data_count", deltaLatencyData.size()); //latencyData maybe has been purged to file periodically
             log.info("get_test_summary - latency_data");
 
             //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
@@ -158,6 +160,21 @@ public class MatchingEngineWebWrapper {
 
             final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
             data.put("latency_data_count", latency_data_count_all);
+
+            List<String[]> tailResponseLatencyData = new ArrayList<>();
+            AtomicLong latencyDataCounter = new AtomicLong(0);
+            long maxNumberOfResponseLatencyData = 400;
+            long startIndexOfReponseLatencyData = latency_data_count_all>400? latency_data_count_all-400 : 0;
+            //TODO performance improvement - read twice(here) above get latency_data_count_all
+            java.nio.file.Files.lines(outputAppendingLatencyDataFile).forEach(line ->{
+
+                latencyDataCounter.incrementAndGet();
+                if(latencyDataCounter.get() >= startIndexOfReponseLatencyData){
+                    tailResponseLatencyData.add(line.split(","));
+                }
+
+            });
+            data.put("latency_data", tailResponseLatencyData);
 
             //the last line is the latest information
             Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_OverallStart_" + finalNameFormatter.format(instantStart) + ".json.txt");

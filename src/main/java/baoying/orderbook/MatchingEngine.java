@@ -5,11 +5,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.WaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +47,6 @@ public class MatchingEngine {
 	private final long _msgIDBase = System.nanoTime();
 	private final AtomicLong _msgIDIncreament = new  AtomicLong(0);
 
-	private BlockingQueue<MatchingEngineInputMessageFlag> _inputInitialExecutingOrderORAggOrdBookRequests;
-
     //TODO how to promise the consumer will only consume?
 	public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForExecRpt;
 	//the book depth is determined by the request
@@ -60,7 +61,8 @@ public class MatchingEngine {
 	private PriorityQueue<ExecutingOrder> _offerBook;// lower price is on the
 	                                                 // top
 
-	private final MatchingThread _matchingThread;
+	Disruptor<MatchingEngineInputMessageEvent> _inputMessageDisruptor;
+	RingBuffer<MatchingEngineInputMessageEvent> _inputMessageRingBuffer;
 
 	public MatchingEngine(String symbol) {
 		_symbol = symbol;
@@ -68,11 +70,22 @@ public class MatchingEngine {
 		_bidBook = createBidBook();
 		_offerBook = createAskBook();
 
-		_inputInitialExecutingOrderORAggOrdBookRequests = new LinkedBlockingQueue<MatchingEngineInputMessageFlag>();
+
+		Executor executor = Executors.newSingleThreadExecutor();
+		int bufferSize = 1024;
+		WaitStrategy waitStrategy = new BusySpinWaitStrategy();
+		_inputMessageDisruptor = new Disruptor<>(MatchingEngineInputMessageEvent::new, bufferSize, executor, ProducerType.MULTI,waitStrategy);
+		_inputMessageRingBuffer = _inputMessageDisruptor.getRingBuffer();
+		//_inputMessageDisruptor.handleEventsWith(this::handleEvent);
+		_inputMessageDisruptor.handleEventsWith(
+				(MatchingEngineInputMessageEvent event, long sequence, boolean endOfBatch) ->{
+					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = event._value;
+					processInputMessage(originalOrderORAggBookRequest);
+				});
+
 		_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 		_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 
-		_matchingThread = new MatchingThread("matching-thread-" + _symbol);
 	}
 
 	// check matching result(ExecutionReport) from _processResult
@@ -89,7 +102,7 @@ public class MatchingEngine {
 			initialExecutingOrder = new ExecutingOrder(order);
 		}
 
-		_inputInitialExecutingOrderORAggOrdBookRequests.add(initialExecutingOrder);
+		_inputMessageRingBuffer.publishEvent((event, sequence, buffer) -> event.set(initialExecutingOrder));
 
         return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
                 System.currentTimeMillis(),
@@ -100,56 +113,28 @@ public class MatchingEngine {
     }
 
     public void addAggOrdBookRequest(AggregatedOrderBookRequest aggregatedOrderBookRequest) {
-        _inputInitialExecutingOrderORAggOrdBookRequests.add(aggregatedOrderBookRequest);
+
+		_inputMessageRingBuffer.publishEvent((event, sequence, buffer) -> event.set(aggregatedOrderBookRequest));
     }
 
-	class MatchingThread extends Thread {
+	private void processInputMessage(MatchingEngineInputMessageFlag originalOrderORAggBookRequest)
+	{
+		if (originalOrderORAggBookRequest instanceof ExecutingOrder) {
 
-		private volatile boolean _stopFlag = false;
-
-		MatchingThread(String threadName) {
-			super(threadName);
-		}
-
-		@Override
-		public void run() {
-			while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
-				try {
-					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = _inputInitialExecutingOrderORAggOrdBookRequests
-					        .poll(5, TimeUnit.SECONDS);
-					if (originalOrderORAggBookRequest == null) {
-						continue;
-					}
-
-					if (originalOrderORAggBookRequest instanceof ExecutingOrder) {
-
-                        ExecutingOrder executingOrder = (ExecutingOrder) originalOrderORAggBookRequest;
-                        if(executingOrder._isLatencyTestOrder){
-                            executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder = System.nanoTime();
-                        }
-
-						processInputOrder(executingOrder);
-
-					} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
-						AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
-						AggregatedOrderBook aggOrderBook = buildAggregatedOrderBook(aggOrdBookRequest._depth);
-						_outputQueueForAggBookAndBookDelta.add(aggOrderBook);
-					} else {
-						log.error("received unknown type : {}",
-						        originalOrderORAggBookRequest.getClass().toGenericString());
-					}
-
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					log.info("matching thread " + Thread.currentThread().getName() + " is interrupted", e);
-				}
+			ExecutingOrder executingOrder = (ExecutingOrder) originalOrderORAggBookRequest;
+			if(executingOrder._isLatencyTestOrder){
+				executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder = System.nanoTime();
 			}
 
-			_stopFlag = true;
-		}
+			processInputOrder(executingOrder);
 
-		public void stopIt() {
-			this._stopFlag = true;
+		} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
+			AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
+			AggregatedOrderBook aggOrderBook = buildAggregatedOrderBook(aggOrdBookRequest._depth);
+			_outputQueueForAggBookAndBookDelta.add(aggOrderBook);
+		} else {
+			log.error("received unknown type : {}",
+					originalOrderORAggBookRequest.getClass().toGenericString());
 		}
 	}
 
@@ -416,15 +401,12 @@ public class MatchingEngine {
 	}
 
 	public void start() {
-		_matchingThread.start();
-		log.info("starting matching thread" + _matchingThread.getName());
+		_inputMessageDisruptor.start();
+		log.info("starting disruptor for "+ this._symbol );
 	}
 
 	public void stop() {
-
-		_matchingThread.stopIt();
-		_matchingThread.interrupt();
-		log.info("stop matching thread" + _matchingThread.getState());
+		this._inputMessageDisruptor.shutdown();
 	}
 
 	PriorityQueue<ExecutingOrder> createBidBook() {
@@ -470,6 +452,16 @@ public class MatchingEngine {
 			}
 		});
 
+	}
+
+	static class MatchingEngineInputMessageEvent
+	{
+		private MatchingEngineInputMessageFlag _value;
+
+		public void set(MatchingEngineInputMessageFlag value)
+		{
+			this._value = value;
+		}
 	}
 
 }

@@ -36,7 +36,7 @@ public class GCLogUtil {
 
         if(args.length>=2){
             Path outputGCTookFile = Paths.get(args[1]);
-            if(!Files.exists(outputGCTookFile)){
+            if(Files.exists(outputGCTookFile)){
                 Files.delete(outputGCTookFile);
             }
 
