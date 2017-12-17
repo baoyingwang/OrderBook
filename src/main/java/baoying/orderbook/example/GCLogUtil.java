@@ -39,7 +39,7 @@ public class GCLogUtil {
             if(!Files.exists(outputGCTookFile)){
                 Files.delete(outputGCTookFile);
             }
-            
+
             Files.write( outputGCTookFile, ("gcLogTime,took_us,type\n").getBytes(),  CREATE);
             Files.write(outputGCTookFile, gcLogEntrySummaryCSVLines, UTF_8, APPEND, CREATE);
         }else{
