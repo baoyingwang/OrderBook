@@ -4,12 +4,13 @@ from by_common_import import *
 import os
 
 
-#/c/baoying.wang/ws/gitnas/OrderBook/log   
-#python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py LatencyData_OverallStart_20171216_132132.485Z.csv LatencyData_OverallStart_20171216_132132.485Z.summary.txt GC.summary.csv
+#cd /c/baoying.wang/ws/gitnas/OrderBook/log   
+#python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py LatencyData_OverallStart_20171217_024027.120Z.csv LatencyData_OverallStart_20171217_024027.120Z.summary.csv GC.summary.csv
 def process(inputLatencyFile, outputSummaryFile, inputGCSummaryFile):
 
 	#os.chdir("C:\\baoying.wang\\ws\\gitnas\\OrderBook\\build\\libs\\log")
 	df_latency=pd.read_csv(inputLatencyFile)
+	df_latency=df_latency[51:df_latency.size]
 	
 	df_latency["put2InputQ_us"]=df_latency["put2InputQ"]/1000
 	df_latency["pickFromInputQ_us"]=df_latency["pickFromInputQ"]/1000
