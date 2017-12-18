@@ -19,7 +19,7 @@ import baoying.orderbook.TradeMessage.OriginalOrder;
 
 public class MatchingEngineTest {
 
-	MatchingEngine _exchange = new MatchingEngine("USDJPY");
+	MatchingEngine _exchange = new MatchingEngine("USDJPY", null, null);
 	
 	@Test
 	public void testCreateBidBook(){

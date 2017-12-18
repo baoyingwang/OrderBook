@@ -8,6 +8,8 @@ import java.util.TreeMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.eventbus.AsyncEventBus;
+import com.google.common.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,11 +44,13 @@ public class MatchingEngine {
 	private final long _msgIDBase = System.nanoTime();
 	private final AtomicLong _msgIDIncreament = new  AtomicLong(0);
 
+    private final AsyncEventBus _outputMarketDataBus;
+    private final AsyncEventBus _outputExecutionReportsBus;
     //TODO how to promise the consumer will only consume?
-	public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForExecRpt;
+	//public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForExecRpt;
 	//the book depth is determined by the request
 	//the delta is for ALL prices in the full engine orderbook. 
-	public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForAggBookAndBookDelta;
+	//public BlockingQueue<MatchingEnginOutputMessageFlag> _outputQueueForAggBookAndBookDelta;
 
 	// for FX, bid|ask the base ccy,
 	// e.g. for USDJPY, USD is always the base ccy, and JPY is the terms ccy.
@@ -56,14 +60,17 @@ public class MatchingEngine {
 	private PriorityQueue<ExecutingOrder> _offerBook;// lower price is on the
 	                                                 // top
 
-	public MatchingEngine(String symbol) {
+	public MatchingEngine(String symbol, AsyncEventBus outputExecutionReportsBus, AsyncEventBus outputMarketDataBus) {
 		_symbol = symbol;
 
 		_bidBook = createBidBook();
 		_offerBook = createAskBook();
 
-		_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
-		_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
+		_outputExecutionReportsBus = outputExecutionReportsBus;
+        _outputMarketDataBus = outputMarketDataBus;
+
+		//_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
+		//_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 
 	}
 
@@ -83,7 +90,7 @@ public class MatchingEngine {
 		} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
 			AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
 			AggregatedOrderBook aggOrderBook = buildAggregatedOrderBook(aggOrdBookRequest._depth);
-			_outputQueueForAggBookAndBookDelta.add(aggOrderBook);
+            _outputMarketDataBus.post(aggOrderBook);
 		} else {
 			log.error("received unknown type : {}",
 					originalOrderORAggBookRequest.getClass().toGenericString());
@@ -111,8 +118,13 @@ public class MatchingEngine {
 
 		Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
 
-		_outputQueueForExecRpt.addAll(matchResult._1);
-		_outputQueueForAggBookAndBookDelta.addAll(matchResult._2);
+        matchResult._1.forEach( execRpt ->{
+            _outputExecutionReportsBus.post(execRpt);
+        } );
+
+        matchResult._2.forEach( ordBookDelta ->{
+            _outputMarketDataBus.post(ordBookDelta);
+        } );
 	}
 
 	/*-

@@ -26,10 +26,10 @@ public class MarketDataMessage {
 
 	public static class AggregatedOrderBook implements MatchingEnginOutputMessageFlag{
 
-		long _msgID;
+		public long _msgID;
 
-		final String _symbol;
-		final int _depth;
+		public final String _symbol;
+		public final int _depth;
 		TreeMap<Double, Integer> _bidBookMap;
 		TreeMap<Double, Integer> _offerBookMap;
 

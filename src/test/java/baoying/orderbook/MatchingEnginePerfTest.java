@@ -15,9 +15,10 @@ import java.util.TreeMap;
 
 public class MatchingEnginePerfTest {
 
-	MatchingEngine _exchange = new MatchingEngine("USDJPY");
+	MatchingEngine _exchange = new MatchingEngine("USDJPY", null, null);
 
 	PriorityQueue<ExecutingOrder> getInitialBidBook() {
+
 		String symbol = "USDJPY";
 		Side bid = Side.BID;
 

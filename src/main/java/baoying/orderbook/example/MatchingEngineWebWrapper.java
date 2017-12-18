@@ -1,6 +1,9 @@
 package baoying.orderbook.example;
 
 import baoying.orderbook.*;
+import com.google.common.eventbus.AsyncEventBus;
+import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
@@ -39,8 +42,6 @@ import static java.nio.file.StandardOpenOption.CREATE;
 @RequestMapping("/matching")
 public class MatchingEngineWebWrapper {
 
-
-
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
     private final MatchingEngine _matchingEngine_USDJPY;
@@ -49,10 +50,8 @@ public class MatchingEngineWebWrapper {
     private final DisruptorInputAcceptor _disruptorInputAcceptor_USDJPY;
     private final DisruptorInputAcceptor _disruptorInputAcceptor_USDHKD;
 
-    private final EngineExecConsumingThread _execUSDJPYThread;
-    private final EngineMDConsumingThread _mdUSDJPYThread;
-    private final EngineExecConsumingThread _execUSDHKDThread;
-    private final EngineMDConsumingThread _mdUSDHKDThread;
+    private final AsyncEventBus _outputMarketDataBus;
+    private final AsyncEventBus _outputExecutionReportsBus;
 
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
     //value: list of execution report(as Map<String, String)
@@ -63,16 +62,17 @@ public class MatchingEngineWebWrapper {
         orderbookBySymbol = new ConcurrentHashMap<>();
         executionReportsByOrderID = new ConcurrentHashMap<>();
 
-        _matchingEngine_USDJPY = new MatchingEngine("USDJPY");
-        _matchingEngine_USDHKD = new MatchingEngine("USDHKD");
+        _outputExecutionReportsBus = new AsyncEventBus("async evt ER bus - for all engines", Executors.newSingleThreadExecutor());
+        _outputExecutionReportsBus.register(new SimpleOverallERHandler());
+
+        _outputMarketDataBus = new AsyncEventBus("async evt MD bus - for all engines", Executors.newSingleThreadExecutor());
+        _outputMarketDataBus.register(new SimpleOverallMDHandler());
+
+        _matchingEngine_USDJPY = new MatchingEngine("USDJPY", _outputExecutionReportsBus, _outputMarketDataBus);
+        _matchingEngine_USDHKD = new MatchingEngine("USDHKD", _outputExecutionReportsBus, _outputMarketDataBus);
+
         _disruptorInputAcceptor_USDJPY = new DisruptorInputAcceptor(_matchingEngine_USDJPY);
         _disruptorInputAcceptor_USDHKD = new DisruptorInputAcceptor(_matchingEngine_USDHKD);
-
-        _execUSDJPYThread = new EngineExecConsumingThread("EngineExecConsumingThread-USDJPY", _matchingEngine_USDJPY._outputQueueForExecRpt );
-        _mdUSDJPYThread = new EngineMDConsumingThread("EngineMDConsumingThread-USDJPY", "USDJPY",_matchingEngine_USDJPY._outputQueueForAggBookAndBookDelta );
-
-        _execUSDHKDThread = new EngineExecConsumingThread("EngineExecConsumingThread-HKD", _matchingEngine_USDHKD._outputQueueForExecRpt );
-        _mdUSDHKDThread = new EngineMDConsumingThread("EngineMDConsumingThread-HKD", "USDHKD",_matchingEngine_USDHKD._outputQueueForAggBookAndBookDelta );
 
         List<DisruptorInputAcceptor> engines = new ArrayList<>();
         engines.add(_disruptorInputAcceptor_USDJPY);
@@ -86,8 +86,6 @@ public class MatchingEngineWebWrapper {
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
     private BlockingQueue<long[]> testTimeDataQueue = new LinkedBlockingQueue<long[]>();
 
-
-
     @PostConstruct
     public void start(){
 
@@ -96,10 +94,6 @@ public class MatchingEngineWebWrapper {
         _disruptorInputAcceptor_USDJPY.start();
         _disruptorInputAcceptor_USDHKD.start();
 
-        _execUSDJPYThread.start();
-        _mdUSDJPYThread.start();
-        _execUSDHKDThread.start();
-        _mdUSDHKDThread.start();
         _internalTriggerOrderBookThread.start();
     }
 
@@ -262,7 +256,7 @@ public class MatchingEngineWebWrapper {
 
             List<String[]> tailResponseLatencyData = new ArrayList<>();
             AtomicLong latencyDataCounter = new AtomicLong(0);
-            long maxNumberOfResponseLatencyData = 400;
+            long maxNumberOfResponseLatencyData = 200;
             long startIndexOfReponseLatencyData = latency_data_count_all>400? latency_data_count_all-400 : 0;
             //TODO performance improvement - read twice(here) above get latency_data_count_all
             java.nio.file.Files.lines(outputAppendingLatencyDataFile).forEach(line ->{
@@ -299,73 +293,47 @@ public class MatchingEngineWebWrapper {
         MAKER, TAKER;
     }
 
-    class EngineExecConsumingThread extends Thread {
+    class SimpleOverallERHandler {
 
-        private final BlockingQueue<MatchingEngine.MatchingEnginOutputMessageFlag> _engineOutputQueueForExecRpt;
-        private volatile boolean _stopFlag = false;
+        @Subscribe
+        public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        EngineExecConsumingThread(String threadName, BlockingQueue<MatchingEngine.MatchingEnginOutputMessageFlag> engineOutputQueueForExecRpt) {
-            super(threadName);
-            _engineOutputQueueForExecRpt = engineOutputQueueForExecRpt;
-        }
-
-        @Override
-        public void run() {
-            while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
-                try {
-                    MatchingEngine.MatchingEnginOutputMessageFlag matchER_or_singleSideER = _engineOutputQueueForExecRpt
-                            .poll(5, TimeUnit.SECONDS);
-                    if (matchER_or_singleSideER == null) {
-                        continue;
-                    }
-
-                    if(matchER_or_singleSideER instanceof TradeMessage.MatchedExecutionReport){
-                        TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)matchER_or_singleSideER;
-
-                        //this is the only thread to modify the executionReportsByOrderID
-                        if(matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-                            addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
-                        }
-                        if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-                            long outputConsumingNanoTime = System.nanoTime();
-                            addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
-
-                            testTimeDataQueue.add(new long[]{
-                                    matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
-                                    matchedExecutionReport._taker_enterInputQ_sysNano_test
-                                            - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test,
-
-                                    matchedExecutionReport._taker_pickFromInputQ_sysNano_test
-                                            - matchedExecutionReport._taker_enterInputQ_sysNano_test,
-
-                                    matchedExecutionReport._matching_sysNano_test
-                                            - matchedExecutionReport._taker_pickFromInputQ_sysNano_test,
-
-                                    outputConsumingNanoTime - matchedExecutionReport._matching_sysNano_test});
-                        }
-                    }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
-
-                        TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport) matchER_or_singleSideER;
-                        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-                            List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
-                            List<Map<String, String>> originalReportsNew = new ArrayList<>();
-                            if (originalReports != null) {
-                                originalReportsNew.addAll(originalReports);
-                            }
-                            originalReportsNew.add(buildExternalERfromInternalER(singleSideExecutionReport));
-                            executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
-                        }
-                    }else{
-                        log.error("unknown type: {}", matchER_or_singleSideER);
-                    }
-
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.info("matching thread " + Thread.currentThread().getName() + " is interruped", e);
+            if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+                List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
+                List<Map<String, String>> originalReportsNew = new ArrayList<>();
+                if (originalReports != null) {
+                    originalReportsNew.addAll(originalReports);
                 }
+                originalReportsNew.add(buildExternalERfromInternalER(singleSideExecutionReport));
+                executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
             }
 
-            _stopFlag = true;
+        }
+
+        @Subscribe
+        public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
+
+            //this is the only thread to modify the executionReportsByOrderID
+            if(matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+                addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
+            }
+            if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+                long outputConsumingNanoTime = System.nanoTime();
+                addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
+
+                testTimeDataQueue.add(new long[]{
+                        matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
+                        matchedExecutionReport._taker_enterInputQ_sysNano_test
+                                - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test,
+
+                        matchedExecutionReport._taker_pickFromInputQ_sysNano_test
+                                - matchedExecutionReport._taker_enterInputQ_sysNano_test,
+
+                        matchedExecutionReport._matching_sysNano_test
+                                - matchedExecutionReport._taker_pickFromInputQ_sysNano_test,
+
+                        outputConsumingNanoTime - matchedExecutionReport._matching_sysNano_test});
+            }
         }
 
         private void addERStore(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker, TradeMessage.OriginalOrder originalOrder){
@@ -425,69 +393,31 @@ public class MatchingEngineWebWrapper {
             return erMap;
         }
 
-        public void stopIt() {
-            this._stopFlag = true;
-        }
     }
 
+    class SimpleOverallMDHandler {
 
-    class EngineMDConsumingThread extends Thread {
-
-        private final BlockingQueue<MatchingEngine.MatchingEnginOutputMessageFlag> _engineOutputQueueForAggBookAndBookDelta;
-        private volatile boolean _stopFlag = false;
-        private final String _symbol;
-
-        EngineMDConsumingThread(String threadName, String symbol, BlockingQueue<MatchingEngine.MatchingEnginOutputMessageFlag> engineOutputQueueForAggBookAndBookDelta) {
-            super(threadName);
-            _symbol = symbol;
-            _engineOutputQueueForAggBookAndBookDelta = engineOutputQueueForAggBookAndBookDelta;
+        @Subscribe
+        public void process(MarketDataMessage.AggregatedOrderBook aggBook) {
+            orderbookBySymbol.put(aggBook._symbol,aggBook);
         }
 
-        @Override
-        public void run() {
-            while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
-                try {
-                    MatchingEngine.MatchingEnginOutputMessageFlag aggBook_or_bookDelta = _engineOutputQueueForAggBookAndBookDelta
-                            .poll(5, TimeUnit.SECONDS);
-                    if (aggBook_or_bookDelta == null) {
-                        continue;
-                    }
-
-                    if(aggBook_or_bookDelta instanceof MarketDataMessage.AggregatedOrderBook){
-                        MarketDataMessage.AggregatedOrderBook aggOrdBook = (MarketDataMessage.AggregatedOrderBook)aggBook_or_bookDelta;
-                        orderbookBySymbol.put(_symbol,aggOrdBook);
-
-                    }else if(aggBook_or_bookDelta instanceof MarketDataMessage.OrderBookDelta){
-                        MarketDataMessage.OrderBookDelta matchedExecutionReport = (MarketDataMessage.OrderBookDelta)aggBook_or_bookDelta;
-                        //TODO i am going to write a standalone MarketEngine to build a FULL orderbook(full depth)
-                        //IGNORE in this example. We will send agg book request periodically & internally.
-                    }else{
-                        log.error("unknown type: {}", aggBook_or_bookDelta);
-                    }
-
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.info("matching thread " + Thread.currentThread().getName() + " is interrupted", e);
-                }
-            }
-
-            _stopFlag = true;
-
+        @Subscribe
+        public void process(MarketDataMessage.OrderBookDelta orderBookDelta) {
+                //TODO i am going to write a standalone MarketEngine to build a FULL orderbook(full depth)
+                //IGNORE in this example. We will send agg book request periodically & internally.
         }
 
-        public void stopIt() {
-            this._stopFlag = true;
-        }
     }
 
     class InternalTriggerOrderBookThread extends Thread {
 
         private volatile boolean _stopFlag = false;
-        private List<DisruptorInputAcceptor> _engines;
+        private List<DisruptorInputAcceptor> _engineInputAcceptors;
 
         InternalTriggerOrderBookThread(String threadName, List<DisruptorInputAcceptor> engines) {
             super(threadName);
-            _engines = engines;
+            _engineInputAcceptors = engines;
         }
 
         @Override
@@ -495,8 +425,8 @@ public class MatchingEngineWebWrapper {
 
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
-                for(DisruptorInputAcceptor engine: _engines){
-                    engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
+                for(DisruptorInputAcceptor engineInputAcceptor: _engineInputAcceptors){
+                    engineInputAcceptor.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
                 }
 
                 try {
