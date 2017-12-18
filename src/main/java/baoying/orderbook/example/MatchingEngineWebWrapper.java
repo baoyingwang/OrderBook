@@ -1,9 +1,6 @@
 package baoying.orderbook.example;
 
-import baoying.orderbook.CommonMessage;
-import baoying.orderbook.MarketDataMessage;
-import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.TradeMessage;
+import baoying.orderbook.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
@@ -11,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -51,6 +46,9 @@ public class MatchingEngineWebWrapper {
     private final MatchingEngine _matchingEngine_USDJPY;
     private final MatchingEngine _matchingEngine_USDHKD;
 
+    private final DisruptorInputAcceptor _disruptorInputAcceptor_USDJPY;
+    private final DisruptorInputAcceptor _disruptorInputAcceptor_USDHKD;
+
     private final EngineExecConsumingThread _execUSDJPYThread;
     private final EngineMDConsumingThread _mdUSDJPYThread;
     private final EngineExecConsumingThread _execUSDHKDThread;
@@ -67,6 +65,8 @@ public class MatchingEngineWebWrapper {
 
         _matchingEngine_USDJPY = new MatchingEngine("USDJPY");
         _matchingEngine_USDHKD = new MatchingEngine("USDHKD");
+        _disruptorInputAcceptor_USDJPY = new DisruptorInputAcceptor(_matchingEngine_USDJPY);
+        _disruptorInputAcceptor_USDHKD = new DisruptorInputAcceptor(_matchingEngine_USDHKD);
 
         _execUSDJPYThread = new EngineExecConsumingThread("EngineExecConsumingThread-USDJPY", _matchingEngine_USDJPY._outputQueueForExecRpt );
         _mdUSDJPYThread = new EngineMDConsumingThread("EngineMDConsumingThread-USDJPY", "USDJPY",_matchingEngine_USDJPY._outputQueueForAggBookAndBookDelta );
@@ -74,9 +74,9 @@ public class MatchingEngineWebWrapper {
         _execUSDHKDThread = new EngineExecConsumingThread("EngineExecConsumingThread-HKD", _matchingEngine_USDHKD._outputQueueForExecRpt );
         _mdUSDHKDThread = new EngineMDConsumingThread("EngineMDConsumingThread-HKD", "USDHKD",_matchingEngine_USDHKD._outputQueueForAggBookAndBookDelta );
 
-        List<MatchingEngine> engines = new ArrayList<>();
-        engines.add(_matchingEngine_USDJPY);
-        engines.add(_matchingEngine_USDHKD);
+        List<DisruptorInputAcceptor> engines = new ArrayList<>();
+        engines.add(_disruptorInputAcceptor_USDJPY);
+        engines.add(_disruptorInputAcceptor_USDHKD);
         _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engines);
 
     }
@@ -85,6 +85,105 @@ public class MatchingEngineWebWrapper {
     private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
     private BlockingQueue<long[]> testTimeDataQueue = new LinkedBlockingQueue<long[]>();
+
+
+
+    @PostConstruct
+    public void start(){
+
+        log.info("start the MatchingEngineWebWrapper");
+
+        _disruptorInputAcceptor_USDJPY.start();
+        _disruptorInputAcceptor_USDHKD.start();
+
+        _execUSDJPYThread.start();
+        _mdUSDJPYThread.start();
+        _execUSDHKDThread.start();
+        _mdUSDHKDThread.start();
+        _internalTriggerOrderBookThread.start();
+    }
+
+    private DisruptorInputAcceptor getMatchingEngine(String symbol){
+
+        if("USDJPY".equals(symbol)){
+            return _disruptorInputAcceptor_USDJPY;
+        }else if("USDHKD".equals(symbol)){
+            return _disruptorInputAcceptor_USDHKD;
+        } else{
+            String errorInfo = "ERROR - Only USDJPY and USDHKD is supported. Unknown symbol:"+ symbol;
+            log.error(errorInfo);
+            throw new RuntimeException(errorInfo);
+        }
+    }
+
+    @RequestMapping("/place_order")
+    public String placeOrder(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol,
+                             @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
+                             @RequestParam(value = "side", defaultValue="Bid") String side,
+                             @RequestParam(value = "price", defaultValue="126.0") double price,
+                             @RequestParam(value = "qty", defaultValue = "5000") int qty){
+
+        String clientOrdID = clientEntity+"_"+System.nanoTime();
+        String orderID = symbol+"_"+clientEntity+"_"+System.nanoTime();
+
+        log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
+        final CommonMessage.Side orderSide;
+        if("Bid".equalsIgnoreCase(side)){
+            orderSide = CommonMessage.Side.BID;
+        }else if("Offer".equalsIgnoreCase(side)){
+            orderSide = CommonMessage.Side.OFFER;
+        }else{
+            log.error("unknown side : " + side);
+            return "ERROR - unknown side : " + side;
+        }
+
+
+        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
+        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
+        }
+        DisruptorInputAcceptor engine = getMatchingEngine(originalOrder._symbol);
+        if(engine != null) {
+            TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+
+            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
+            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
+            else{_lastOriginalOrderSinceTest = originalOrder;}
+
+            Gson gson = new GsonBuilder().create();
+            String jsonString = gson.toJson(erNew);
+            return jsonString;
+        }else{
+            return "ERROR - not supported symbol:" + originalOrder._symbol;
+        }
+    }
+
+    @RequestMapping("/query_exec_reports")
+    public String requestExecReport(@RequestParam(value = "order_id", defaultValue = "") String orderID){
+
+        List<Map<String, String>> ers = executionReportsByOrderID.get(orderID);
+        Map<String, Object> ersMap = new HashMap<>();
+        ersMap.put("order_id", orderID);
+        ersMap.put("execution_reports", ers);
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(ersMap);
+        return jsonString;
+    }
+
+    @RequestMapping("/query_order_book")
+    public String queryOrderBook(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol){
+
+        log.info("query_order_book on symbol:{}", symbol);
+
+        Map<String, Object> orderBook = new HashMap<>();
+        orderBook.put("symbol", symbol);
+        orderBook.put("order_book", orderbookBySymbol.get(symbol));
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(orderBook);
+        return jsonString;
+    }
 
     @RequestMapping("/reset_test_data")
     public void resetBeforeTest(){
@@ -196,101 +295,6 @@ public class MatchingEngineWebWrapper {
         return jsonString;
     }
 
-    @PostConstruct
-    public void start(){
-
-        log.info("start the MatchingEngineWebWrapper");
-        _matchingEngine_USDJPY.start();
-        _matchingEngine_USDHKD.start();
-        _execUSDJPYThread.start();
-        _mdUSDJPYThread.start();
-        _execUSDHKDThread.start();
-        _mdUSDHKDThread.start();
-        _internalTriggerOrderBookThread.start();
-    }
-
-    private MatchingEngine getMatchingEngine(String symbol){
-
-        if("USDJPY".equals(symbol)){
-            return _matchingEngine_USDJPY;
-        }else if("USDHKD".equals(symbol)){
-            return _matchingEngine_USDHKD;
-        } else{
-            String errorInfo = "ERROR - Only USDJPY and USDHKD is supported. Unknown symbol:"+ symbol;
-            log.error(errorInfo);
-            throw new RuntimeException(errorInfo);
-        }
-    }
-
-    @RequestMapping("/place_order")
-    public String placeOrder(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol,
-                             @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
-                             @RequestParam(value = "side", defaultValue="Bid") String side,
-                             @RequestParam(value = "price", defaultValue="126.0") double price,
-                             @RequestParam(value = "qty", defaultValue = "5000") int qty){
-
-        String clientOrdID = clientEntity+"_"+System.nanoTime();
-        String orderID = symbol+"_"+clientEntity+"_"+System.nanoTime();
-
-        log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
-        final CommonMessage.Side orderSide;
-        if("Bid".equalsIgnoreCase(side)){
-            orderSide = CommonMessage.Side.BID;
-        }else if("Offer".equalsIgnoreCase(side)){
-            orderSide = CommonMessage.Side.OFFER;
-        }else{
-            log.error("unknown side : " + side);
-            return "ERROR - unknown side : " + side;
-        }
-
-
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
-        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-            originalOrder._recvFromClientSysNanoTime = System.nanoTime();
-        }
-        MatchingEngine engine = getMatchingEngine(originalOrder._symbol);
-        if(engine != null) {
-            TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
-
-            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
-            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
-            else{_lastOriginalOrderSinceTest = originalOrder;}
-
-            Gson gson = new GsonBuilder().create();
-            String jsonString = gson.toJson(erNew);
-            return jsonString;
-        }else{
-            return "ERROR - not supported symbol:" + originalOrder._symbol;
-        }
-    }
-
-    @RequestMapping("/query_exec_reports")
-    public String requestExecReport(@RequestParam(value = "order_id", defaultValue = "") String orderID){
-
-        List<Map<String, String>> ers = executionReportsByOrderID.get(orderID);
-        Map<String, Object> ersMap = new HashMap<>();
-        ersMap.put("order_id", orderID);
-        ersMap.put("execution_reports", ers);
-
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(ersMap);
-        return jsonString;
-    }
-
-    @RequestMapping("/query_order_book")
-    public String queryOrderBook(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol){
-
-        log.info("query_order_book on symbol:{}", symbol);
-
-        Map<String, Object> orderBook = new HashMap<>();
-        orderBook.put("symbol", symbol);
-        orderBook.put("order_book", orderbookBySymbol.get(symbol));
-
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(orderBook);
-        return jsonString;
-    }
-
     static enum MAKER_TAKER{
         MAKER, TAKER;
     }
@@ -328,16 +332,16 @@ public class MatchingEngineWebWrapper {
 
                             testTimeDataQueue.add(new long[]{
                                     matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
-                                    matchedExecutionReport._taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder
-                                            - matchedExecutionReport._takerOriginOrder._recvFromClientSysNanoTime,
+                                    matchedExecutionReport._taker_enterInputQ_sysNano_test
+                                            - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test,
 
-                                    matchedExecutionReport._taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder
-                                            - matchedExecutionReport._taker_nanoSysTemOfOriginOrdEnteringEngine4LatencyTestOrder,
+                                    matchedExecutionReport._taker_pickFromInputQ_sysNano_test
+                                            - matchedExecutionReport._taker_enterInputQ_sysNano_test,
 
-                                    matchedExecutionReport._matchingSysNanoTime4LatencyTestOrder
-                                            - matchedExecutionReport._taker_nanoSysTimeOfPickingFromInputQ4LatencyTestOrder,
+                                    matchedExecutionReport._matching_sysNano_test
+                                            - matchedExecutionReport._taker_pickFromInputQ_sysNano_test,
 
-                                    outputConsumingNanoTime - matchedExecutionReport._matchingSysNanoTime4LatencyTestOrder});
+                                    outputConsumingNanoTime - matchedExecutionReport._matching_sysNano_test});
                         }
                     }else if(matchER_or_singleSideER instanceof TradeMessage.SingleSideExecutionReport){
 
@@ -479,9 +483,9 @@ public class MatchingEngineWebWrapper {
     class InternalTriggerOrderBookThread extends Thread {
 
         private volatile boolean _stopFlag = false;
-        private List<MatchingEngine> _engines;
+        private List<DisruptorInputAcceptor> _engines;
 
-        InternalTriggerOrderBookThread(String threadName, List<MatchingEngine> engines) {
+        InternalTriggerOrderBookThread(String threadName, List<DisruptorInputAcceptor> engines) {
             super(threadName);
             _engines = engines;
         }
@@ -491,7 +495,7 @@ public class MatchingEngineWebWrapper {
 
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
-                for(MatchingEngine engine: _engines){
+                for(DisruptorInputAcceptor engine: _engines){
                     engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
                 }
 

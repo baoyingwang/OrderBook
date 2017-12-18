@@ -8,11 +8,6 @@ import java.util.TreeMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.lmax.disruptor.BusySpinWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.WaitStrategy;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +33,7 @@ public class MatchingEngine {
 	public static String LATENCY_ENTITY_PREFIX = "LTC$$";
 
 	// e.g. USDJPY for FX, or BABA for security exchange
-	private final String _symbol;
+	public final String _symbol;
 
 	private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 	public static double MIN_DIFF_FOR_PRICE = 0.00000001;
@@ -61,69 +56,26 @@ public class MatchingEngine {
 	private PriorityQueue<ExecutingOrder> _offerBook;// lower price is on the
 	                                                 // top
 
-	Disruptor<MatchingEngineInputMessageEvent> _inputMessageDisruptor;
-	RingBuffer<MatchingEngineInputMessageEvent> _inputMessageRingBuffer;
-
 	public MatchingEngine(String symbol) {
 		_symbol = symbol;
 
 		_bidBook = createBidBook();
 		_offerBook = createAskBook();
 
-
-		Executor executor = Executors.newSingleThreadExecutor();
-		int bufferSize = 1024;
-		WaitStrategy waitStrategy = new BusySpinWaitStrategy();
-		_inputMessageDisruptor = new Disruptor<>(MatchingEngineInputMessageEvent::new, bufferSize, executor, ProducerType.MULTI,waitStrategy);
-		_inputMessageRingBuffer = _inputMessageDisruptor.getRingBuffer();
-		//_inputMessageDisruptor.handleEventsWith(this::handleEvent);
-		_inputMessageDisruptor.handleEventsWith(
-				(MatchingEngineInputMessageEvent event, long sequence, boolean endOfBatch) ->{
-					MatchingEngineInputMessageFlag originalOrderORAggBookRequest = event._value;
-					processInputMessage(originalOrderORAggBookRequest);
-				});
-
 		_outputQueueForExecRpt = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 		_outputQueueForAggBookAndBookDelta = new LinkedBlockingQueue<MatchingEnginOutputMessageFlag>();
 
 	}
 
-	// check matching result(ExecutionReport) from _processResult
-	public SingleSideExecutionReport addOrder(OriginalOrder order) {
 
-		if (!_symbol.equals(order._symbol)) {	// it should never reach here
-			throw new RuntimeException("not the expected symbol, expect:"+_symbol+", by it is:"+order._symbol+", client_entity:"+order._clientEntityID+" client ord id:"+order._clientOrdID);
-		}
-
-        final ExecutingOrder initialExecutingOrder;
-		if(order._clientEntityID.startsWith(LATENCY_ENTITY_PREFIX)){
-			initialExecutingOrder = new ExecutingOrder(order,System.nanoTime(), true);
-		}else {
-			initialExecutingOrder = new ExecutingOrder(order);
-		}
-
-		_inputMessageRingBuffer.publishEvent((event, sequence, buffer) -> event.set(initialExecutingOrder));
-
-        return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-                System.currentTimeMillis(),
-                order,
-                TradeMessage.SingleSideExecutionType.NEW,
-                order._qty,
-                "Entered Order Book");
-    }
-
-    public void addAggOrdBookRequest(AggregatedOrderBookRequest aggregatedOrderBookRequest) {
-
-		_inputMessageRingBuffer.publishEvent((event, sequence, buffer) -> event.set(aggregatedOrderBookRequest));
-    }
-
-	private void processInputMessage(MatchingEngineInputMessageFlag originalOrderORAggBookRequest)
+	void processInputMessage(MatchingEngineInputMessageFlag originalOrderORAggBookRequest)
 	{
-		if (originalOrderORAggBookRequest instanceof ExecutingOrder) {
+		if (originalOrderORAggBookRequest instanceof OriginalOrder) {
 
-			ExecutingOrder executingOrder = (ExecutingOrder) originalOrderORAggBookRequest;
-			if(executingOrder._isLatencyTestOrder){
-				executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder = System.nanoTime();
+			OriginalOrder order = (OriginalOrder) originalOrderORAggBookRequest;
+			ExecutingOrder executingOrder = new ExecutingOrder(order);
+			if(order._isLatencyTestOrder){
+				executingOrder._pickFromInputQ_sysNano_test = System.nanoTime();
 			}
 
 			processInputOrder(executingOrder);
@@ -228,7 +180,7 @@ public class MatchingEngine {
 
 			final MatchedExecutionReport executionReport ;
 
-			if(executingOrder._isLatencyTestOrder){
+			if(executingOrder._origOrder._isLatencyTestOrder){
                 //only track taker side latency, since maker maybe has sit in orderbook long time
 
 				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
@@ -239,8 +191,8 @@ public class MatchingEngine {
 						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
 						executingOrder._origOrder, executingOrder._leavesQty,
 
-						executingOrder._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder,
-                        executingOrder._sysNanoTimeOfPickingFromInputQ4LatencyTestOrder,
+						executingOrder._origOrder._enterInputQ_sysNano_test,
+                        executingOrder._pickFromInputQ_sysNano_test,
                         System.nanoTime());
 			}else{
 				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
@@ -375,38 +327,19 @@ public class MatchingEngine {
     public static interface MatchingEnginOutputMessageFlag {
 	}
 
-	static class ExecutingOrder implements MatchingEngineInputMessageFlag{
-
-		// this value will change on each matching
-		int _leavesQty;
+	static class ExecutingOrder{
 
 		final OriginalOrder _origOrder;
 
-        final boolean _isLatencyTestOrder;
-        final long _sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder;
-        long _sysNanoTimeOfPickingFromInputQ4LatencyTestOrder;
+		// this value will change on each matching
+		int _leavesQty;
+        long _pickFromInputQ_sysNano_test;
 
 		ExecutingOrder(OriginalOrder originalOrder) {
-			this(originalOrder, -1, false);
-		}
-
-		ExecutingOrder(OriginalOrder originalOrder, long nanoTime, boolean isLatencyTestOrder) {
 			_origOrder = originalOrder;
 			_leavesQty = originalOrder._qty;
-
-            _isLatencyTestOrder = isLatencyTestOrder;
-			_sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder = nanoTime;
 		}
 
-	}
-
-	public void start() {
-		_inputMessageDisruptor.start();
-		log.info("starting disruptor for "+ this._symbol );
-	}
-
-	public void stop() {
-		this._inputMessageDisruptor.shutdown();
 	}
 
 	PriorityQueue<ExecutingOrder> createBidBook() {
@@ -418,7 +351,7 @@ public class MatchingEngine {
 				// note: not required, it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder - o2._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder);
+					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
@@ -440,7 +373,7 @@ public class MatchingEngine {
 				// TODO it should also be considered equal price, if the diff is
 		        // very minor.
 				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder - o2._sysNanoTimeOfOriginOrdEnteringEngine4LatencyTestOrder);
+					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
 				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
