@@ -203,13 +203,13 @@ public class MatchingEngineWebWrapper {
             final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
             data.put("latency_data_count", latency_data_count_all);
 
-            List<String[]> tailResponseLatencyData = loadTailCsvLines(outputAppendingLatencyDataFile, 200, latency_data_count_all);
+            List<String[]> tailResponseLatencyData = loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
             data.put("latency_data", tailResponseLatencyData);
 
             try {
                 //bad performance to process the same lines many times
                 GCLogUtil.main(new String[]{"log/GC.txt", "log/GC.summary.csv"});
-                List<String[]> tailGCTookData = loadTailCsvLines(Paths.get("log/GC.summary.csv"), 200);
+                List<String[]> tailGCTookData = loadTailCsvLines(Paths.get("log/GC.summary.csv"), 100);
                 data.put("gc_took", tailGCTookData);
             }catch (Exception e2){
                 log.error("",e2);

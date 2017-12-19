@@ -61,7 +61,8 @@
             </tr>
         </table>
 
-        <div id="chart"></div>
+        <div id="latency_chart"></div>
+        <div id="gc_took_chart"></div>
 
         Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="latencyDataChecked" aria-label="Toggle ngShow"><br />
         <div ng-show="latencyDataChecked">
@@ -118,7 +119,8 @@
         <script>
 
             //http://c3js.org/samples/data_stringx.html
-            var chart = c3.generate({
+            var latency_chart = c3.generate({
+                bindto: '#latency_chart',
                 data: {
                     x : 'x',
                     columns:  [
@@ -132,7 +134,26 @@
                     }
                 }
             });
-            chart.unload({
+            latency_chart.unload({
+				ids: ['data1']
+			});
+
+            var gc_took_chart = c3.generate({
+                bindto: '#gc_took_chart',
+                data: {
+                    x : 'x',
+                    columns:  [
+                        ['x','x1','x2','x3'],
+                        ['data1',1,2,3]
+                    ]
+                },
+                axis: {
+                    x: {
+                        type: 'category' // this needed to load string x value
+                    }
+                }
+            });
+            gc_took_chart.unload({
 				ids: ['data1']
 			});
 
@@ -146,22 +167,35 @@
                         var latency_data_copy = new Array(response.data['latency_data'].length);
                         for(var i = 0; i < response.data['latency_data'].length; i++){	latency_data_copy[i] = response.data['latency_data'][i].slice(0);}
                         var columnLatencyData = latency_data_copy[0].map((col, i) => latency_data_copy.map(row => row[i]));
-
                         columnLatencyData[0].unshift('x'); //categary - recvTime
-                        columnLatencyData[1].unshift('put2InputQ');
-                        columnLatencyData[2].unshift('pickFromInputQ');
-                        columnLatencyData[3].unshift('match');
-                        columnLatencyData[4].unshift('pickFromOutputQ');
-
+                        columnLatencyData[1].unshift('put2InputQ_ns');
+                        columnLatencyData[2].unshift('pickFromInputQ_ns');
+                        columnLatencyData[3].unshift('match_ns');
+                        columnLatencyData[4].unshift('pickFromOutputQ_ns');
                         //addParagraph('console_container',latency_data_copy.length);
                         //addParagraph('console_container',latency_data_copy[0].length);
-                        chart.load({
+                        latency_chart.load({
                             columns: [
                                 columnLatencyData[0],
                                 columnLatencyData[1],
                                 columnLatencyData[2],
                                 columnLatencyData[3],
                                 columnLatencyData[4]
+                            ]
+                        });
+
+
+                        var gc_data_copy = new Array(response.data['gc_took'].length);
+                        for(var i = 0; i < response.data['gc_took'].length; i++){	gc_data_copy[i] = response.data['gc_took'][i].slice(0);}
+                        var columnGCTookData = gc_data_copy[0].map((col, i) => gc_data_copy.map(row => row[i]));
+                        columnGCTookData[0].unshift('x'); //categary - recvTime
+                        columnGCTookData[1].unshift('took_us');
+                        columnGCTookData[2].unshift('type');
+                        gc_took_chart.load({
+                            columns: [
+                                columnGCTookData[0],
+                                columnGCTookData[1],
+                                columnGCTookData[2],
                             ]
                         });
 
