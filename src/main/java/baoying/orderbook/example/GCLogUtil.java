@@ -15,6 +15,7 @@ import java.util.stream.Stream;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 
 //TODO move this out of this project, to another java util project.
 public class GCLogUtil {
@@ -36,12 +37,9 @@ public class GCLogUtil {
 
         if(args.length>=2){
             Path outputGCTookFile = Paths.get(args[1]);
-            if(Files.exists(outputGCTookFile)){
-                Files.delete(outputGCTookFile);
-            }
-
-            Files.write( outputGCTookFile, ("gcLogTime,took_us,type\n").getBytes(),  CREATE);
+            Files.write( outputGCTookFile, ("gcLogTime,took_us,type\n").getBytes(), CREATE, TRUNCATE_EXISTING);
             Files.write(outputGCTookFile, gcLogEntrySummaryCSVLines, UTF_8, APPEND, CREATE);
+
         }else{
             System.out.println("gcLogTime,took_us,type");
             gcLogEntrySummaryCSVLines.forEach(line -> System.out.println(line));

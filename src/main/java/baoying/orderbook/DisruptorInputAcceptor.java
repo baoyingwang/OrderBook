@@ -25,8 +25,8 @@ public class DisruptorInputAcceptor {
 	private final long _msgIDBase = System.nanoTime();
 	private final AtomicLong _msgIDIncreament = new  AtomicLong(0);
 
-	Disruptor<MatchingEngineInputMessageEvent> _inputMessageDisruptor;
-	RingBuffer<MatchingEngineInputMessageEvent> _inputMessageRingBuffer;
+	private final Disruptor<MatchingEngineInputMessageEvent> _inputMessageDisruptor;
+	private final RingBuffer<MatchingEngineInputMessageEvent> _inputMessageRingBuffer;
 
 	public DisruptorInputAcceptor(MatchingEngine matchingEngine) {
 		_matchingEngine = matchingEngine;

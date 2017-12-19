@@ -63,9 +63,8 @@
 
         <div id="chart"></div>
 
-        Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="checked" aria-label="Toggle ngShow"><br />
-
-        <div ng-show="checked">
+        Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="latencyDataChecked" aria-label="Toggle ngShow"><br />
+        <div ng-show="latencyDataChecked">
             <table>
 
                 <tr>
@@ -81,15 +80,36 @@
                     https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
                     -->
                     <td align="right">{{ one_record[0] }}</td>
-                    <td align="right">{{ one_record[1] }}</td>
-                    <td align="right">{{ one_record[2] }}</td>
-                    <td align="right">{{ one_record[3] }}</td>
-                    <td align="right">{{ one_record[4] }}</td>
+                    <td align="right">{{ one_record[1] | number : 0}}</td>
+                    <td align="right">{{ one_record[2] | number : 0}}</td>
+                    <td align="right">{{ one_record[3] | number : 0}}</td>
+                    <td align="right">{{ one_record[4] | number : 0}}</td>
 
                 </tr>
             </table>
         </div>
 
+        Show GC took time Detail Data: <input type="checkbox" checked="true"  ng-model="gcTookTimeChecked" aria-label="Toggle ngShow"><br />
+        <div ng-show="gcTookTimeChecked">
+            <table>
+
+                <tr>
+                    <td>time</td>
+                    <td>tookInMacroSeconds</td>
+                    <td>type</td>
+                </tr>
+                <tr ng-repeat = "one_record in test_summary.gc_took ">
+                    <!--
+                    https://docs.angularjs.org/api/ng/filter/number - this link tells how to format the number in js and html.GOOD.
+                    https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                    -->
+                    <td align="right">{{ one_record[0] }}</td>
+                    <td align="right">{{ one_record[1] | number : 0}}</td>
+                    <td align="right">{{ one_record[2] }}</td>
+
+                </tr>
+            </table>
+        </div>
     </div>
 
 
@@ -133,8 +153,8 @@
                         columnLatencyData[3].unshift('match');
                         columnLatencyData[4].unshift('pickFromOutputQ');
 
-                        addParagraph('console_container',latency_data_copy.length);
-                        addParagraph('console_container',latency_data_copy[0].length);
+                        //addParagraph('console_container',latency_data_copy.length);
+                        //addParagraph('console_container',latency_data_copy[0].length);
                         chart.load({
                             columns: [
                                 columnLatencyData[0],
@@ -152,7 +172,7 @@
                 $scope.filterOutLatencyDataFromMap = function(items) {
                     var result = {};
                     angular.forEach(items, function(value, key) {
-                        if (key !== 'latency_data' ) {
+                        if (key !== 'latency_data' && key !== 'gc_took' ) {
                             result[key] = value;
                         }
                     });
