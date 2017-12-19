@@ -36,6 +36,9 @@ public class MatchingEngineWebWrapper {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
+    private long _msgIDBase = System.nanoTime();
+    private AtomicLong _msgIDCounter = new AtomicLong(0);
+
     private AtomicLong _placedOrderCounter = new AtomicLong(0);
     private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
@@ -67,8 +70,8 @@ public class MatchingEngineWebWrapper {
                              @RequestParam(value = "price", defaultValue="126.0") double price,
                              @RequestParam(value = "qty", defaultValue = "5000") int qty){
 
-        String clientOrdID = clientEntity+"_"+System.nanoTime();
-        String orderID = symbol+"_"+clientEntity+"_"+System.nanoTime();
+        final String clientOrdID = clientEntity+"_"+ _msgIDBase + "_" + this._msgIDCounter.incrementAndGet();
+        final String orderID = symbol+"_"+clientEntity+"_"+ _msgIDBase + "_" + this._msgIDCounter.incrementAndGet();
 
         log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
         final CommonMessage.Side orderSide;

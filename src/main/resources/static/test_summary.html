@@ -61,9 +61,8 @@
             </tr>
         </table>
 
+        <h3>Latency Chart</h3>
         <div id="latency_chart"></div>
-        <div id="gc_took_chart"></div>
-
         Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="latencyDataChecked" aria-label="Toggle ngShow"><br />
         <div ng-show="latencyDataChecked">
             <table>
@@ -90,6 +89,9 @@
             </table>
         </div>
 
+
+        <h3>GC Took Chart</h3>
+        <div id="gc_took_chart"></div>
         Show GC took time Detail Data: <input type="checkbox" checked="true"  ng-model="gcTookTimeChecked" aria-label="Toggle ngShow"><br />
         <div ng-show="gcTookTimeChecked">
             <table>
