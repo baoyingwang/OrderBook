@@ -1,8 +1,8 @@
 package baoying.orderbook;
 
 import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.MatchingEngine.MatchingEnginOutputMessageFlag;
-import baoying.orderbook.MatchingEngine.MatchingEngineInputMessageFlag;
+import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
+import baoying.orderbook.OrderBook.MatchingEngineInputMessageFlag;
 
 public class TradeMessage {
     public static class OriginalOrder implements MatchingEngineInputMessageFlag {

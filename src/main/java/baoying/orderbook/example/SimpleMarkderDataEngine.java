@@ -1,6 +1,6 @@
 package baoying.orderbook.example;
 
-import baoying.orderbook.DisruptorInputAcceptor;
+import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.MarketDataMessage;
 import com.google.common.eventbus.Subscribe;
 import org.slf4j.Logger;
@@ -17,7 +17,7 @@ public class SimpleMarkderDataEngine {
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
 
-    SimpleMarkderDataEngine(List<DisruptorInputAcceptor> engineInputAcceptors){
+    SimpleMarkderDataEngine(List<MatchingEngine> engineInputAcceptors){
         orderbookBySymbol = new ConcurrentHashMap<>();
         _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engineInputAcceptors);
     }
@@ -44,9 +44,9 @@ public class SimpleMarkderDataEngine {
     class InternalTriggerOrderBookThread extends Thread {
 
         private volatile boolean _stopFlag = false;
-        private List<DisruptorInputAcceptor> _engineInputAcceptors;
+        private List<MatchingEngine> _engineInputAcceptors;
 
-        InternalTriggerOrderBookThread(String threadName, List<DisruptorInputAcceptor> engines) {
+        InternalTriggerOrderBookThread(String threadName, List<MatchingEngine> engines) {
             super(threadName);
             _engineInputAcceptors = engines;
         }
@@ -56,7 +56,7 @@ public class SimpleMarkderDataEngine {
 
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
-                for(DisruptorInputAcceptor engineInputAcceptor: _engineInputAcceptors){
+                for(MatchingEngine engineInputAcceptor: _engineInputAcceptors){
                     engineInputAcceptor.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
                 }
 

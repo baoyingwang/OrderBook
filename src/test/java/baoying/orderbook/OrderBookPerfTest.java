@@ -2,20 +2,18 @@ package baoying.orderbook;
 
 import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.MarketDataMessage.OrderBookDelta;
-import baoying.orderbook.MatchingEngine.ExecutingOrder;
-import baoying.orderbook.MatchingEngine.MatchingEnginOutputMessageFlag;
-import baoying.orderbook.TradeMessage.MatchedExecutionReport;
+import baoying.orderbook.OrderBook.ExecutingOrder;
+import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.TreeMap;
 
-public class MatchingEnginePerfTest {
+public class OrderBookPerfTest {
 
-	MatchingEngine _exchange = new MatchingEngine("USDJPY", null, null);
+	OrderBook _exchange = new OrderBook("USDJPY");
 
 	PriorityQueue<ExecutingOrder> getInitialBidBook() {
 

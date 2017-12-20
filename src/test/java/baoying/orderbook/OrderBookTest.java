@@ -1,25 +1,21 @@
 package baoying.orderbook;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
 
 import org.junit.Test;
 
-import baoying.orderbook.CommonMessage;
-import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.MarketDataMessage.OrderBookDelta;
-import baoying.orderbook.MatchingEngine.ExecutingOrder;
-import baoying.orderbook.MatchingEngine.MatchingEnginOutputMessageFlag;
+import baoying.orderbook.OrderBook.ExecutingOrder;
+import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
 import baoying.orderbook.TradeMessage.MatchedExecutionReport;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 
-public class MatchingEngineTest {
+public class OrderBookTest {
 
-	MatchingEngine _exchange = new MatchingEngine("USDJPY", null, null);
+	OrderBook _exchange = new OrderBook("USDJPY");
 	
 	@Test
 	public void testCreateBidBook(){
@@ -116,7 +112,7 @@ public class MatchingEngineTest {
 		
 		OriginalOrder bid_145_1point5Mio = new OriginalOrder( System.currentTimeMillis(),symbol, CommonMessage.Side.BID,CommonMessage.OrderType.LIMIT, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
 
-		MatchingEngine.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
+		OrderBook.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
 		List<MatchingEnginOutputMessageFlag> reports = result._1;
 		List<OrderBookDelta> orderbookDeltas = result._2;
 		for(MatchingEnginOutputMessageFlag r : reports){

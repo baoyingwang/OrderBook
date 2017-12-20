@@ -1,9 +1,9 @@
 package baoying.orderbook.example;
 
 import baoying.orderbook.MatchingEngine;
+import baoying.orderbook.OrderBook;
 import baoying.orderbook.TradeMessage;
 import com.google.common.eventbus.Subscribe;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;

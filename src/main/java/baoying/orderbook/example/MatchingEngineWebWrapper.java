@@ -5,10 +5,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,7 +17,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -43,18 +38,18 @@ public class MatchingEngineWebWrapper {
     private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
 
-    private final Map<String,DisruptorInputAcceptor> _disruptorInputAcceptorsBySymbol;
+    private final Map<String,MatchingEngine> _enginesBySimbol;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
-    MatchingEngineWebWrapper(SimpleOMSEngine simpleOMSEngine,
-                             SimpleMarkderDataEngine simpleMarkderDataEngine,
-                             Map<String,DisruptorInputAcceptor> disruptorInputAcceptorsBySymbol){
+    MatchingEngineWebWrapper(Map<String,MatchingEngine> engines,
+                             SimpleOMSEngine simpleOMSEngine,
+                             SimpleMarkderDataEngine simpleMarkderDataEngine){
 
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
-        _disruptorInputAcceptorsBySymbol = disruptorInputAcceptorsBySymbol;
+        _enginesBySimbol = engines;
 
     }
 
@@ -89,7 +84,7 @@ public class MatchingEngineWebWrapper {
         if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
             originalOrder._recvFromClient_sysNano_test = System.nanoTime();
         }
-        DisruptorInputAcceptor inputAcceptor = _disruptorInputAcceptorsBySymbol.get(originalOrder._symbol);
+        MatchingEngine inputAcceptor = _enginesBySimbol.get(originalOrder._symbol);
         if(inputAcceptor != null) {
             TradeMessage.SingleSideExecutionReport erNew = inputAcceptor.addOrder(originalOrder);
 
@@ -206,13 +201,13 @@ public class MatchingEngineWebWrapper {
             final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
             data.put("latency_data_count", latency_data_count_all);
 
-            List<String[]> tailResponseLatencyData = loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
+            List<String[]> tailResponseLatencyData = Util.loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
             data.put("latency_data", tailResponseLatencyData);
 
             try {
                 //bad performance to process the same lines many times
                 GCLogUtil.main(new String[]{"log/GC.txt", "log/GC.summary.csv"});
-                List<String[]> tailGCTookData = loadTailCsvLines(Paths.get("log/GC.summary.csv"), 100);
+                List<String[]> tailGCTookData = Util.loadTailCsvLines(Paths.get("log/GC.summary.csv"), 100);
                 data.put("gc_took", tailGCTookData);
             }catch (Exception e2){
                 log.error("",e2);
@@ -234,23 +229,6 @@ public class MatchingEngineWebWrapper {
         }
 
         return jsonString;
-    }
-
-    private List<String[]> loadTailCsvLines(Path outputAppendingLatencyDataFile, long maxNumberOfResponseLatencyData, long latency_data_count_all) throws Exception{
-        List<String[]> tailResponseLatencyData = new ArrayList<>();
-        long skipLines = latency_data_count_all>400? latency_data_count_all-400 : 1;
-        //TODO performance improvement - read twice(here) above get latency_data_count_all
-        java.nio.file.Files.lines(outputAppendingLatencyDataFile).skip(skipLines).forEach(line ->{
-            tailResponseLatencyData.add(line.split(","));
-        });
-
-        return tailResponseLatencyData;
-    }
-
-    private List<String[]> loadTailCsvLines(Path outputAppendingLatencyDataFile, long maxNumberOfResponseLatencyData) throws Exception{
-
-        final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
-        return loadTailCsvLines(outputAppendingLatencyDataFile,  maxNumberOfResponseLatencyData,latency_data_count_all);
     }
 
 }

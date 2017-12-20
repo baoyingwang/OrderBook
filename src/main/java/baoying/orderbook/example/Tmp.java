@@ -18,5 +18,9 @@ public class Tmp {
 
     public static void main(String[] args) throws Exception{
 
+        Path outputAppendingLatencyDataFile = Paths.get("log/GC.txt");
+        long maxNumberOfResponseLatencyData = 200;
+        List<String[]> r = Util.loadTailCsvLines(outputAppendingLatencyDataFile, maxNumberOfResponseLatencyData);
+        System.out.println(r.size());
     }
 }
