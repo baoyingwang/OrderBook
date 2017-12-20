@@ -12,10 +12,52 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class SimpleOMSEngine {
 
     public static final String IGNORE_ENTITY_PREFIX ="BACKGROUND";
+
+    PerfTestData _perfTestData = new PerfTestData();
+    class PerfTestData{
+
+        AtomicLong _placedOrderCounter = new AtomicLong(0);
+        TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
+        TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
+
+        void resetBeforeTest(){
+            _placedOrderCounter.set(0);
+            _firstOriginalOrderSinceTest = null;
+            _lastOriginalOrderSinceTest = null;
+
+            _testTimeDataQueue.clear();
+        }
+
+        //TODO will thread issue? since maybe multi threads call this method.
+        void recordNewOrder(TradeMessage.OriginalOrder originalOrder){
+            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
+            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
+            else{_lastOriginalOrderSinceTest = originalOrder;}
+        }
+
+        long count(){
+            return _placedOrderCounter.get();
+        }
+
+        long startInEpochMS(){
+            if(_firstOriginalOrderSinceTest == null){
+                throw new RuntimeException("fail to get start in MS");
+            }
+            return _firstOriginalOrderSinceTest._recvFromClientEpochMS;
+        }
+
+        long lastInEpochMS(){
+            if(_lastOriginalOrderSinceTest == null){
+                throw new RuntimeException("fail to get end in MS");
+            }
+            return _lastOriginalOrderSinceTest._recvFromClientEpochMS;
+        }
+    }
 
     //value: list of execution report(as Map<String, String)
     private final Map<String, List<Map<String, String>>> executionReportsByOrderID;
@@ -35,9 +77,7 @@ public class SimpleOMSEngine {
         _testTimeDataQueue.drainTo(deltaLatencyData);
         return deltaLatencyData;
     }
-    void clearTestTimeDataQueue(){
-        _testTimeDataQueue.clear();
-    }
+
 
     @Subscribe
     public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {

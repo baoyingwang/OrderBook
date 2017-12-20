@@ -93,8 +93,6 @@ public class MatchingEngineFIXWrapper {
 
     public void processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
 
-
-
         TradeMessage.OriginalOrder originalOrder = null;
         switch(maker_taker){
             case MAKER :
@@ -160,6 +158,8 @@ public class MatchingEngineFIXWrapper {
                 }
 
                 TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+                _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
+
                 Message fixER = buildFIXExecutionReport(erNew);
 
                 try {

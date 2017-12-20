@@ -31,10 +31,6 @@ public class MatchingEngineWebWrapper {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
-    private AtomicLong _placedOrderCounter = new AtomicLong(0);
-    private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
-    private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
-
     private final Map<String,MatchingEngine> _enginesBySimbol;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
@@ -87,11 +83,9 @@ public class MatchingEngineWebWrapper {
             log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
             return "ERROR - wrong symbol - MORE DETAIL TO BE PROVIDED";
         }
-        TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
 
-        long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
-        if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
-        else{_lastOriginalOrderSinceTest = originalOrder;}
+        TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+        _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(erNew);
@@ -128,15 +122,9 @@ public class MatchingEngineWebWrapper {
 
     @RequestMapping("/reset_test_data")
     public String resetBeforeTest(){
-        _placedOrderCounter.set(0);
-        _firstOriginalOrderSinceTest = null;
-        _lastOriginalOrderSinceTest = null;
-        _simpleOMSEngine.clearTestTimeDataQueue();
-
+        _simpleOMSEngine._perfTestData.resetBeforeTest();
         log.info("===============reset_test_data===============");
-
         return "reset done";
-
     }
 
     DateTimeFormatter finalNameFormatter =
@@ -149,15 +137,15 @@ public class MatchingEngineWebWrapper {
             log.info("get_test_summary enter");
             Map<String, Object> data = new HashMap<>();
 
-            long allOrderCount = _placedOrderCounter.get();
+            long allOrderCount = _simpleOMSEngine._perfTestData.count();
             data.put("order_count", allOrderCount);
 
-
-            if (_firstOriginalOrderSinceTest == null || allOrderCount == 0) {
+            if (allOrderCount < 2) {
                 log.error("get_test_summary - ERROR - no order during the test");
-                return "ERROR - no order during the test";
+                return "ERROR - not calculate summary if order count less than 2, now:" + allOrderCount;
             }
-            long startTimeInEpochMS = _firstOriginalOrderSinceTest._recvFromClientEpochMS;
+
+            long startTimeInEpochMS = _simpleOMSEngine._perfTestData.startInEpochMS();
             Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
             data.put("start_time", instantStart.toString());
             log.info("get_test_summary - start_time");
@@ -165,10 +153,7 @@ public class MatchingEngineWebWrapper {
             final Instant instantEnd;
             final long endTimeInEpochMS;
             {
-                if (_lastOriginalOrderSinceTest == null) {
-                    return "ERROR - get_test_summary - no summary since only single order for now";
-                }
-                endTimeInEpochMS = _lastOriginalOrderSinceTest._recvFromClientEpochMS;
+                endTimeInEpochMS = _simpleOMSEngine._perfTestData.lastInEpochMS();
                 instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
             }
             data.put("end_time", instantEnd.toString());
@@ -186,7 +171,7 @@ public class MatchingEngineWebWrapper {
             data.put("rate_per_second", String.format("%.2f", ratePerSecond));
 
             final List<long[]> deltaLatencyData = _simpleOMSEngine.drainTestTimeDataQueue();
-            log.info("get_test_summary - latency_data :{} ", deltaLatencyData.size());
+            data.put("drained_latency_data", deltaLatencyData.size());
 
             //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
             Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_OverallStart_" + finalNameFormatter.format(instantStart) + ".csv");
@@ -201,7 +186,7 @@ public class MatchingEngineWebWrapper {
             log.info("get_test_summary - outputAppendingLatencyDataFile");
 
             final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
-            data.put("latency_data_count", latency_data_count_all);
+            data.put("latency_data_count", latency_data_count_all-1);
 
             List<String[]> tailResponseLatencyData = Util.loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
             data.put("latency_data", tailResponseLatencyData);
