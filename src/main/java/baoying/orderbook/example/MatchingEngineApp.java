@@ -33,6 +33,9 @@ public class MatchingEngineApp {
     private final SimpleOMSEngine         _simpleOMSEngine ;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
+    private final MatchingEngineWebWrapper _webWrapper;
+    private final MatchingEngineFIXWrapper _fixWrapper;
+
     //Why are the Bean declarations required?  MatchingEnginWebWrapper depends on Spring Rest feature. That needs Beans as constructor arguments.
     @Bean
     SimpleOMSEngine createSimpleOMSEngine(){
@@ -52,7 +55,7 @@ public class MatchingEngineApp {
         return result;
     }
 
-    public MatchingEngineApp(){
+    public MatchingEngineApp() throws Exception{
 
         _executionReportsBus = new AsyncEventBus("async evt ER bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
                     @Override
@@ -74,6 +77,20 @@ public class MatchingEngineApp {
         _simpleMarkderDataEngine = new SimpleMarkderDataEngine(Arrays.asList(_matchingEngine_USDJPY, _matchingEngine_USDHKD));
         _executionReportsBus.register(_simpleOMSEngine);
         _marketDataBus.register(_simpleMarkderDataEngine);
+
+        Map<String, MatchingEngine> enginesBySymbol = new HashMap<>();
+        enginesBySymbol.put("USDJPY", _matchingEngine_USDJPY);
+        enginesBySymbol.put("USDHKD", _matchingEngine_USDHKD);
+        _webWrapper = new MatchingEngineWebWrapper(enginesBySymbol,
+                _simpleOMSEngine,
+                _simpleMarkderDataEngine);
+
+        _fixWrapper = new MatchingEngineFIXWrapper(enginesBySymbol,
+                _simpleOMSEngine,
+                _simpleMarkderDataEngine,
+                "DefaultDynamicSessionQFJServer.qfj.config.txt");
+        //register FIX, for streaming output
+        _executionReportsBus.register(_fixWrapper);
     }
 
     @PostConstruct
@@ -84,19 +101,7 @@ public class MatchingEngineApp {
         _matchingEngine_USDHKD.start();
         _simpleMarkderDataEngine.start();
 
-        Map<String, MatchingEngine> enginesBySymbol = new HashMap<>();
-        enginesBySymbol.put("USDJPY", _matchingEngine_USDJPY);
-        enginesBySymbol.put("USDHKD", _matchingEngine_USDHKD);
-
-        MatchingEngineWebWrapper webWrapper = new MatchingEngineWebWrapper(enginesBySymbol,
-                                                                            _simpleOMSEngine,
-                                                                            _simpleMarkderDataEngine);
-
-        MatchingEngineFIXWrapper fixWrapper = new MatchingEngineFIXWrapper(enginesBySymbol,
-                                                                            _simpleOMSEngine,
-                                                                            _simpleMarkderDataEngine,
-                                                                            "DefaultDynamicSessionQFJServer.qfj.config.txt");
-        fixWrapper.start();
+        _fixWrapper.start();
     }
 
     public static void main(String[] args) {

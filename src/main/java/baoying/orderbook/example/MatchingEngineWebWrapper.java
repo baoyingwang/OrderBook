@@ -31,9 +31,6 @@ public class MatchingEngineWebWrapper {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
-    private long _msgIDBase = System.nanoTime();
-    private AtomicLong _msgIDCounter = new AtomicLong(0);
-
     private AtomicLong _placedOrderCounter = new AtomicLong(0);
     private TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
     private TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
@@ -65,8 +62,8 @@ public class MatchingEngineWebWrapper {
                              @RequestParam(value = "price", defaultValue="126.0") double price,
                              @RequestParam(value = "qty", defaultValue = "5000") int qty){
 
-        final String clientOrdID = clientEntity+"_"+ _msgIDBase + "_" + this._msgIDCounter.incrementAndGet();
-        final String orderID = symbol+"_"+clientEntity+"_"+ _msgIDBase + "_" + this._msgIDCounter.incrementAndGet();
+        final String clientOrdID = clientEntity+"_"+ UniqIDGenerator.next();
+        final String orderID = symbol+"_"+clientEntity+"_"+ UniqIDGenerator.next();
 
         log.info("received order request, symbol:{}, client ordID:{}, ordID:{}", new Object[]{symbol,clientOrdID,orderID });
         final CommonMessage.Side orderSide;
@@ -84,20 +81,22 @@ public class MatchingEngineWebWrapper {
         if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
             originalOrder._recvFromClient_sysNano_test = System.nanoTime();
         }
-        MatchingEngine inputAcceptor = _enginesBySimbol.get(originalOrder._symbol);
-        if(inputAcceptor != null) {
-            TradeMessage.SingleSideExecutionReport erNew = inputAcceptor.addOrder(originalOrder);
 
-            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
-            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
-            else{_lastOriginalOrderSinceTest = originalOrder;}
-
-            Gson gson = new GsonBuilder().create();
-            String jsonString = gson.toJson(erNew);
-            return jsonString;
-        }else{
-            return "ERROR - not supported symbol:" + originalOrder._symbol;
+        MatchingEngine engine = _enginesBySimbol.get(originalOrder._symbol);
+        if(engine == null){
+            log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
+            return "ERROR - wrong symbol - MORE DETAIL TO BE PROVIDED";
         }
+        TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+
+        long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
+        if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
+        else{_lastOriginalOrderSinceTest = originalOrder;}
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(erNew);
+        return jsonString;
+
     }
 
     @RequestMapping("/query_exec_reports")
@@ -128,13 +127,16 @@ public class MatchingEngineWebWrapper {
     }
 
     @RequestMapping("/reset_test_data")
-    public void resetBeforeTest(){
+    public String resetBeforeTest(){
         _placedOrderCounter.set(0);
         _firstOriginalOrderSinceTest = null;
         _lastOriginalOrderSinceTest = null;
         _simpleOMSEngine.clearTestTimeDataQueue();
 
         log.info("===============reset_test_data===============");
+
+        return "reset done";
+
     }
 
     DateTimeFormatter finalNameFormatter =

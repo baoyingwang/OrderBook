@@ -40,21 +40,54 @@ public class TradeMessage {
         public final String _clientEntityID; // to avoid execution with himself
 	}
 
-    public enum SingleSideExecutionType{
+	//https://stackoverflow.com/questions/8157755/how-to-convert-enum-value-to-int
+    //http://www.onixs.biz/fix-dictionary/4.4/tagNum_150.html
+    public enum ExecutionType {
 
-		NEW,CANCELLED, REJECTED;
+		NEW('0'),CANCELLED('4'), REJECTED('8'),
+        TRADE('F'); //F = Trade (partial fill or fill)
+
+		private final char _fix150ExecType;
+
+		private ExecutionType(char fix150ExecType){
+			this._fix150ExecType = fix150ExecType;
+		}
+
+		public char getFIX150Type(){
+			return _fix150ExecType;
+		}
 	}
+
+    //http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_39.html
+    public enum OrderStatus{
+
+        NEW('0'),
+        PARTIALLY_FILLED('1'),
+        FILLED('2'),
+        CANCELLED('4'),
+        REJECTED('8');
+
+        private final char _fix39OrdStatus;
+
+        private OrderStatus(char fix39OrdStatus){
+            this._fix39OrdStatus = fix39OrdStatus;
+        }
+
+        public char getFIX39OrdStatus(){
+            return _fix39OrdStatus;
+        }
+    }
 	// maker: who sit in the book
     public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
 
         public final long _msgID;
 		public final long _msgEpochMS;
-        public final SingleSideExecutionType _type;
+        public final ExecutionType _type; //http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_150.html
         public final OriginalOrder _originOrder;
         public final int _leavesQty;
         public final String _description;
 
-        public SingleSideExecutionReport(long msgID,long msgEpochMS, OriginalOrder originOrder, SingleSideExecutionType type, int leavesQty, String description){
+        public SingleSideExecutionReport(long msgID, long msgEpochMS, OriginalOrder originOrder, ExecutionType type, int leavesQty, String description){
 			_msgID = msgID;
 			_msgEpochMS = msgEpochMS;
 			_originOrder = originOrder;

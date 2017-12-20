@@ -75,7 +75,7 @@ public class MatchingEngine {
 			return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
 					System.currentTimeMillis(),
 					order,
-					TradeMessage.SingleSideExecutionType.NEW,
+					TradeMessage.ExecutionType.NEW,
 					order._qty,
 					"Entered Order Book");
 		}else{
@@ -83,7 +83,7 @@ public class MatchingEngine {
 			return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
 					System.currentTimeMillis(),
 					order,
-					TradeMessage.SingleSideExecutionType.REJECTED,
+					TradeMessage.ExecutionType.REJECTED,
 					order._qty,
 					"Fail to enter Order Book");
 		}

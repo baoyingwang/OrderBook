@@ -15,6 +15,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class SimpleOMSEngine {
 
+    public static final String IGNORE_ENTITY_PREFIX ="BACKGROUND";
+
     //value: list of execution report(as Map<String, String)
     private final Map<String, List<Map<String, String>>> executionReportsByOrderID;
     private final BlockingQueue<long[]> _testTimeDataQueue;
@@ -55,15 +57,9 @@ public class SimpleOMSEngine {
     @Subscribe
     public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
 
-        //this is the only thread to modify the executionReportsByOrderID
-        if(matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
-            addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
-        }
-
+        //ignore maker side, because maker orders always sit in book during test
         if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
             long outputConsumingNanoTime = System.nanoTime();
-            addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
-
             _testTimeDataQueue.add(new long[]{
                     matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
                     matchedExecutionReport._taker_enterInputQ_sysNano_test
@@ -77,6 +73,15 @@ public class SimpleOMSEngine {
 
                     outputConsumingNanoTime - matchedExecutionReport._matching_sysNano_test});
         }
+
+        if(! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
+            addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
+        }
+
+        if(! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)) {
+            addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
+        }
+
     }
 
     private void addERStore(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker, TradeMessage.OriginalOrder originalOrder){

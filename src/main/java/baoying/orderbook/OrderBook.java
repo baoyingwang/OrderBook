@@ -7,13 +7,11 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.eventbus.AsyncEventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.MarketDataMessage.AggregatedOrderBook;
-import baoying.orderbook.MarketDataMessage.AggregatedOrderBookRequest;
 import baoying.orderbook.MarketDataMessage.OrderBookDelta;
 import baoying.orderbook.TradeMessage.MatchedExecutionReport;
 import baoying.orderbook.TradeMessage.OriginalOrder;
@@ -129,7 +127,7 @@ public class OrderBook {
 			if (peekedContraBestPriceOrder._origOrder._clientEntityID
 			        .equals(executingOrder._origOrder._clientEntityID)) {
 				execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(), System.currentTimeMillis(),executingOrder._origOrder,
-				        TradeMessage.SingleSideExecutionType.REJECTED, executingOrder._leavesQty,"Cannot trade with yourself"));
+				        TradeMessage.ExecutionType.REJECTED, executingOrder._leavesQty,"Cannot trade with yourself"));
 				rejected = true;
 				break;
 			}
@@ -186,7 +184,7 @@ public class OrderBook {
                 switch(executingOrder._origOrder._type) {
                     case MARKET :
                         execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),  System.currentTimeMillis(),executingOrder._origOrder,
-                            TradeMessage.SingleSideExecutionType.CANCELLED, executingOrder._leavesQty,"No available liquidity for this market order"));
+                            TradeMessage.ExecutionType.CANCELLED, executingOrder._leavesQty,"No available liquidity for this market order"));
                         break;
                     case LIMIT :
                         sameSideBook.add(executingOrder);

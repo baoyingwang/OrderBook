@@ -47,3 +47,4 @@ ConnectionType=acceptor
 #not required to define the SenderCompID/TargetCompID anymore.
 [session]
 AcceptorTemplate=Y
+SenderCompID=BaoyingMatchingCompID
