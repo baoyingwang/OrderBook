@@ -39,7 +39,6 @@ public class MatchingEngineApp {
         return _simpleOMSEngine;
     }
 
-
     @Bean
     SimpleMarkderDataEngine createSimpleMarkderDataEngine(){
         return _simpleMarkderDataEngine;
@@ -78,7 +77,7 @@ public class MatchingEngineApp {
     }
 
     @PostConstruct
-    public void start(){
+    public void start() throws Exception{
 
         log.info("start the MatchingEngineApp");
         _matchingEngine_USDJPY.start();
@@ -95,7 +94,9 @@ public class MatchingEngineApp {
 
         MatchingEngineFIXWrapper fixWrapper = new MatchingEngineFIXWrapper(enginesBySymbol,
                                                                             _simpleOMSEngine,
-                                                                            _simpleMarkderDataEngine);
+                                                                            _simpleMarkderDataEngine,
+                                                                            "DefaultDynamicSessionQFJServer.qfj.config.txt");
+        fixWrapper.start();
     }
 
     public static void main(String[] args) {
