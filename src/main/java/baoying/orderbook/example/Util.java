@@ -22,6 +22,9 @@ import java.util.stream.Stream;
 public class Util {
     private final static Logger log = LoggerFactory.getLogger(Util.class);
 
+    static DateTimeFormatter fileNameFormatter =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.SSS'Z'").withZone( ZoneId.of("UTC") );
+
     static String toCsvString(long[] array){
 
         return toCsvString(array, 0, array.length);

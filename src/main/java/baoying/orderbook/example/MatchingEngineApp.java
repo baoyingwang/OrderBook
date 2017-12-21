@@ -10,16 +10,21 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 import javax.annotation.PostConstruct;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
 
 @SpringBootApplication
-//@Configuration
-//@ComponentScan
-//@EnableAutoConfiguration
 public class MatchingEngineApp {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineApp.class);
@@ -35,6 +40,8 @@ public class MatchingEngineApp {
 
     private final MatchingEngineWebWrapper _webWrapper;
     private final MatchingEngineFIXWrapper _fixWrapper;
+
+    private final SysPerfDataCollectionEngine sysPerfEngine;
 
     //Why are the Bean declarations required?  MatchingEnginWebWrapper depends on Spring Rest feature. That needs Beans as constructor arguments.
     @Bean
@@ -56,6 +63,21 @@ public class MatchingEngineApp {
     }
 
     public MatchingEngineApp() throws Exception{
+
+        //TODO configurable. It should be be printed per minute, or per 2 minutes on production
+        String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
+        Path usageFile = Paths.get("log/sysUsage_app.start"+ startTimeAsFileName+".csv");
+        Path sysInfoFile = Paths.get("log/sysInfo_app.start"+ startTimeAsFileName+".txt");
+        sysPerfEngine = new SysPerfDataCollectionEngine(5, TimeUnit.SECONDS, usageFile);
+        Map<String, String> config = sysPerfEngine.config();
+        config.forEach((k, v)->{
+            try {
+                Files.write(sysInfoFile, (k + ":" + v + "\n").getBytes(), APPEND, CREATE);
+            }catch (Exception e){
+            //TODO log exception
+            e.printStackTrace();
+            }
+        });
 
         _executionReportsBus = new AsyncEventBus("async evt ER bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
                     @Override

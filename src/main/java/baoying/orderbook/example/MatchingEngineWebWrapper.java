@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -127,8 +126,6 @@ public class MatchingEngineWebWrapper {
         return "reset done";
     }
 
-    DateTimeFormatter finalNameFormatter =
-            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.SSS'Z'").withZone( ZoneId.of("UTC") );
     @RequestMapping("/get_test_summary")
     public String endTest(){
 
@@ -174,7 +171,7 @@ public class MatchingEngineWebWrapper {
             data.put("drained_latency_data", deltaLatencyData.size());
 
             //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
-            Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_OverallStart_" + finalNameFormatter.format(instantStart) + ".csv");
+            Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_test.start" + Util.fileNameFormatter.format(instantStart) + ".csv");
             //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
             List<String> latencyDataCSVLines = deltaLatencyData.stream()
                     .map(it -> Instant.ofEpochMilli(it[0]) + "," + Util.toCsvString(it, 1, it.length)).collect(Collectors.toList());
@@ -200,7 +197,7 @@ public class MatchingEngineWebWrapper {
                 log.error("",e2);
             }
             //the last line is the latest information
-            Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_OverallStart_" + finalNameFormatter.format(instantStart) + ".json.txt");
+            Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_test.start" + Util.fileNameFormatter.format(instantStart) + ".json.txt");
             Gson gson = new GsonBuilder().create();
             jsonString = gson.toJson(data);
             Files.write(outputAppendingLatencySummaryFile, (jsonString + "\n").getBytes(), APPEND, CREATE);
