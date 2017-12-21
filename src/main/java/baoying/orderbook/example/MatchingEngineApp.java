@@ -68,7 +68,7 @@ public class MatchingEngineApp {
         String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
         Path usageFile = Paths.get("log/sysUsage_app.start"+ startTimeAsFileName+".csv");
         Path sysInfoFile = Paths.get("log/sysInfo_app.start"+ startTimeAsFileName+".txt");
-        sysPerfEngine = new SysPerfDataCollectionEngine(5, TimeUnit.SECONDS, usageFile);
+        sysPerfEngine = SysPerfDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
         Map<String, String> config = sysPerfEngine.config();
         config.forEach((k, v)->{
             try {

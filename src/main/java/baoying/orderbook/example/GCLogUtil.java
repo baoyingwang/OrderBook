@@ -32,7 +32,7 @@ public class GCLogUtil {
 
         List<GCLogEntry> GCLogEntryList = parseGCLog(gcLogPath);
         List<String> gcLogEntrySummaryCSVLines = GCLogEntryList.stream()
-                .map(entry -> entry._logTime +","+entry._microTook+","+entry._type)
+                .map(entry -> Util.formterOfOutputTime.format(entry._logTime) +","+entry._microTook+","+entry._type)
                 .collect(Collectors.toList());
 
         if(args.length>=2){
@@ -145,7 +145,7 @@ public class GCLogUtil {
     }
 
     static class GCLogEntry{
-        final Instant _logTime; //TODO use UTC
+        final Instant _logTime;
         final double _microTook;
         final String _type;
         GCLogEntry(Instant logTime, double microLatency, String type){

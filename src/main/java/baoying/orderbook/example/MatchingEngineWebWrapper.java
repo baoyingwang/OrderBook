@@ -174,7 +174,7 @@ public class MatchingEngineWebWrapper {
             Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_test.start" + Util.fileNameFormatter.format(instantStart) + ".csv");
             //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
             List<String> latencyDataCSVLines = deltaLatencyData.stream()
-                    .map(it -> Instant.ofEpochMilli(it[0]) + "," + Util.toCsvString(it, 1, it.length)).collect(Collectors.toList());
+                    .map(it -> Util.formterOfOutputTime.format(Instant.ofEpochMilli(it[0])) + "," + Util.toCsvString(it, 1, it.length)).collect(Collectors.toList());
             if (!Files.exists(outputAppendingLatencyDataFile)) {
                 Files.createFile(outputAppendingLatencyDataFile); //need create in advance because the following check line count requires it.
                 Files.write(outputAppendingLatencyDataFile, ("recvTime,put2InputQ,pickFromInputQ,match,pickFromOutputQ" + "\n").getBytes(), APPEND, CREATE);
@@ -200,12 +200,9 @@ public class MatchingEngineWebWrapper {
             Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_test.start" + Util.fileNameFormatter.format(instantStart) + ".json.txt");
             Gson gson = new GsonBuilder().create();
             jsonString = gson.toJson(data);
-            Files.write(outputAppendingLatencySummaryFile, (jsonString + "\n").getBytes(), APPEND, CREATE);
-
+            Files.write(outputAppendingLatencySummaryFile, (Util.formterOfOutputTime.format(Instant.now())+" "+jsonString + "\n").getBytes(), APPEND, CREATE);
 
             log.info("get_test_summary json generated");
-
-
 
             log.info("get_test_summary end");
         }catch(Exception e){

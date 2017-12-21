@@ -30,7 +30,15 @@ public class SysPerfDataCollectionEngine {
         executor = null;
     }
 
-    SysPerfDataCollectionEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
+    public static SysPerfDataCollectionEngine asUtil(){
+        return new SysPerfDataCollectionEngine();
+    }
+
+    public static SysPerfDataCollectionEngine asEngine(long period, TimeUnit unit, Path usageFile)throws Exception{
+        return new SysPerfDataCollectionEngine( period,  unit,  usageFile);
+    }
+
+    private SysPerfDataCollectionEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
 
         if (!Files.exists(usageFile)) {
             //Files.createFile(usageFile); TODO is it required to create here? since CREATE option is used next/while-writing?
@@ -123,7 +131,13 @@ public class SysPerfDataCollectionEngine {
         List<GarbageCollectorMXBean> gcMXBeans = ManagementFactory.getGarbageCollectorMXBeans();
         AtomicInteger gcCounter = new AtomicInteger((0));
         gcMXBeans.forEach( bean -> {
-            data.put("gc Name " + gcCounter.incrementAndGet(), bean.getName());
+            int c = gcCounter.incrementAndGet();
+            data.put("gc Name " + c, bean.getName());
+
+            AtomicInteger memPoolCounter = new AtomicInteger((0));
+            for(String poolName : bean.getMemoryPoolNames()){
+                data.put("gc Name " + c +" Pool " +memPoolCounter.incrementAndGet(), poolName);
+            }
         });
 
         RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
@@ -157,10 +171,18 @@ public class SysPerfDataCollectionEngine {
 
     String csvUsage(){
         Map<String, String> usage = allUsage();
-        StringBuilder usageData = new StringBuilder(Instant.now().toString());
+        StringBuilder usageData = new StringBuilder(Util.formterOfOutputTime.format(Instant.now()));
         usage.values().forEach(it -> usageData.append(",").append(it));
 
         return usageData.toString();
     }
 
+    public static void main(String[] args){
+        SysPerfDataCollectionEngine u = SysPerfDataCollectionEngine.asUtil();
+        u.config().forEach((k,v) ->{
+            if(k.startsWith("gc")) {
+                System.out.println(k + ":" + v);
+            }
+        });
+    }
 }
