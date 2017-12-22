@@ -1,5 +1,7 @@
-package baoying.orderbook.example;
+package baoying.orderbook.testtool;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.Application;
 import quickfix.DoNotSend;
 import quickfix.FieldNotFound;
@@ -16,48 +18,48 @@ import quickfix.UnsupportedMessageType;
 		// "to" means to remote endpoint *
  */
 public class FirstMessageCallback implements Application {
-	
 
+	private final static Logger log = LoggerFactory.getLogger(FirstMessageCallback.class);
 	@Override
 	public void fromAdmin(Message paramMessage, SessionID paramSessionID)
 			throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon {
-		System.out.println("fromAdmin session received :  " + paramMessage.toString());
+		log.info("fromAdmin session received :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void fromApp(Message paramMessage, SessionID paramSessionID)
 			throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
-		System.out.println("fromApp session received :  " + paramMessage.toString());
+		log.info("fromApp session received :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void onCreate(SessionID paramSessionID) {
-		System.out.println("onCreate session :  " + paramSessionID.toString());
+		log.info("onCreate session :  " + paramSessionID.toString());
 	}
 
 	@Override
 	public void onLogon(SessionID paramSessionID) {
-		System.out.println("onLogon session :  " + paramSessionID.toString());
+		log.info("onLogon session :  " + paramSessionID.toString());
 
 	}
 
 	@Override
 	public void onLogout(SessionID paramSessionID) {
-		System.out.println("onLogout session :  " + paramSessionID.toString());
+		log.info("onLogout session :  " + paramSessionID.toString());
 
 	}
 
 	@Override
 	public void toAdmin(Message paramMessage, SessionID paramSessionID) {
-		System.out.println("toAdmin session send :  " + paramMessage.toString());
+		log.info("toAdmin session send :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
-		System.out.println("toApp session send :  " + paramMessage.toString());
+		log.info("toApp session send :  " + paramMessage.toString());
 
 	}
 

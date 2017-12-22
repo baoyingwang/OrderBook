@@ -6,6 +6,7 @@ import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 import com.google.common.eventbus.AsyncEventBus;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
@@ -33,17 +34,29 @@ public class MatchingEngine {
 
 	private final AsyncEventBus _outputMarketDataBus;
 	private final AsyncEventBus _outputExecutionReportsBus;
+	private final int _bufferSize ;
+	private final WaitStrategy  _waitStrategy ;
 
+	public MatchingEngine(OrderBook orderBook,
+						  AsyncEventBus outputExecutionReportsBus,
+						  AsyncEventBus outputMarketDataBus ){
 
-	public MatchingEngine(OrderBook orderBook, AsyncEventBus outputExecutionReportsBus, AsyncEventBus outputMarketDataBus) {
+		this(orderBook, outputExecutionReportsBus,outputMarketDataBus,new SleepingWaitStrategy(),65536 );
+
+	}
+	public MatchingEngine(OrderBook orderBook,
+						  AsyncEventBus outputExecutionReportsBus,
+						  AsyncEventBus outputMarketDataBus,
+						  WaitStrategy waitStrategy,
+						  int bufferSize) {
 		_orderBook = orderBook;
 
 		_outputExecutionReportsBus = outputExecutionReportsBus;
 		_outputMarketDataBus = outputMarketDataBus;
-
+		_bufferSize = bufferSize;
 		Executor executor = Executors.newSingleThreadExecutor();
-		int bufferSize = 1024;
-		WaitStrategy waitStrategy = new BusySpinWaitStrategy();
+
+		_waitStrategy = waitStrategy;
 		_inputMessageDisruptor = new Disruptor<>(MatchingEngineInputMessageEvent::new, bufferSize, executor, ProducerType.MULTI,waitStrategy);
 		_inputMessageRingBuffer = _inputMessageDisruptor.getRingBuffer();
 		//_inputMessageDisruptor.handleEventsWith(this::handleEvent);

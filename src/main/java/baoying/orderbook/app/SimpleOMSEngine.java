@@ -1,7 +1,6 @@
-package baoying.orderbook.example;
+package baoying.orderbook.app;
 
 import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
 import baoying.orderbook.TradeMessage;
 import com.google.common.eventbus.Subscribe;
 

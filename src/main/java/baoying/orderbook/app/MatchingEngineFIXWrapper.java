@@ -1,4 +1,4 @@
-package baoying.orderbook.example;
+package baoying.orderbook.app;
 
 import baoying.orderbook.CommonMessage;
 import baoying.orderbook.MatchingEngine;
@@ -7,7 +7,6 @@ import com.google.common.eventbus.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.*;
-import quickfix.field.BeginString;
 import quickfix.mina.acceptor.AcceptorSessionProvider;
 import quickfix.mina.acceptor.DynamicAcceptorSessionProvider;
 
@@ -20,7 +19,7 @@ import java.util.*;
 public class MatchingEngineFIXWrapper {
 
     //warn : should be exactly same with the value in the quickfix configuration file
-    private static String serverCompID = "BaoyingMatchingCompID";
+    public static String serverCompID = "BaoyingMatchingCompID";
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineFIXWrapper.class);
 
@@ -66,12 +65,7 @@ public class MatchingEngineFIXWrapper {
             return;
         }
 
-        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(SimpleOMSEngine.IGNORE_ENTITY_PREFIX)) {
-            log.info("ignore single side execution, because it meet the ignore prefix. ignored client entity:{}",singleSideExecutionReport._originOrder._clientEntityID );
-            return;
-        }
         Message fixER = buildFIXExecutionReport(singleSideExecutionReport);
-
         try {
             SessionID paramSessionID =  new SessionID("FIXT.1.1", serverCompID, singleSideExecutionReport._originOrder._clientEntityID, "");
             if(! Session.doesSessionExist(paramSessionID)){

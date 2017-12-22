@@ -17,14 +17,13 @@ import baoying.orderbook.TradeMessage.MatchedExecutionReport;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 
-/*-
- * 
+/**
+ *
  * An OrderBook for a specific symbol.
- * 
- * note: the /*- prevent the eclipse to format the below TODO list with '-' as prefix
-	- //TODO consider use other data structure(instead of simply priority queue) for book, to 1) simplify dump order book. 2) for FX, support match 2nd best price, if no relationship with 1st one(should this be supported?).
-	- //TODO consider to apply LMAX DISRUPTOR to improve the performance, if required.
-	- //note: for FX swap, we could use same logic, symbol like USDJPY_1W. But only support Spot+Fwd as standard way.
+ * note: NOT threadsafe. The {@link baoying.orderbook.MatchingEngine} promises single thread context.
+ * note: consider use other data structure(instead of simply priority queue) for book, to 1) simplify dump order book. 2) for FX, support match 2nd best price, if no relationship with 1st one(should this be supported?).
+ * note: for FX swap, we could use same logic, symbol like USDJPY_1W. But only support Spot+Fwd as standard way.
+ *
 */
 public class OrderBook {
 

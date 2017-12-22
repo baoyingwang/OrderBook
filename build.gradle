@@ -93,7 +93,7 @@ jar {
 	 manifest {
 		 attributes 'Implementation-Title': 'Baoying OrderBook/MatchingEngine'
 		 attributes 'Implementation-Version': version
-		 attributes "Main-Class": "baoying.orderbook.example.MatchingEngineWebWrapper"
+		 attributes "Main-Class": "baoying.orderbook.app.MatchingEngineApp"
 	 }
  }
 

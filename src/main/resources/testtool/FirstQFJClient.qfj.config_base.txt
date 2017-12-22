@@ -20,12 +20,10 @@ FileIncludeTimeStampForMessages=Y
 
 PersistMessages=Y
 
-[session]
+
 ConnectionType=initiator
 
-#SenderCompID is your own id
 #TargetCompID is remote id
-SenderCompID=LTC$$_FIX_001
 TargetCompID=BaoyingMatchingCompID
 
 #
@@ -59,3 +57,7 @@ ValidateFieldsOutOfOrder=N
 #Session validation setting for enabling whether field ordering is * validated. 
 #Values are "Y" or "N". Default is "Y".
 ValidateUnorderedGroupFields=N
+
+#[session]
+#SenderCompID is your own id
+#SenderCompID=LTC$$_FIX_001

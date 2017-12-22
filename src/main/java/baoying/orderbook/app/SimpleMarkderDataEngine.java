@@ -1,4 +1,4 @@
-package baoying.orderbook.example;
+package baoying.orderbook.app;
 
 import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.MarketDataMessage;
