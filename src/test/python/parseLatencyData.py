@@ -29,11 +29,13 @@ def process(inputLatencyFile, outputSummaryFile, inputGCSummaryFile):
 	
 	
 	#https://matplotlib.org/api/pyplot_api.html
-	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , color='r', marker='o')
+	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , color='r', marker='h' )
 	#plt.plot(df_latency["recvTime_datetime"], df_latency["match_us"],  marker='o')
-	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromOutputQ_us"] , label="pickFromOutputQ_us", color='g', marker='o')
+	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromOutputQ_us"] , label="pickFromOutputQ_us", color='g', marker='h')
 	plt.legend(loc='best')
-	plt.savefig('pickFromInputQ_us_and_pickFromOutputQ_us.png', dpi=1000, format='png')
+	fig=plt.gcf()
+	fig.set_size_inches(18.5, 10.5)
+	fig.savefig('pickFromInputQ_us_and_pickFromOutputQ_us.png', dpi=1000)
 	#https://stackoverflow.com/questions/741877/how-do-i-tell-matplotlib-that-i-am-done-with-a-plot
 	plt.clf()
 	
@@ -44,7 +46,10 @@ def process(inputLatencyFile, outputSummaryFile, inputGCSummaryFile):
 	df_gc['gcLogTime_datetime'] = df_gc['gcLogTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
 	plt.plot(df_gc["gcLogTime_datetime"], df_gc["took_us"],  label="gc took_us", color='b', marker='o')
 	plt.legend(loc='best')
-	plt.savefig('gcLogTime_datetime.png', dpi=1000, format='png')
+	fig=plt.gcf()
+	fig.set_size_inches(18.5, 10.5)
+	fig.savefig('gcLogTime_datetime.png', dpi=1000)
+	#plt.savefig('gcLogTime_datetime.png', dpi=1000, format='png')
 	#https://stackoverflow.com/questions/741877/how-do-i-tell-matplotlib-that-i-am-done-with-a-plot
 	plt.clf()
 	
