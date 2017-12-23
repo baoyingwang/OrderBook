@@ -175,10 +175,10 @@ public class FirstQFJClientBatch {
         @Parameter
         private List<String> parameters = new ArrayList<>();
 
-        @Parameter(names =  "-n", description = "number of clients")
+        @Parameter(names =  "-clientNum", description = "number of clients")
         private int numOfClients = 1;
 
-        @Parameter(names =  "-r", description = "rate of sending - per minute for overall(clients as a whole). ")
+        @Parameter(names =  "-ratePerMinute", description = "rate of sending - per minute for overall(clients as a whole). ")
         private int ratePerMinute = 10;
 
         @Parameter(names =  "-client_prefix", description = "client compid prefix, e.g. LTC$$_FIX_, BACKGROUD_FIX_")

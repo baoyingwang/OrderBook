@@ -14,10 +14,18 @@
             </PatternLayout>
             <TimeBasedTriggeringPolicy />
         </RollingFile>
+
+        <RollingFile name="RollingFile_testtool" fileName="log/${app_name}_testtool.log" filePattern="logarchive/${app_name}-%d{MM-dd-yyyy}.log.gz"
+                     ignoreExceptions="false" bufferSize="8192000">
+            <PatternLayout>
+                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+            </PatternLayout>
+            <TimeBasedTriggeringPolicy />
+        </RollingFile>
     </Appenders>
     <Loggers>
-        <Logger name="baoying.orderbook.testtool" level="debug">
-            <AppenderRef ref="Console"/>
+        <Logger name="baoying.orderbook.testtool" level="info">
+            <AppenderRef ref="RollingFile_testtool"/>
         </Logger>
         <Root level="info">
 <!--
