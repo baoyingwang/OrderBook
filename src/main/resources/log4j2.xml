@@ -16,15 +16,15 @@
         </RollingFile>
     </Appenders>
     <Loggers>
-        <Logger name="com.foo.Bar" level="trace">
+        <Logger name="baoying.orderbook.testtool" level="debug">
             <AppenderRef ref="Console"/>
         </Logger>
         <Root level="info">
-            <!--
-                        <AppenderRef ref="Console"/>
-
-            -->
+<!--
+            <AppenderRef ref="Console"/>
+-->
             <AppenderRef ref="RollingFile"/>
+
         </Root>
     </Loggers>
 </Configuration>

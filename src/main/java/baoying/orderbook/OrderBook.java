@@ -18,7 +18,7 @@ import baoying.orderbook.TradeMessage.OriginalOrder;
 import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 
 /**
- *
+ * //TODO check minimize qty - if the leaves qty is less than min_qty, it will be rejeted.
  * An OrderBook for a specific symbol.
  * note: NOT threadsafe. The {@link baoying.orderbook.MatchingEngine} promises single thread context.
  * note: consider use other data structure(instead of simply priority queue) for book, to 1) simplify dump order book. 2) for FX, support match 2nd best price, if no relationship with 1st one(should this be supported?).
@@ -30,6 +30,7 @@ public class OrderBook {
 	public final String _symbol;
 
 	private final static Logger log = LoggerFactory.getLogger(OrderBook.class);
+
 	public static double MIN_DIFF_FOR_PRICE = 0.00000001;
 
 	//Assumption: our message generation speed will NOT be faster than 1000,000,000/second.
@@ -50,7 +51,6 @@ public class OrderBook {
 		_bidBook = createBidBook();
 		_offerBook = createAskBook();
 	}
-
 
 	Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>  processInputOrder(ExecutingOrder executingOrder) {
 
@@ -140,7 +140,6 @@ public class OrderBook {
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
 			final MatchedExecutionReport executionReport ;
-
 			if(executingOrder._origOrder._isLatencyTestOrder){
                 //only track taker side latency, since maker maybe has sit in orderbook long time
 

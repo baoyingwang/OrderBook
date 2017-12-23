@@ -182,6 +182,7 @@ public class MatchingEngineWebWrapper {
 
             final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
             data.put("latency_data_count", latency_data_count_all-1);
+            data.put("latency_data_rate_per_second", String.format("%.2f",(latency_data_count_all-1)*1.0/durationInSecond));
 
             List<String[]> tailResponseLatencyData = Util.loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
             data.put("latency_data", tailResponseLatencyData);
