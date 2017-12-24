@@ -2,7 +2,14 @@ package baoying.orderbook.app;
 
 import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.OrderBook;
+import baoying.orderbook.testtool.FirstQFJClientBatch;
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
+import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.SleepingWaitStrategy;
+import com.lmax.disruptor.WaitStrategy;
+import com.lmax.disruptor.YieldingWaitStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -14,9 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +33,10 @@ import static java.nio.file.StandardOpenOption.CREATE;
 public class MatchingEngineApp {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineApp.class);
+
+    private static String _queueType ;
+    private static String _disruptorStrategy ;
+    private static int _queueSize ;
 
     private final MatchingEngine _matchingEngine_USDJPY;
     private final MatchingEngine _matchingEngine_USDHKD;
@@ -92,8 +101,25 @@ public class MatchingEngineApp {
             )
         );
 
-        _matchingEngine_USDJPY = new MatchingEngine(new OrderBook("USDJPY"), _executionReportsBus, _marketDataBus);
-        _matchingEngine_USDHKD = new MatchingEngine(new OrderBook("USDHKD"), _executionReportsBus, _marketDataBus);
+        switch (_queueType){
+            case "Disruptor" :
+                final WaitStrategy waitStrategy;
+                switch (_disruptorStrategy){
+                    case "SleepingWaitStrategy": waitStrategy = new SleepingWaitStrategy(); break;
+                    case "YieldingWaitStrategy": waitStrategy = new YieldingWaitStrategy(); break;
+                    case "BusySpinWaitStrategy": waitStrategy = new BusySpinWaitStrategy(); break;
+                    default: throw new RuntimeException("unknown disruptor strategy:" + _disruptorStrategy +". Only SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy  is supported.");
+
+                }
+                _matchingEngine_USDJPY = new MatchingEngine(new OrderBook("USDJPY"), _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
+                _matchingEngine_USDHKD = new MatchingEngine(new OrderBook("USDHKD"), _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
+                break;
+            case "BlockingQueue" :
+                _matchingEngine_USDJPY = new MatchingEngine(new OrderBook("USDJPY"), _executionReportsBus, _marketDataBus, _queueSize);
+                _matchingEngine_USDHKD = new MatchingEngine(new OrderBook("USDHKD"), _executionReportsBus, _marketDataBus, _queueSize);
+                break;
+            default: throw new RuntimeException("unknown queue type:" + _queueType +". Only Disruptor and BlockingQueue is supported.");
+        }
 
         _simpleOMSEngine          = new SimpleOMSEngine();
         _simpleMarkderDataEngine = new SimpleMarkderDataEngine(Arrays.asList(_matchingEngine_USDJPY, _matchingEngine_USDHKD));
@@ -126,9 +152,29 @@ public class MatchingEngineApp {
         _fixWrapper.start();
     }
 
-    public static void main(String[] args) {
-        SpringApplication.run(MatchingEngineApp.class);
+    static class Args {
+        @Parameter(names = "-q", description = "queue type: BlockingQueue(default), Disruptor")
+        private String queueType = "BlockingQueue";
 
+        @Parameter(names = "-s", description = "strategy for Disruptor : SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy")
+        private String disruptorStrategy = "SleepingWaitStrategy";
+
+        @Parameter(names = "-b", description = "queue size. default : 65536. 2^x is required for Disruptor Q type")
+        private int queueSize = 65536;
     }
+
+    public static void main(String[] args) {
+        Args argsO = new Args();
+        JCommander.newBuilder().addObject(argsO).build().parse(args);
+
+        //TODO how to pass the argument in to MatchingEngineApp? right now, static fields are used
+        _queueType = argsO.queueType;
+        _disruptorStrategy = argsO.disruptorStrategy;
+        _queueSize = argsO.queueSize;
+
+        SpringApplication.run(MatchingEngineApp.class);
+    }
+
+
 }
 
