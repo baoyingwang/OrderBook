@@ -46,6 +46,8 @@ public class MatchingEngine {
 						  AsyncEventBus outputMarketDataBus,
 						  int bufferSize){
 
+		log.info("BlockingQueue with buffer size:{}", bufferSize);
+
 		_QueueType = QueueType.BLOCKING_QUEUE;
 		_inputMessageDisruptor = null;
 		_inputMessageRingBuffer = null;
@@ -84,6 +86,7 @@ public class MatchingEngine {
                           int disruptorBufferSize,
 						  WaitStrategy waitStrategy) {
 
+		log.info("DISRUPTOR with buffer size:{}, and strategy:{}", disruptorBufferSize, waitStrategy.toString());
 		_QueueType = QueueType.DISRUPTOR;
 		_inputMessagesBlockingQueue = null;
 
