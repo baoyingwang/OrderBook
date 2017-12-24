@@ -194,7 +194,7 @@ public class OrderBook {
             }
 		}
 
-		return new Tuple(execReportsAsResult,orderbookDeltasAsResult);
+		return new Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>(execReportsAsResult,orderbookDeltasAsResult);
 	}
 
 	//https://dzone.com/articles/whats-wrong-java-8-part-v
