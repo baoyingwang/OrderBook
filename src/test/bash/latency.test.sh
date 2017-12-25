@@ -1,8 +1,10 @@
-#jarfile=../BaoyingOrderBookFat-2017-12-24_212235.242-all.jar
-#bash latency.test.sh ${jarfile} Disruptor     $((60*100)) 600 BusySpinWaitStrategy
-#bash latency.test.sh ${jarfile} Disruptor     $((60*100)) 600 SleepingWaitStrategy
-#bash latency.test.sh ${jarfile} Disruptor     $((60*100)) 600 YieldingWaitStrategy
-#bash latency.test.sh ${jarfile} BlockingQueue $((60*100)) 600 X
+#!/bin/bash
+#ps -eo pid,user,comm,pcpu | grep java | cut -d' ' -f2 | xargs kill -9
+#jarfile=../BaoyingOrderBookFat-2017-12-24_221538.471-all.jar
+#bash latency.test.sh Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
+#bash latency.test.sh Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
+#bash latency.test.sh Disruptor_YieldingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  YieldingWaitStrategy   $((60*100)) 600 
+#bash latency.test.sh BlockingQueue_X_bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} BlockingQueue  X   $((60*100)) 600 
 
 #vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
 #http://localhost:18080/matching/reset_test_data
@@ -10,17 +12,13 @@
 #http://localhost:18080/main.html
 
 
-echo "stop all java process, then start others for next test"
-ps -eo pid,user,comm,pcpu | grep java | cut -d' ' -f2 | xargs kill -9
 
-jarfile=$1
-queue_type=$2
-background_rate_per_min=$3
-duration_in_second=$4
-strategy=$5
-
-test_name=${queue_type}_${strategy}_bg${background_rate_per_min}perMin_$(date '+%Y%m%d_%H%M%S')_duration${duration_in_second}Sec
-echo $test_name
+test_name=$1
+jarfile=$2
+queue_type=$3
+strategy=$4
+background_rate_per_min=$5
+duration_in_second=$6
 
 
 mkdir -p ${test_name}/log
@@ -34,14 +32,18 @@ echo "sleep 10 seconds to wait matching up initialize done"
 sleep 10
 
 echo "begin preparing big orders to book, for later background orders and latency orders"
-for bidPriceForBookPrepare in {101..120}
+for delta in {1..20}
 do
-	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Bid -qty 50000000 -ordType Limit -px ${bidPriceForBookPrepare} -d 5 &
+	USDJPY_base_px=110
+	USDJPY_px_for_book=$(($USDJPY_base_px-$delta))
+	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Bid -qty 50000000 -ordType Limit -px ${USDJPY_px_for_book} -d 5 &
 done
 
-for offerPriceForBookPrepare in {121..140}
+for delta in {1..20}
 do
-	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Offer -qty 50000000 -ordType Limit -px ${offerPriceForBookPrepare} -d 5 &
+	USDJPY_base_px=110
+	USDJPY_px_for_book=$(($USDJPY_base_px+$delta))
+	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Offer -qty 50000000 -ordType Limit -px ${USDJPY_px_for_book} -d 5 &
 done
 echo "wait 30 seconds to populate book done"
 sleep 30

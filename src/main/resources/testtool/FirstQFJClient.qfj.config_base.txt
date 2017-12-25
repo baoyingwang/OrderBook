@@ -11,15 +11,12 @@ ReconnectInterval=5
 FileStorePath=./fileStore/FirstQFJClient
 
 #Logging
-#http://www.quickfixj.org/quickfixj/usermanual/1.6.4/usage/configuration.html#Logging
-#The File entries are for FileLogFactory ONLY.
-FileLogPath=log/FirstQFJClient
-FileLogHeartbeats=Y
-FileIncludeMilliseconds=Y
-FileIncludeTimeStampForMessages=Y
+#https://www.quickfixj.org/usermanual/1.6.4//usage/configuration.html#Logging
+#Nothing here, since we use SLFJ, not required to define log path here(which is in log4j2.xml).
+#There are some SLFJ configuraiton. Use default for now.
 
-PersistMessages=Y
-
+#Not required to persist message for test clients.
+PersistMessages=N
 
 ConnectionType=initiator
 
@@ -48,7 +45,6 @@ UseDataDictionary=Y
 AppDataDictionary=FIX50SP1.xml
 
 ResetOnLogon=Y
-
 
 #If set to N, fields that are out of order (i.e. body fields in the header, or header fields in the body) will not be rejected. 
 #Useful for connecting to systems which do not properly order fields.

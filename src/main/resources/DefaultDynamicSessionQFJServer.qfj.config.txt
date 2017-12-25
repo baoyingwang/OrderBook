@@ -6,11 +6,9 @@ ReconnectInterval=5
 
 #logging
 #http://www.quickfixj.org/quickfixj/usermanual/1.5.0/usage/configuration.html#Logging
-FileStorePath=./log/fileStore/FIXDynamicAcceptor
-FileLogPath=log/FIXDynamicAcceptor
-FileLogHeartbeats=Y
-FileIncludeMilliseconds=Y
-FileIncludeTimeStampForMessages=Y
+#SLFJ is used, see log4j2.xml.
+
+FileStorePath=./log/fileStore
 
 SocketAcceptAddress=localhost
 SocketAcceptPort=17005
