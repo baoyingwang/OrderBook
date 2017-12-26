@@ -134,14 +134,14 @@ def genPlot(plotTitle,df_latency,df_sysUsage, outputPicPrefix):
 	
 	#http://blog.csdn.net/han_xiaoyang/article/details/49797143
 	#https://matplotlib.org/users/gridspec.html
-	plt.subplot2grid((4,3),(0,0))  #4 rows, 3 columns. The index start from 0.
+	#plt.subplot2grid((5,3),(0,0))  #5 rows, 3 columns. The index start from 0.
 	
 	
 	#================================df_latency==============================
-	plt.subplot2grid((4,3),(0,0), colspan=2) 
+	plt.subplot2grid((5,3),(0,0), colspan=2) 
 	#https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
 	describeResult = df_latency.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-	plt.text(0, 0.2 ,describeResult.to_string())
+	plt.text(0, 0.1 ,describeResult.to_string())
 	plt.title(u"latency summary")	
 
 	plt.subplot2grid((5,3),(0,2))
@@ -149,17 +149,17 @@ def genPlot(plotTitle,df_latency,df_sysUsage, outputPicPrefix):
 	plt.ylabel(u"us")
 	plt.title(u"pickFromInputQ_us")
 
-	plt.subplot2grid((4,3),(1,0)) 
+	plt.subplot2grid((5,3),(1,0)) 
 	plt.plot(df_latency["recvTime_datetime"], df_latency["put2InputQ_us"]  , label="put2InputQ_us" ,  marker='h' )
 	plt.ylabel(u"us")
 	plt.title(u"put2InputQ_us")
 
-	plt.subplot2grid((4,3),(1,1)) 
+	plt.subplot2grid((5,3),(1,1)) 
 	plt.plot(df_latency["recvTime_datetime"], df_latency["match_us"]  , label="match_us" ,  marker='h' )
 	plt.ylabel(u"us")
 	plt.title(u"match_us")	
 	
-	plt.subplot2grid((4,3),(1,2)) 
+	plt.subplot2grid((5,3),(1,2)) 
 	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromOutputQ_us"] , label="pickFromOutputQ_us",  marker='h')
 	plt.ylabel(u"us")
 	plt.title(u"pickFromOutputQ_us")
@@ -168,39 +168,39 @@ def genPlot(plotTitle,df_latency,df_sysUsage, outputPicPrefix):
 	
 	#================================df_sysUsage==== 
 
-	plt.subplot2grid((4,3),(2,0))
+	plt.subplot2grid((5,3),(2,0))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_ProcessCpuLoad"]  , label="cpu_ProcessCpuLoad" ,  marker='h' )
 	plt.ylabel(u"%")
 	plt.title(u"cpu_ProcessCpuLoad")
 
-	plt.subplot2grid((4,3),(2,1))
+	plt.subplot2grid((5,3),(2,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_SystemLoadAverage"]  , label="cpu_SystemLoadAverage" ,  marker='h' )
 	plt.ylabel(u"%")
 	plt.title(u"cpu_SystemLoadAverage")
 
-	plt.subplot2grid((4,3),(2,2))
+	plt.subplot2grid((5,3),(2,2))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["thread_ThreadCount"]  , label="thread_ThreadCount" ,  marker='h' )
 	plt.title(u"thread_ThreadCount")
 	
-	plt.subplot2grid((4,3),(3,0))
+	plt.subplot2grid((5,3),(3,0))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Used"]/(1024*1024)        , label="heapMemory_Used" ,  marker='h' )
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Committed"]/(1024*1024)   , label="heapMemory_Committed" ,  marker='h' )
 	plt.title(u"heapMemory (MB)")	
 	plt.legend((u'Used', u'Committed'),loc='best') 
 	
-	plt.subplot2grid((4,3),(4,0))
+	plt.subplot2grid((5,3),(4,0))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Used"]/(1024*1024)       , label="non-heapMemory_Used" ,  marker='h' )
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Committed"]/(1024*1024)  , label="non-heapMemory_Committed" ,  marker='h' )
 	plt.title(u"non-heapMemory (MB)")	
 	plt.legend((u'Used', u'Committed'),loc='best') 
 	
-	plt.subplot2grid((4,3),(3,1))
+	plt.subplot2grid((5,3),(3,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionCount"] , label="gc_ConcurrentMarkSweep_CollectionCount",  marker='h')
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionCount"]              , label="gc_ParNew_CollectionCount"             ,  marker='h')
 	plt.title(u"GC Collection Count")	
 	plt.legend((u'ConcurrentMarkSweep', u'ParNew'),loc='best') 
 	
-	plt.subplot2grid((4,3),(4,1))
+	plt.subplot2grid((5,3),(4,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionTime"] , label="gc_ConcurrentMarkSweep_CollectionTime",  marker='h')
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionTime"]              , label="gc_ParNew_CollectionTime"             ,  marker='h')
 	plt.title(u"GC Collection Accumulated Time-MS? to be confirmed")	

@@ -32,6 +32,7 @@ java $JVMOptions -jar  ${jarfile} ${arguments} &
 echo "sleep 10 seconds to wait matching up initialize done"
 sleep 10
 
+
 JVMOptions_popOB="-Xmx64M"
 
 echo "$(date '+%Y%m%d_%H%M%S') begin preparing big orders to book, for later background orders and latency orders"
@@ -63,6 +64,7 @@ do
 done
 echo "$(date '+%Y%m%d_%H%M%S') Offer side book done"
 
+
 echo "begin seding background orders"
 background_rate_per_min_single_side=$((${background_rate_per_min}/2))
 java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUD_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
@@ -73,6 +75,10 @@ latency_rate_per_min_single_side=$((60*1))
 java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min_single_side} -client_prefix 'LTC$$_FIX_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
 java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min_single_side} -client_prefix 'LTC$$_FIX_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 
+
+echo "reset test data, after wait 5 seconds(the fix session setup will wait several seconds)"
+sleep 5
+curl http://localhost:8080/matching/reset_test_data | cut -c1-150
 
 for i in {1..10}
 do

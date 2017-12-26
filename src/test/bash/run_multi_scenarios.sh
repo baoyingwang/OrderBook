@@ -1,16 +1,16 @@
 
 SCRIPT_START_DIR=`pwd`
-
 DIRNAMECMD="/usr/bin/dirname"
 MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
 
-#vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
 
 jarfile=$SCRIPT_START_DIR/$1
 duration_in_seconds=${2:-300}
 
 #trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
 ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+#vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
+
 
 for background_rate_per_second in 50 200 500
 do
@@ -21,7 +21,7 @@ do
 							"Disruptor,BusySpinWaitStrategy,${background_rate_per_second},${duration_in_seconds}" \
 							"Disruptor,YieldingWaitStrategy,${background_rate_per_second},${duration_in_seconds}" \
 							"Disruptor,SleepingWaitStrategy,${background_rate_per_second},${duration_in_seconds}" \
-							"BlockingQueue,X,${background_rate_per_second},600")
+							"BlockingQueue,X,${background_rate_per_second},${duration_in_seconds}")
 	for test_case in "${test_cases[@]}"
 	do
 		cd ${MYSCRIPTDIR}
