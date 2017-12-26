@@ -35,7 +35,7 @@ def processLatencyFile(inputLatencyFile, outputSummaryFile, outputPicPrefix):
 	fig=plt.gcf()
 	#https://stackoverflow.com/questions/39370584/how-do-you-add-an-overall-title-to-a-figure-with-subplots-in-matplotlib
 	fig.suptitle('from '+inputLatencyFile)
-	fig.set_size_inches(12, 8)
+	fig.set_size_inches(10, 8)
 	
 	plt.subplot(2,3,1)
 	plt.plot(df_latency["recvTime_datetime"], df_latency["put2InputQ_us"]  , label="put2InputQ_us" ,  marker='h' )
@@ -92,6 +92,7 @@ def getLatency(inputLatencyFile):
 
 
 #time_datetime
+#cpu_ProcessCpuLoad
 #cpu_SystemLoadAverage
 #gc_ConcurrentMarkSweep_CollectionCount
 #gc_ConcurrentMarkSweep_CollectionTime
@@ -143,7 +144,7 @@ def genPlot(plotTitle,df_latency,df_sysUsage, outputPicPrefix):
 	plt.text(0, 0.2 ,describeResult.to_string())
 	plt.title(u"latency summary")	
 
-	plt.subplot2grid((4,3),(0,2)) 
+	plt.subplot2grid((5,3),(0,2))
 	plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , marker='h' )
 	plt.ylabel(u"us")
 	plt.title(u"pickFromInputQ_us")
@@ -166,39 +167,46 @@ def genPlot(plotTitle,df_latency,df_sysUsage, outputPicPrefix):
 
 	
 	#================================df_sysUsage==== 
-	
-	plt.subplot2grid((4,3),(2,0)) 
+
+	plt.subplot2grid((4,3),(2,0))
+	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_ProcessCpuLoad"]  , label="cpu_ProcessCpuLoad" ,  marker='h' )
+	plt.ylabel(u"%")
+	plt.title(u"cpu_ProcessCpuLoad")
+
+	plt.subplot2grid((4,3),(2,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_SystemLoadAverage"]  , label="cpu_SystemLoadAverage" ,  marker='h' )
 	plt.ylabel(u"%")
-	plt.title(u"cpu_SystemLoadAverage")	
+	plt.title(u"cpu_SystemLoadAverage")
+
+	plt.subplot2grid((4,3),(2,2))
+	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["thread_ThreadCount"]  , label="thread_ThreadCount" ,  marker='h' )
+	plt.title(u"thread_ThreadCount")
 	
-	plt.subplot2grid((4,3),(2,1)) 
+	plt.subplot2grid((4,3),(3,0))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Used"]/(1024*1024)        , label="heapMemory_Used" ,  marker='h' )
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Committed"]/(1024*1024)   , label="heapMemory_Committed" ,  marker='h' )
 	plt.title(u"heapMemory (MB)")	
 	plt.legend((u'Used', u'Committed'),loc='best') 
 	
-	plt.subplot2grid((4,3),(2,2)) 
+	plt.subplot2grid((4,3),(4,0))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Used"]/(1024*1024)       , label="non-heapMemory_Used" ,  marker='h' )
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Committed"]/(1024*1024)  , label="non-heapMemory_Committed" ,  marker='h' )
 	plt.title(u"non-heapMemory (MB)")	
 	plt.legend((u'Used', u'Committed'),loc='best') 
 	
-	plt.subplot2grid((4,3),(3,0)) 
+	plt.subplot2grid((4,3),(3,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionCount"] , label="gc_ConcurrentMarkSweep_CollectionCount",  marker='h')
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionCount"]              , label="gc_ParNew_CollectionCount"             ,  marker='h')
 	plt.title(u"GC Collection Count")	
 	plt.legend((u'ConcurrentMarkSweep', u'ParNew'),loc='best') 
 	
-	plt.subplot2grid((4,3),(3,1)) 
+	plt.subplot2grid((4,3),(4,1))
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionTime"] , label="gc_ConcurrentMarkSweep_CollectionTime",  marker='h')
 	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionTime"]              , label="gc_ParNew_CollectionTime"             ,  marker='h')
 	plt.title(u"GC Collection Accumulated Time-MS? to be confirmed")	
 	plt.legend((u'ConcurrentMarkSweep', u'ParNew'),loc='best') 
 	
-	plt.subplot2grid((4,3),(3,2)) 
-	plt.plot(df_sysUsage["time_datetime"], df_sysUsage["thread_ThreadCount"]  , label="thread_ThreadCount" ,  marker='h' )
-	plt.title(u"thread_ThreadCount")		
+
 	#
 	
 	fig=plt.gcf()

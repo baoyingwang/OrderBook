@@ -23,25 +23,25 @@ public class FirstMessageCallback implements Application {
 	@Override
 	public void fromAdmin(Message paramMessage, SessionID paramSessionID)
 			throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon {
-		log.info("fromAdmin session received :  " + paramMessage.toString());
+		log.debug("fromAdmin session received :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void fromApp(Message paramMessage, SessionID paramSessionID)
 			throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
-		log.info("fromApp session received :  " + paramMessage.toString());
+		log.debug("fromApp session received :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void onCreate(SessionID paramSessionID) {
-		log.info("onCreate session :  " + paramSessionID.toString());
+		log.debug("onCreate session :  " + paramSessionID.toString());
 	}
 
 	@Override
 	public void onLogon(SessionID paramSessionID) {
-		log.info("onLogon session :  " + paramSessionID.toString());
+		log.debug("onLogon session :  " + paramSessionID.toString());
 
 	}
 
@@ -53,13 +53,13 @@ public class FirstMessageCallback implements Application {
 
 	@Override
 	public void toAdmin(Message paramMessage, SessionID paramSessionID) {
-		log.info("toAdmin session send :  " + paramMessage.toString());
+		log.debug("toAdmin session send :  " + paramMessage.toString());
 
 	}
 
 	@Override
 	public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
-		log.info("toApp session send :  " + paramMessage.toString());
+		log.debug("toApp session send :  " + paramMessage.toString());
 
 	}
 

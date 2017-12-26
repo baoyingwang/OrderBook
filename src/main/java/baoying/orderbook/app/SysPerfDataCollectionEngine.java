@@ -1,5 +1,6 @@
 package baoying.orderbook.app;
 
+import javax.management.*;
 import java.lang.management.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -93,7 +94,31 @@ public class SysPerfDataCollectionEngine {
 
         Map<String, String> data = new TreeMap<>();
         data.put("cpu SystemLoadAverage", String.valueOf(osMXBean.getSystemLoadAverage())); ////always -1 on windows
+
+        try {
+            //http://knight76.blogspot.com/2009/05/how-to-get-java-cpu-usage-jvm-instance.html
+            data.put("cpu ProcessCpuLoad", String.format("%.2f",getProcessCpuLoad()));
+        }catch (Exception e){
+
+        }
         return data;
+    }
+
+    //https://stackoverflow.com/questions/3044841/cpu-usage-mbean-on-sun-jvm
+    public static double getProcessCpuLoad() throws MalformedObjectNameException, ReflectionException, InstanceNotFoundException {
+
+        MBeanServer mbs    = ManagementFactory.getPlatformMBeanServer();
+        ObjectName name    = ObjectName.getInstance("java.lang:type=OperatingSystem");
+        AttributeList list = mbs.getAttributes(name, new String[]{ "ProcessCpuLoad" });
+
+        if (list.isEmpty())     return Double.NaN;
+
+        Attribute att = (Attribute)list.get(0);
+        Double value  = (Double)att.getValue();
+
+        if (value == -1.0)      return Double.NaN;
+
+        return ((int)(value * 1000) / 10.0);        // returns a percentage value with 1 decimal point precision
     }
 
     Map<String, String> gcUsage()
@@ -108,6 +133,7 @@ public class SysPerfDataCollectionEngine {
 
         return data;
     }
+
 
     Map<String, String> allUsage(){
         Map<String, String> usage = new TreeMap<>();

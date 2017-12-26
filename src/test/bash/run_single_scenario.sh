@@ -1,5 +1,6 @@
 #!/bin/bash
-#ps -eo pid,user,comm,pcpu | grep java | cut -d' ' -f2 | xargs kill -9
+#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
+#ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 #jarfile=../BaoyingOrderBookFat-2017-12-24_221538.471-all.jar
 #bash $0 Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
 #bash $0 Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
@@ -31,22 +32,36 @@ java $JVMOptions -jar  ${jarfile} ${arguments} &
 echo "sleep 10 seconds to wait matching up initialize done"
 sleep 10
 
-echo "begin preparing big orders to book, for later background orders and latency orders"
-for delta in {1..20}
+JVMOptions_popOB="-Xmx64M"
+
+echo "$(date '+%Y%m%d_%H%M%S') begin preparing big orders to book, for later background orders and latency orders"
+for delta in {1..2}
 do
 	USDJPY_base_px=110
 	USDJPY_px_for_book=$(($USDJPY_base_px-$delta))
-	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Bid -qty 50000000 -ordType Limit -px ${USDJPY_px_for_book} -d 5 &
+	for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
+	do
+		px="$USDJPY_px_for_book$fraction_party"
+		java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+	done
+	sleep 20
 done
 
-for delta in {1..20}
+echo "$(date '+%Y%m%d_%H%M%S') Bid side book done"
+
+for delta in {1..2}
 do
 	USDJPY_base_px=110
 	USDJPY_px_for_book=$(($USDJPY_base_px+$delta))
-	java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Offer -qty 50000000 -ordType Limit -px ${USDJPY_px_for_book} -d 5 &
+	for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
+	do
+		px="$USDJPY_px_for_book$fraction_party"
+		java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUD_FIX_prepare -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+	done
+	
+	sleep 20
 done
-echo "wait 30 seconds to populate book done"
-sleep 30
+echo "$(date '+%Y%m%d_%H%M%S') Offer side book done"
 
 echo "begin seding background orders"
 background_rate_per_min_single_side=$((${background_rate_per_min}/2))
