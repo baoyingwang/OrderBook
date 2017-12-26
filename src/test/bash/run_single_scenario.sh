@@ -1,10 +1,10 @@
 #!/bin/bash
 #ps -eo pid,user,comm,pcpu | grep java | cut -d' ' -f2 | xargs kill -9
 #jarfile=../BaoyingOrderBookFat-2017-12-24_221538.471-all.jar
-#bash latency.test.sh Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
-#bash latency.test.sh Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
-#bash latency.test.sh Disruptor_YieldingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  YieldingWaitStrategy   $((60*100)) 600 
-#bash latency.test.sh BlockingQueue_X_bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} BlockingQueue  X   $((60*100)) 600 
+#bash $0 Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
+#bash $0 Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
+#bash $0 Disruptor_YieldingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  YieldingWaitStrategy   $((60*100)) 600 
+#bash $0 BlockingQueue_X_bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} BlockingQueue  X                  $((60*100)) 600 
 
 #vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
 #http://localhost:18080/matching/reset_test_data
@@ -23,7 +23,7 @@ duration_in_second=$6
 
 mkdir -p ${test_name}/log
 cd ${test_name}
-arguments="-q ${queue_type} -s ${strategy}"
+arguments="--queue_type ${queue_type} --strategy ${strategy} --symbols USDJPY --queue_size 65536"
 mkdir -p log
 JVMOptions="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -Xmx1024M -Xms1024M -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGC -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:log/GC.txt"
 java $JVMOptions -jar  ${jarfile} ${arguments} &
@@ -58,9 +58,10 @@ latency_rate_per_min_single_side=$((60*1))
 java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min_single_side} -client_prefix 'LTC$$_FIX_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
 java -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min_single_side} -client_prefix 'LTC$$_FIX_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 
+
 for i in {1..10}
 do
-	echo "sleep every $(($duration_in_second/10)) seconds, and trigger the dump latency data later"
+	echo "${test_name} sleep every $(($duration_in_second/10)) seconds, and trigger the dump latency data later"
 	sleep $(($duration_in_second/10))
 	curl http://localhost:8080/matching/get_test_summary | cut -c1-150
 done
