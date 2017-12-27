@@ -1,18 +1,19 @@
 #!/bin/bash
-#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
-#ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
-#jarfile=../BaoyingOrderBookFat-2017-12-24_221538.471-all.jar
+
 #bash $0 Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
 #bash $0 Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
 #bash $0 Disruptor_YieldingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  YieldingWaitStrategy   $((60*100)) 600 
 #bash $0 BlockingQueue_X_bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} BlockingQueue  X                  $((60*100)) 600 
 
-#vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
-#http://localhost:18080/matching/reset_test_data
-#http://localhost:18080/test_summary.html
-#http://localhost:18080/main.html
+#clean exist process
+#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
+ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 
-
+vmstat_count=$(ps -ef |grep "vmstat 5 -t" | grep -v grep | wc -l)
+if [[ $vmstat_count -lt 1 ]]; then
+        echo "start vmstat, since not yet exist "
+        vmstat 5 -t >> vmstat_since$(date '+%Y%m%d').log &
+fi
 
 test_name=$1
 jarfile=$2
@@ -33,9 +34,8 @@ echo "sleep 10 seconds to wait matching up initialize done"
 sleep 10
 
 
-JVMOptions_popOB="-Xmx64M"
-
 echo "$(date '+%Y%m%d_%H%M%S') begin preparing big orders to book, for later background orders and latency orders"
+JVMOptions_popOB="-Xmx64M"
 for delta in {1..2}
 do
 	USDJPY_base_px=110
@@ -86,3 +86,7 @@ do
 	sleep $(($duration_in_second/10))
 	curl http://localhost:8080/matching/get_test_summary | cut -c1-150
 done
+
+
+#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
+ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9

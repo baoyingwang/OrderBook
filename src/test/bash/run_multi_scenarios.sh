@@ -1,3 +1,4 @@
+#!/bin/bash
 
 SCRIPT_START_DIR=`pwd`
 DIRNAMECMD="/usr/bin/dirname"
@@ -6,10 +7,6 @@ MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
 
 jarfile=$SCRIPT_START_DIR/$1
 duration_in_seconds=${2:-300}
-
-#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
-ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
-#vmstat 5 -t >> vmstat_begin.from$(date '+%Y%m%d_%H%M%S').log &
 
 
 for background_rate_per_second in 50 200 500
@@ -38,8 +35,6 @@ do
 		echo "stop all java process, then start others for next test"
 
 		bash run_single_scenario.sh ${test_name} ${jarfile} ${queue_type} ${strategy} ${background_rate_per_min} ${duration_in_second} 
-		
-		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 		
 		cd ${MYSCRIPTDIR}
 		zip -r zip_${test_name}.zip ${test_name}
