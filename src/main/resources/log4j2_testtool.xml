@@ -2,7 +2,7 @@
 <Configuration status="WARN">
 
     <Properties>
-        <Property name="app_name">orderbook</Property>
+        <Property name="app_name">orderbook testtool</Property>
     </Properties>
 
     <Appenders>
@@ -20,13 +20,9 @@
     </Appenders>
 
     <Loggers>
-
-        <Root level="info">
-<!--
-            <AppenderRef ref="Console"/>
--->
+        <Root level="warn">
             <AppenderRef ref="RollingFile"/>
-
         </Root>
     </Loggers>
+
 </Configuration>

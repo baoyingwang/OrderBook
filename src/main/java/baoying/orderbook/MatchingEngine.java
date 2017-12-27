@@ -156,6 +156,7 @@ public class MatchingEngine {
 					order._qty,
 					"Entered Order Book");
 		}else{
+			log.warn("fail to add order to book, because of capacity, client:{}, client ord id:{}", order._clientEntityID, order._clientOrdID);
 			//TODO re-try 3 times before rejection
 			return new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
 					System.currentTimeMillis(),

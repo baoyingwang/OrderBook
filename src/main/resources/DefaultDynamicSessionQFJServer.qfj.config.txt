@@ -8,6 +8,7 @@ ReconnectInterval=5
 #http://www.quickfixj.org/quickfixj/usermanual/1.5.0/usage/configuration.html#Logging
 #SLFJ is used, see log4j2.xml.
 
+PersistMessages=Y
 FileStorePath=./log/fileStore
 
 SocketAcceptAddress=localhost
