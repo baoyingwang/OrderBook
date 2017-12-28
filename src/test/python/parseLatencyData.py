@@ -23,6 +23,9 @@ def getLatency(inputLatencyFile):
     df_latency["match_us"]=df_latency["match"]/1000
     df_latency["pickFromOutputQ_us"]=df_latency["pickFromOutputQ"]/1000
     df_latency.drop(['put2InputQ', 'pickFromInputQ', 'match', 'pickFromOutputQ'], axis=1, inplace=True)
+
+    #TODO remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
+    df_latency.drop(['put2InputQ_us'], axis=1, inplace=True)
  
     
     #https://stackoverflow.com/questions/19079143/how-to-plot-time-series-in-python
@@ -94,23 +97,24 @@ def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, outputPicPrefix):
     
     
     #================================df_latency==============================
-    plt.subplot2grid((7,3),(0,0), colspan=2) 
+    plt.subplot2grid((7,3),(0,0), colspan=3)
     #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
     describeResult = df_latency.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
     plt.text(0, 0.1 ,describeResult.to_string())
     plt.title(plotTitle + " latency summary" )
 
-    plt.subplot2grid((7,3),(0,2))
-    ax=plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , marker='h' )
+    #TODO remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
+    #plt.subplot2grid((7,3),(0,2))
+    #plt.plot(df_latency["recvTime_datetime"], df_latency["put2InputQ_us"]  , label="put2InputQ_us" ,  marker='h' )
+    #plt.ylabel(u"us")
+    #plt.title(u"put2InputQ_us")
+    #plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid((7,3),(1,0))
+    plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , marker='h' )
     #https://plot.ly/matplotlib/axes/
     plt.ylabel(u"us")
     plt.title(u"pickFromInputQ_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid((7,3),(1,0))
-    plt.plot(df_latency["recvTime_datetime"], df_latency["put2InputQ_us"]  , label="put2InputQ_us" ,  marker='h' )
-    plt.ylabel(u"us")
-    plt.title(u"put2InputQ_us")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
     plt.subplot2grid((7,3),(1,1)) 
@@ -224,7 +228,7 @@ def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, outputPicPrefix):
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
     
     fig=plt.gcf()
-    fig.savefig(outputPicPrefix+'_latency_overall.png', dpi=200)
+    fig.savefig(outputPicPrefix+'_latency_overall.png', dpi=100)
     plt.clf()
 
 

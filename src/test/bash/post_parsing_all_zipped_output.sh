@@ -1,7 +1,7 @@
 #
 #bash /c/baoying.wang/ws/gitnas/OrderBook/src/test/bash/post_parsing_all_zipped_output.sh \
-# vmstat_begin.from20171226_061037.log \
-# /c/Users/U0127650/Desktop/test_result_20171226_v2
+# /c/Users/U0127650/Desktop/test_result_20171228/vmstat_since20171228.log \
+# /c/Users/U0127650/Desktop/test_result_20171228
 #
 SCRIPT_START_DIR=`pwd`
 DIRNAMECMD="/usr/bin/dirname"
@@ -11,7 +11,7 @@ vmstat_file=$1
 zipfies_dir=${2:-${SCRIPT_START_DIR}}
 
 
-vm_output_csv=${vm_output_csv}.csv
+vm_output_csv=${vmstat_file}.csv
 bash $MYSCRIPTDIR/vm.output.to.csv.sh $vmstat_file > ${vm_output_csv}
 
 ls -l ${zipfies_dir} | grep zip | awk '{print $NF }' | while read zipfile

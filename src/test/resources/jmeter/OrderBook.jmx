@@ -24,7 +24,7 @@
           </elementProp>
           <elementProp name="client_entity_prefix_of_latency" elementType="Argument">
             <stringProp name="Argument.name">client_entity_prefix_of_latency</stringProp>
-            <stringProp name="Argument.value">LTC$$</stringProp>
+            <stringProp name="Argument.value">LxTxCx</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="rate_per_minute_background_bid" elementType="Argument">

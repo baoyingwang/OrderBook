@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MatchingEngine {
 
-    public static String LATENCY_ENTITY_PREFIX = "LTC$$";
+    public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
     private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
 	private final OrderBook _orderBook;
@@ -76,7 +76,7 @@ public class MatchingEngine {
                     }
             	}
 
-                log.warn("exiting matching engin processing queue");
+                log.warn("exiting matching engine processing queue");
 			}
 		});
 	}

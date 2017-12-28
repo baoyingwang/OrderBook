@@ -67,8 +67,8 @@ public class FirstQFJClientBatch {
         LogFactory logFactory = new SLF4JLogFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
 
-        SocketInitiator initiator = new SocketInitiator(application, storeFactory, settings, logFactory,
-                messageFactory);
+        //multi-thread is used, for better performance to consume messages on high load, e.g. 500 order/second
+        ThreadedSocketInitiator initiator = new ThreadedSocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
 
         initiator.start();
 
@@ -124,7 +124,7 @@ public class FirstQFJClientBatch {
                 //100 intervals
                 period = 10;
                 unit = TimeUnit.MILLISECONDS;
-                msgNumPerPeriod = (int)Math.round(0.49 + ratePerMinute/(60 * 10));            }
+                msgNumPerPeriod = (int)Math.round(0.49 + ratePerMinute/(60 * 100));            }
         }
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
