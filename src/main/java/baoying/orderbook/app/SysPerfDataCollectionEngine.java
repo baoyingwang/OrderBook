@@ -175,7 +175,11 @@ public class SysPerfDataCollectionEngine {
         data.put("runtime SpecVendor",	runtimeBean.getSpecVendor());
         data.put("runtime SpecVersion",	runtimeBean.getSpecVersion());
         data.put("runtime StartTime",	String.valueOf(runtimeBean.getStartTime()));
-        data.put("runtime SystemProperties",	String.valueOf(runtimeBean.getSystemProperties()));
+
+        Map<String, String> sysProperties = new HashMap<>(runtimeBean.getSystemProperties());
+        sysProperties.put("line.separator","removed to avoid new line in csv");
+        data.put("runtime SystemProperties",	String.valueOf(sysProperties));
+
         data.put("runtime Uptime",	String.valueOf(runtimeBean.getUptime()));
         data.put("runtime VmName",	runtimeBean.getVmName());
         data.put("runtime VmVendor",	runtimeBean.getVmVendor());
