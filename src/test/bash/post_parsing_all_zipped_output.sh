@@ -27,7 +27,7 @@ do
 	unzip -p ${zipfies_dir}/$zipfile $name/log/sysInfo*                    > $name.sysInfo.txt
 	unzip -p ${zipfies_dir}/$zipfile $name/log/GC.txt                      > $name.GC.txt
 	unzip -p ${zipfies_dir}/$zipfile $name/log/GC.summary.csv              > $name.GC.summary.csv
-	python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py $name.latency.data.csv $name.sysUsage.csv ${vm_output_csv} $name.sysInfo.txt $name
+	python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py $name.latency.data.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
 
 done
 

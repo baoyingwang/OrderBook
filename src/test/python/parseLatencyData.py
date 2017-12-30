@@ -184,7 +184,7 @@ def genPlotSysUsage(plt, shape, sys_usage_row_start_index, df_sysUsage):
     next_row_index_for_plot=sys_usage_row_start_index + 2 +1
     return next_row_index_for_plot
 
-def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle):
+def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle, output_file_prefix):
 
     #note remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
     #plt.subplot2grid(shape,(0,2))
@@ -198,6 +198,7 @@ def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle):
     describeResult = df_latency.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
     plt.text(0, 0 ,describeResult.to_string())
     plt.title(plotTitle + " latency summary" )
+    describeResult.to_csv(output_file_prefix+"_latency_describe.csv")
 
     plt.subplot2grid(shape,(row_start_index+1,0))
     plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , marker='h' )
@@ -252,7 +253,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+1
 
 
-def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, outputPicPrefix):
+def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -270,29 +271,28 @@ def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, out
     shape=(8,3)
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
-    next_row_index = genPlotLatencyData(plt, shape, next_row_index, df_latency , plotTitle)
+    next_row_index = genPlotLatencyData(plt, shape, next_row_index, df_latency , plotTitle, output_file_prefix)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
 
     fig=plt.gcf()
-    fig.savefig(outputPicPrefix+'_latency_overall.png', dpi=100)
+    fig.savefig(output_file_prefix+'_latency_overall.png', dpi=100)
     plt.clf()
 
 
-#cd /c/Users/U0127650/Desktop/test_result_20171226_v2/tmp
 #python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py \
-#    Disruptor_BusySpinWaitStrategy_bg50perSec_20171226_061723_duration300Sec.latency.data.csv \
-#    Disruptor_BusySpinWaitStrategy_bg50perSec_20171226_061723_duration300Sec.sysUsage.csv \
-#    vmstat_begin.from20171226_061037.log.csv \
-#    picPrefix
+#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.latency.data.csv \
+#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.sysUsage.csv \
+#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.sysInfo.txt \
+#    vmstat_since20171229.log.csv \
+#    output_file_prefix
 
 #http://www.diveintopython.net/scripts_and_streams/command_line_arguments.html
-inputLatencyFile=sys.argv[1]
-inputSysUsageFile=sys.argv[2]
-inputVmstatFile=sys.argv[3]
-sysInfoFile=sys.argv[4]
-outputPicPrefix=sys.argv[5]
-
+inputLatencyFile    = sys.argv[1]
+inputSysUsageFile   = sys.argv[2]
+inputSysInfoFile    = sys.argv[3]
+inputVmstatFile     = sys.argv[4]
+output_file_prefix  = sys.argv[5]
 
 
 df_latency=getLatency(inputLatencyFile)
@@ -303,12 +303,12 @@ df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] < df_sysUsage["time_datetim
 df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] > df_sysUsage["time_datetime"].max()].index, inplace=True) #remove those after  engine down
 
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
-with open(sysInfoFile) as f:
+with open(inputSysInfoFile) as f:
     sysInfoContentList = f.readlines()
 # you may also want to remove whitespace characters like `\n` at the end of each line
 #sysInfoContentList = [x.strip() for x in sysInfoContentList]
 
 
-genPlot(inputLatencyFile,df_latency,df_sysUsage,df_vmstat,sysInfoContentList,outputPicPrefix)
+genPlot(inputLatencyFile,df_latency,df_sysUsage,df_vmstat,sysInfoContentList,output_file_prefix)
 
 
