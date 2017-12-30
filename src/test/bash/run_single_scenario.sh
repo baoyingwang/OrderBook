@@ -27,7 +27,9 @@ mkdir -p ${test_name}/log
 cd ${test_name}
 arguments="--queue_type ${queue_type} --strategy ${strategy} --symbols USDJPY --queue_size 65536"
 mkdir -p log
-JVMOptions="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -Xmx1024M -Xms1024M -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGC -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:log/GC.txt"
+VisualVMOptions="-Dcom.sun.management.jmxremote.port=3333  -Dcom.sun.management.jmxremote.ssl=false  -Dcom.sun.management.jmxremote.authenticate=false"
+GCPrintOptions="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGC -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:log/GC.txt"
+JVMOptions="${VisualVMOptions} -XX:NewRatio=1 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -Xmx3072M -Xms3072M ${GCPrintOptions}"
 java $JVMOptions -jar  ${jarfile} ${arguments} &
 
 echo "sleep 10 seconds to wait matching up initialize done"

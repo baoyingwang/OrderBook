@@ -129,12 +129,12 @@ public class MatchingEngineFIXWrapper {
             @Override
             public void fromAdmin(Message paramMessage, SessionID paramSessionID)
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon {
-                log.debug("fromAdmin session:{}, received : {} ", paramSessionID.toString(), paramMessage.toString());
+                log.debug("fromAdmin session:{}, received : {} ", paramSessionID, paramMessage);
             }
 
             @Override
             public void fromApp(Message paramMessage, SessionID paramSessionID) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
-                log.debug("fromApp session:{}, received : {} ", paramSessionID.toString(), paramMessage.toString());
+                log.debug("fromApp session:{}, received : {} ", paramSessionID, paramMessage);
 
                 String msgType = paramMessage.getHeader().getString(35);
                 if(! "D".equals(msgType) ){
@@ -166,31 +166,31 @@ public class MatchingEngineFIXWrapper {
 
             @Override
             public void onCreate(SessionID paramSessionID) {
-                log.debug("onCreate session:{}", paramSessionID.toString());
+                log.debug("onCreate session:{}", paramSessionID);
             }
 
             @Override
             public void onLogon(SessionID paramSessionID) {
-                log.debug("onLogon session:{}", paramSessionID.toString());
+                log.debug("onLogon session:{}", paramSessionID);
                 triedLogonClientCompIDs.add(paramSessionID.getTargetCompID());
 
             }
 
             @Override
             public void onLogout(SessionID paramSessionID) {
-                log.debug("onLogout session:{}", paramSessionID.toString());
+                log.debug("onLogout session:{}", paramSessionID);
 
             }
 
             @Override
             public void toAdmin(Message paramMessage, SessionID paramSessionID) {
-                log.debug("toAdmin session:{}, send : {} ", paramSessionID.toString(), paramMessage.toString());
+                log.debug("toAdmin session:{}, send : {} ", paramSessionID, paramMessage);
 
             }
 
             @Override
             public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
-                log.debug("toApp session:{}, send : {} ", paramSessionID.toString(), paramMessage.toString());
+                log.debug("toApp session:{}, send : {} ", paramSessionID, paramMessage);
 
             }
 
@@ -302,7 +302,7 @@ public class MatchingEngineFIXWrapper {
             _settings = new SessionSettings(appConfigInClasspath);
             for (final Iterator<SessionID> i = _settings.sectionIterator(); i.hasNext();) {
                 final SessionID sessionID = i.next();
-                log.info("session in the configuration : " + sessionID.toString());
+                log.info("session in the configuration :{} ", sessionID);
             }
 
             // It also supports other store factory, e.g. JDBC, memory. Maybe you
