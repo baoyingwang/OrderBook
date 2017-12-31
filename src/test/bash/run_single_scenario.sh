@@ -30,7 +30,7 @@ mkdir -p log
 VisualVMOptions="-Dcom.sun.management.jmxremote.port=3333  -Dcom.sun.management.jmxremote.ssl=false  -Dcom.sun.management.jmxremote.authenticate=false"
 GCPrintOptions="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGC -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:log/GC.txt"
 JVMOptions="${VisualVMOptions} -XX:NewRatio=1 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -Xmx3072M -Xms3072M ${GCPrintOptions}"
-java $JVMOptions -jar  ${jarfile} ${arguments} &
+java $JVMOptions -jar  ${jarfile} ${arguments} | tee log/${test_name}.console.log &
 
 echo "sleep 10 seconds to wait matching up initialize done"
 sleep 10
@@ -85,7 +85,7 @@ curl http://localhost:8080/matching/reset_test_data | cut -c1-150
 
 for i in {1..10}
 do
-	echo "${test_name} sleep every $(($duration_in_second/10)) seconds, and trigger the dump latency data later"
+	echo "$i/10 - ${test_name} sleep every $(($duration_in_second/10)) seconds, and trigger the dump latency data later"
 	sleep $(($duration_in_second/10))
 	curl http://localhost:8080/matching/get_test_summary | cut -c1-150
 done

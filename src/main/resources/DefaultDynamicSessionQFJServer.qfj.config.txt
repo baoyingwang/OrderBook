@@ -9,7 +9,7 @@ ReconnectInterval=5
 #SLFJ is used, see log4j2.xml.
 
 PersistMessages=Y
-FileStorePath=./log/fileStore
+FileStorePath=./log/engineQFJFileStore
 
 SocketAcceptAddress=localhost
 SocketAcceptPort=17005

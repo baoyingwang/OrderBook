@@ -8,7 +8,7 @@ ReconnectInterval=5
 
 #Storage
 #http://www.quickfixj.org/quickfixj/usermanual/1.6.4/usage/configuration.html#Storage
-FileStorePath=./fileStore/FirstQFJClient
+FileStorePath=./log/clientQFJFileStore
 
 #Logging
 #https://www.quickfixj.org/usermanual/1.6.4//usage/configuration.html#Logging
