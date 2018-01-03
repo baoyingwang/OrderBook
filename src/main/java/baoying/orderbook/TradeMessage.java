@@ -80,6 +80,7 @@ public class TradeMessage {
 	// maker: who sit in the book
     public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
 
+        public final String _asFlag;
         public final long _msgID;
 		public final long _msgEpochMS;
         public final ExecutionType _type; //http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_150.html
@@ -94,11 +95,15 @@ public class TradeMessage {
 			_type = type;
 			_leavesQty = leavesQty;
 			_description = description;
+            _asFlag="SingleSideExecutionReport";
+
 		}
+
 	}
 	// maker: who sit in the book
     public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
 
+        public final String _asFlag;
         public final long _matchID;
 		public final long _matchingEpochMS;
 
@@ -154,6 +159,8 @@ public class TradeMessage {
             _taker_enterInputQ_sysNano_test =taker_enterInputQ_sysNano_test;
             _taker_pickFromInputQ_sysNano_test = taker_pickFromInputQ_sysNano_test;
             _matching_sysNano_test = matchingSysNanoTime;
+
+            _asFlag="MatchedExecutionReport";
 		}
 	}
 

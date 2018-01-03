@@ -1,16 +1,25 @@
 package baoying.orderbook.app;
 
+import baoying.orderbook.MarketDataMessage;
 import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.OrderBook;
+import baoying.orderbook.TradeMessage;
 import baoying.orderbook.testtool.FirstQFJClientBatch;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
+import com.google.gson.Gson;
 import com.lmax.disruptor.BusySpinWaitStrategy;
 import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.YieldingWaitStrategy;
+import net.openhft.affinity.AffinityLock;
+import net.openhft.chronicle.queue.ChronicleQueue;
+import net.openhft.chronicle.queue.ExcerptTailer;
+import net.openhft.chronicle.queue.impl.single.SingleChronicleQueueBuilder;
+import net.openhft.chronicle.threads.LongPauser;
+import net.openhft.chronicle.threads.Pauser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -81,7 +90,8 @@ public class MatchingEngineApp {
 
         private final SysPerfDataCollectionEngine sysPerfEngine;
 
-
+        public final String _chronicleERFile="log/chronicleQ/ExecutionReports";
+        public final String _chronicleMDFile="log/chronicleQ/MarketData";
 
         public InternalMatchingEngineApp(List<String> symbols) throws Exception {
 
@@ -117,6 +127,10 @@ public class MatchingEngineApp {
             )
             );
 
+            final ChronicleQueue chronicleQueueER = SingleChronicleQueueBuilder.binary(_chronicleERFile).build();
+            final ChronicleQueue chronicleQueueMD = SingleChronicleQueueBuilder.binary(_chronicleMDFile).build();
+
+
             switch (_queueType) {
                 case "Disruptor":
                     final WaitStrategy waitStrategy;
@@ -136,14 +150,14 @@ public class MatchingEngineApp {
                     }
 
                     symbols.forEach(symbol -> {
-                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
+                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize, waitStrategy, chronicleQueueER, chronicleQueueMD);
                         _engines.add(engine);
                         _enginesBySymbol.put(symbol, engine);
                     });
                     break;
                 case "BlockingQueue":
                     symbols.forEach(symbol -> {
-                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize);
+                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize, chronicleQueueER, chronicleQueueMD);
                         _engines.add(engine);
                         _enginesBySymbol.put(symbol, engine);
                     });
@@ -168,6 +182,73 @@ public class MatchingEngineApp {
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
             //register FIX, for streaming output
             _executionReportsBus.register(_fixWrapper);
+
+
+            final ExcerptTailer erTailer = chronicleQueueER.createTailer();
+            final ExcerptTailer mdTailer = chronicleQueueMD.createTailer();
+            Thread erTrailerThread = new Thread(new Runnable(){
+
+                AffinityLock lock = AffinityLock.acquireLock();
+                private Gson _gson = new Gson();
+                final Pauser pauser = new LongPauser(1, 100, 500, 10_000, TimeUnit.MICROSECONDS);
+                public void run(){
+
+                    while(!Thread.currentThread().isInterrupted()) {
+                        String msg = erTailer.readText();
+                        if (msg != null) {
+                            pauser.reset();
+                            //https://www.mkyong.com/java/how-do-convert-java-object-to-from-json-format-gson-api/
+                            if(msg.indexOf("MatchedExecutionReport") > 0){
+
+                                TradeMessage.MatchedExecutionReport matchedER = _gson.fromJson(msg, TradeMessage.MatchedExecutionReport.class);
+                                _simpleOMSEngine.process(matchedER);
+                                _fixWrapper.process(matchedER);
+                            }else if(msg.indexOf("SingleSideExecutionReport") > 0){
+                                TradeMessage.SingleSideExecutionReport singleSideER = _gson.fromJson(msg, TradeMessage.SingleSideExecutionReport.class);
+                                _simpleOMSEngine.process(singleSideER);
+                                _fixWrapper.process(singleSideER);
+                            }else{
+                                log.error("unknown msg for ER:{}", msg);
+                            }
+                        }else{
+                            pauser.pause();
+                        }
+
+                    }
+                }
+            }, "erTrailerThread");
+            Thread mdTrailerThread = new Thread(new Runnable(){
+
+                AffinityLock lock = AffinityLock.acquireLock();
+                private Gson _gson = new Gson();
+                final Pauser pauser = new LongPauser(1, 100, 500, 10_000, TimeUnit.MICROSECONDS);
+                public void run(){
+
+                    while(!Thread.currentThread().isInterrupted()) {
+                        String msg = mdTailer.readText();
+                        if (msg != null) {
+                            pauser.reset();
+                            //https://www.mkyong.com/java/how-do-convert-java-object-to-from-json-format-gson-api/
+                            if(msg.indexOf("OrderBookDelta") > 0){
+
+                                MarketDataMessage.OrderBookDelta delta = _gson.fromJson(msg, MarketDataMessage.OrderBookDelta.class);
+                                _simpleMarkderDataEngine.process(delta);
+                            }else if(msg.indexOf("AggregatedOrderBook") > 0){
+                                MarketDataMessage.AggregatedOrderBook ob = _gson.fromJson(msg, MarketDataMessage.AggregatedOrderBook.class);
+                                _simpleMarkderDataEngine.process(ob);
+                            }else{
+                                log.error("unknown msg for MD:{}", msg);
+                            }
+                        }else{
+                            pauser.pause();
+                        }
+
+                    }
+                }
+            }, "mdTrailerThread");
+            erTrailerThread.start();
+            mdTrailerThread.start();
+
         }
 
         public void start() throws Exception {

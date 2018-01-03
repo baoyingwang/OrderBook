@@ -10,6 +10,8 @@ public class MarketDataMessage {
 	
 	public static class OrderBookDelta implements MatchingEnginOutputMessageFlag {
 
+		public final String _asFlag;
+
 		final String _symbol;
 		final Side _side;
 		final double _px;
@@ -20,11 +22,15 @@ public class MarketDataMessage {
 			_side = side;
 			_px = px;
 			_deltaQty_couldNegative = deltaQty_couldNegative;
+
+			_asFlag="OrderBookDelta";
 		}
 
 	}
 
 	public static class AggregatedOrderBook implements MatchingEnginOutputMessageFlag{
+
+		public final String _asFlag;
 
 		public long _msgID;
 
@@ -39,6 +45,7 @@ public class MarketDataMessage {
 			_msgID = msgID;
 			_bidBookMap = bidBookMap;
 			_offerBookMap= offerBookMap;
+			_asFlag = "AggregatedOrderBook";
 		}
 
 	}

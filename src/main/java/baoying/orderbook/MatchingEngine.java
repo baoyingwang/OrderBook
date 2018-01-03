@@ -4,10 +4,15 @@ import baoying.orderbook.MarketDataMessage.AggregatedOrderBookRequest;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 import com.google.common.eventbus.AsyncEventBus;
+import com.google.gson.Gson;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
+import net.openhft.chronicle.queue.ChronicleQueue;
+import net.openhft.chronicle.queue.ExcerptAppender;
+import net.openhft.chronicle.queue.impl.single.SingleChronicleQueueBuilder;
+import net.openhft.chronicle.wire.DocumentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +36,12 @@ public class MatchingEngine {
 
 	private final AsyncEventBus _outputMarketDataBus;
 	private final AsyncEventBus _outputExecutionReportsBus;
+
+    private final ChronicleQueue _chronicleQueueER;
+    private final ChronicleQueue _chronicleQueueMD;
+	private final ExcerptAppender _chronicleERAppender;
+	private final ExcerptAppender _chronicleMDAppender;
+
 	private final int _bufferSize ;
 
 	private final BlockingQueue<OrderBook.MatchingEngineInputMessageFlag> _inputMessagesBlockingQueue;
@@ -41,10 +52,15 @@ public class MatchingEngine {
 		DISRUPTOR, BLOCKING_QUEUE;
 	}
 
+	//stateless Gson for performance - https://groups.google.com/forum/#!topic/google-gson/rhIJ4wi5IRE
+    private Gson _gson = new Gson();
+
 	public MatchingEngine(OrderBook orderBook,
 						  AsyncEventBus outputExecutionReportsBus,
 						  AsyncEventBus outputMarketDataBus,
-						  int bufferSize){
+						  int bufferSize,
+                          ChronicleQueue chronicleQueueER,
+                          ChronicleQueue chronicleQueueMD){
 
 		log.info("BlockingQueue with buffer size:{}", bufferSize);
 
@@ -79,12 +95,21 @@ public class MatchingEngine {
                 log.warn("exiting matching engine processing queue");
 			}
 		});
+
+		_chronicleQueueER = chronicleQueueER;
+        _chronicleERAppender = _chronicleQueueER.acquireAppender();
+
+        _chronicleQueueMD = chronicleQueueMD;
+        _chronicleMDAppender = chronicleQueueMD.acquireAppender();
 	}
+
 	public MatchingEngine(OrderBook orderBook,
 						  AsyncEventBus outputExecutionReportsBus,
 						  AsyncEventBus outputMarketDataBus,
                           int disruptorBufferSize,
-						  WaitStrategy waitStrategy) {
+						  WaitStrategy waitStrategy,
+                          ChronicleQueue chronicleQueueER,
+                          ChronicleQueue chronicleQueueMD) {
 
 		log.info("DISRUPTOR with buffer size:{}, and strategy:{}", disruptorBufferSize, waitStrategy.toString());
 		_QueueType = QueueType.DISRUPTOR;
@@ -109,7 +134,17 @@ public class MatchingEngine {
 					OrderBook.MatchingEngineInputMessageFlag originalOrderORAggBookRequest = event._value;
 					processInputMessage(originalOrderORAggBookRequest);
 				});
+
+		//TODO duplicate code
+        _chronicleQueueER = chronicleQueueER;
+        _chronicleERAppender = _chronicleQueueER.acquireAppender();
+
+        _chronicleQueueMD = chronicleQueueMD;
+        _chronicleMDAppender = chronicleQueueMD.acquireAppender();
+
 	}
+
+
 
 	public void start(){
 
@@ -195,18 +230,42 @@ public class MatchingEngine {
 			OrderBook.Tuple<List<OrderBook.MatchingEnginOutputMessageFlag>, List<MarketDataMessage.OrderBookDelta>> matchResult
 					= _orderBook.processInputOrder(executingOrder);
 
-			matchResult._1.forEach( execRpt ->{
-				_outputExecutionReportsBus.post(execRpt);
-			} );
+			boolean useChronicle = true;
+			if(useChronicle){
 
-			matchResult._2.forEach( ordBookDelta ->{
-				_outputMarketDataBus.post(ordBookDelta);
-			} );
+                matchResult._1.forEach(execRpt -> {
+                    //https://www.mkyong.com/java/how-do-convert-java-object-to-from-json-format-gson-api/
+                    String execRptString = _gson.toJson(execRpt);
+                    _chronicleERAppender.writeText(execRptString);
+                });
+
+                matchResult._2.forEach(ordBookDelta -> {
+                    String ordBookDeltaString = _gson.toJson(ordBookDelta);
+                    _chronicleMDAppender.writeText(ordBookDeltaString);
+                });
+
+
+            }else {
+                matchResult._1.forEach(execRpt -> {
+                    _outputExecutionReportsBus.post(execRpt);
+                });
+
+                matchResult._2.forEach(ordBookDelta -> {
+                    _outputMarketDataBus.post(ordBookDelta);
+                });
+            }
 
 		} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
 			AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
 			MarketDataMessage.AggregatedOrderBook aggOrderBook = _orderBook.buildAggregatedOrderBook(aggOrdBookRequest._depth);
-			_outputMarketDataBus.post(aggOrderBook);
+
+            boolean useChronicle = true;
+            if(useChronicle){
+                String ob = _gson.toJson(aggOrderBook);
+                this._chronicleMDAppender.writeText(ob);
+            }else {
+                _outputMarketDataBus.post(aggOrderBook);
+            }
 		} else {
 			log.error("received unknown type : {}",
 					originalOrderORAggBookRequest.getClass().toGenericString());

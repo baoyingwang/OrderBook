@@ -36,8 +36,8 @@ dependencies {
 	compile("org.springframework.boot:spring-boot-starter-log4j2:+")
 
 	compile("org.quickfixj:quickfixj-core:2.0.0")
-
     compile group: 'com.beust', name: 'jcommander', version: '1.72' //http://jcommander.org/ https://mvnrepository.com/artifact/com.beust/jcommander/1.72
+	compile("net.openhft:chronicle-queue:4.6.60") //https://github.com/OpenHFT/Chronicle-Queue
 
 	testCompile 'junit:junit:4.8.2'
  }
