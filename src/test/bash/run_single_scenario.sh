@@ -93,15 +93,30 @@ function startLatencyOrder(){
 }
 
 
-#clean exist process
-#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
-ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+case $OSTYPE in
+	linux*) 
+		#clean exist process
+		#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
+		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+		;;
+	msis*)
+		echo "TODO fiture out how to kill java process on windows"
+		;;
+esac		
 
-vmstat_count=$(ps -ef |grep "vmstat 5 -t" | grep -v grep | wc -l)
-if [[ $vmstat_count -lt 1 ]]; then
-        echo "start vmstat, since not yet exist "
-        vmstat 5 -t >> vmstat_since$(date '+%Y%m%d').log &
-fi
+case $OSTYPE in
+	linux*) 
+		vmstat_count=$(ps -ef |grep "vmstat 5 -t" | grep -v grep | wc -l)
+		if [[ $vmstat_count -lt 1 ]]; then
+				echo "start vmstat, since not yet exist "
+				vmstat 5 -t >> vmstat_since$(date '+%Y%m%d').log &
+		fi
+		;;
+	msis*)
+		echo "no vmstat on windows"
+		;;
+esac
+	
 
 test_name=$1
 jarfile=$2
@@ -136,5 +151,13 @@ do
 done
 
 
-#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
-ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+case $OSTYPE in
+	linux*) 
+		#clean exist process
+		#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
+		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+		;;
+	msis*)
+		echo "TODO fiture out how to kill java process on windows"
+		;;
+esac	
