@@ -102,8 +102,8 @@ jar {
 
 //add buildscript and apply related plugin - see the header part
 shadowJar {
-    baseName = 'BaoyingOrderBookFat'
 
+	archiveName = 'BaoyingOrderBookFat.jar'
     // Required for Spring -- https://github.com/spring-projects/spring-boot/issues/1828
     //add import com.github.jengelman.gradle.plugins.shadow.transformers.* at header
     mergeServiceFiles()
@@ -121,5 +121,14 @@ tasks.withType(JavaCompile) {
 	options.compilerArgs << '-Xlint:unchecked' << '-Xlint:deprecation'
 }
 
+task buildPackage(group: 'build', type: Zip, dependsOn: shadowJar) {
 
+	baseName = 'BaoyingOrderBookFat'
+	ext.publishMe = true
+	ext.zipDistribution = true
+
+	into('jars') { from shadowJar }
+    into('scripts'){from ('src/test/bash/') { include('**/*') } }
+    into('scripts'){from ('src/test/python/') { include('**/*') } }
+}
 

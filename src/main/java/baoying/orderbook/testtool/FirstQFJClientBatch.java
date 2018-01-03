@@ -95,7 +95,7 @@ public class FirstQFJClientBatch {
                 msgNumPerPeriod = (int)Math.round(0.49 + ratePerMinute/60);
 
             }else if(ratePerMinute <= 60 * 10) {
-                //2 intervals
+                //2 intervals per second
                 period = 500;
                 unit = TimeUnit.MILLISECONDS;
                 msgNumPerPeriod = (int)Math.round(0.49 + ratePerMinute/(60 * 2));

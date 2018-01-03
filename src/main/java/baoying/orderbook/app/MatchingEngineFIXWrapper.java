@@ -14,6 +14,9 @@ import javax.annotation.PostConstruct;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
 public class MatchingEngineFIXWrapper {
@@ -30,7 +33,16 @@ public class MatchingEngineFIXWrapper {
     private final DynamicSessionQFJAcceptor _dynamicSessionQFJAcceptor;
     private final String _appConfigInClasspath;
 
-    private final Set<String> triedLogonClientCompIDs = new HashSet<>();
+    private final Set<String> _triedLogonClientCompIDs = new HashSet<>();
+
+
+    private final ExecutorService _fixERSendingExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r, "Thread - FIXInterface Sending ER");
+        }
+    }
+            );
 
 
     MatchingEngineFIXWrapper(Map<String,MatchingEngine> engines,
@@ -60,22 +72,14 @@ public class MatchingEngineFIXWrapper {
     @Subscribe
     public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        if(!triedLogonClientCompIDs.contains(singleSideExecutionReport._originOrder._clientEntityID)){
+        if(!_triedLogonClientCompIDs.contains(singleSideExecutionReport._originOrder._clientEntityID)){
             //orders from web/jmeter(etc) could also reach here
             return;
         }
 
-        Message fixER = buildFIXExecutionReport(singleSideExecutionReport);
-        try {
-            SessionID paramSessionID =  new SessionID("FIXT.1.1", serverCompID, singleSideExecutionReport._originOrder._clientEntityID, "");
-            if(! Session.doesSessionExist(paramSessionID)){
-                log.warn("ignore the realtime ER to client, since he:{} is not online now", singleSideExecutionReport._originOrder._clientEntityID);
-                return;
-            }
-            Session.sendToTarget(fixER, paramSessionID);
-        }catch (SessionNotFound sessionNotFound){
-            log.error("fail to send ER back, because of SessionNot Found" + sessionNotFound.toString(), sessionNotFound);
-        }
+        final SessionID sessionID ;
+        Message er = buildFIXExecutionReport(singleSideExecutionReport);
+        sendER(er, singleSideExecutionReport._originOrder._clientEntityID);
 
     }
 
@@ -87,7 +91,7 @@ public class MatchingEngineFIXWrapper {
 
     public void processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
 
-        TradeMessage.OriginalOrder originalOrder = null;
+        final TradeMessage.OriginalOrder originalOrder;
         switch(maker_taker){
             case MAKER :
                 originalOrder = matchedExecutionReport._makerOriginOrder;
@@ -99,7 +103,7 @@ public class MatchingEngineFIXWrapper {
                 throw new RuntimeException("unknown side : "+maker_taker);
         }
 
-        if(!triedLogonClientCompIDs.contains(originalOrder._clientEntityID)){
+        if(!_triedLogonClientCompIDs.contains(originalOrder._clientEntityID)){
             //orders from web/jmeter(etc) could also reach here
             return;
         }
@@ -108,59 +112,78 @@ public class MatchingEngineFIXWrapper {
             return;
         }
 
-        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,originalOrder._clientEntityID, "");
+
+        Message er = buildExternalERfromInternalER(matchedExecutionReport, maker_taker);
+        sendER(er, originalOrder._clientEntityID);
+
+    }
+
+    private void sendER(Message er, String clientEntityID){
+
+        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
+        sendER(er, sessionID);
+    }
+
+    private void sendER(Message er, SessionID sessionID){
+
         if(! Session.doesSessionExist(sessionID)){
-            log.warn("ignore the realtime ER to client, since he:{} is not online now", originalOrder._clientEntityID);
+            log.warn("ignore the realtime ER to client, since the session:{} is not online now", sessionID.toString());
             return;
         }
 
-        Message er = buildExternalERfromInternalER(matchedExecutionReport, maker_taker);
-        try {
-            Session.sendToTarget(er,sessionID);
-        } catch (SessionNotFound sessionNotFound) {
-            log.error("failure while sending er to :{} "+ originalOrder._clientEntityID, sessionNotFound);
-        }
-
-
+        _fixERSendingExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                try{
+                    Session.sendToTarget(er, sessionID);
+                }catch (Exception e){
+                    log.error("failure", e);
+                }
+            }
+        });
     }
 
     class InternalQFJApplicationCallback implements Application {
 
             @Override
-            public void fromAdmin(Message paramMessage, SessionID paramSessionID)
+            public void fromAdmin(Message message, SessionID sessionId)
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon {
-                log.debug("fromAdmin session:{}, received : {} ", paramSessionID, paramMessage);
+                log.debug("fromAdmin session:{}, received : {} ", sessionId, message);
             }
 
             @Override
-            public void fromApp(Message paramMessage, SessionID paramSessionID) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
+            public void fromApp(final Message paramMessage, final SessionID paramSessionID) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
                 log.debug("fromApp session:{}, received : {} ", paramSessionID, paramMessage);
 
-                String msgType = paramMessage.getHeader().getString(35);
-                if(! "D".equals(msgType) ){
-                    log.error("msg type:{} is not supported. msg:{}", msgType, paramMessage.toString());
-                    return;
-                }
-
-                String orderID = UniqIDGenerator.next();
-                TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
-
-                MatchingEngine engine = _enginesBySimbol.get(originalOrder._symbol);
-                if(engine == null){
-                    log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
-                    return ;
-                }
-
-                TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
-                _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
-
-                Message fixER = buildFIXExecutionReport(erNew);
-
                 try {
-                    Session.sendToTarget(fixER, paramSessionID);
-                }catch (SessionNotFound sessionNotFound){
-                    log.error("fail to send ER back, because of SessionNot Found" + sessionNotFound.toString(), sessionNotFound);
+
+                    String msgType = paramMessage.getHeader().getString(35);
+                    if(! "D".equals(msgType) ){
+                        log.error("msg type:{} is not supported. msg:{}", msgType, paramMessage.toString());
+                        return;
+                    }
+
+                    String orderID = UniqIDGenerator.next();
+                    TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
+
+                    MatchingEngine engine = _enginesBySimbol.get(originalOrder._symbol);
+                    if(engine == null){
+                        log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
+                        return ;
+                    }
+
+                    TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+                    _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
+
+                    final Message fixNewER = buildFIXExecutionReport(erNew);
+                    sendER(fixNewER, paramSessionID);
+
+                }catch (Exception e){
+                    log.error("failure", e);
                 }
+
+
+
 
             }
 
@@ -172,7 +195,7 @@ public class MatchingEngineFIXWrapper {
             @Override
             public void onLogon(SessionID paramSessionID) {
                 log.debug("onLogon session:{}", paramSessionID);
-                triedLogonClientCompIDs.add(paramSessionID.getTargetCompID());
+                _triedLogonClientCompIDs.add(paramSessionID.getTargetCompID());
 
             }
 

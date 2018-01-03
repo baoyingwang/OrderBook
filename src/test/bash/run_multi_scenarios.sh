@@ -23,11 +23,14 @@ do
     background_rate_per_second=$(echo $test_case | cut -d',' -f3)
     background_rate_per_min=$((60*$background_rate_per_second))
     duration_in_second=$(echo $test_case | cut -d',' -f4)
-    test_name=${queue_type}_${strategy}_bg${background_rate_per_second}perSec_$(date '+%Y%m%d_%H%M%S')_duration${duration_in_second}Sec
+
+    latency_rate_per_min=$(echo $test_case | cut -d',' -f5)
+    latency_rate_per_min=${latency_rate_per_min:-60}
+    test_name=${queue_type}_${strategy}_bg${background_rate_per_second}perSec_lt${latency_rate_per_min}perMin_duration${duration_in_second}sec_$(date '+%Y%m%d_%H%M%S')
 
     echo "$test_name"
 
-    bash run_single_scenario.sh ${test_name} ${jarfile} ${queue_type} ${strategy} ${background_rate_per_min} ${duration_in_second}
+    bash run_single_scenario.sh ${test_name} ${jarfile} ${queue_type} ${strategy} ${background_rate_per_min} ${duration_in_second} ${latency_rate_per_min}
 
     cd ${MYSCRIPTDIR}
     zip -r zip_${test_name}.zip ${test_name}

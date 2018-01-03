@@ -1,7 +1,5 @@
 import sys
-sys.path.append('C:\\baoying.wang\\ws\\github\\ML_Kaggle')
 from by_common_import import *
-import os
 import re
 from datetime import datetime
 
@@ -13,7 +11,6 @@ from datetime import datetime
 #pickFromOutputQ_us
 def getLatency(inputLatencyFile):
 
-    #os.chdir("C:\\baoying.wang\\ws\\gitnas\\OrderBook\\build\\libs\\log")
     df_latency=pd.read_csv(inputLatencyFile)
     
     #the heading lines are always bad performance(why?warm up?), below can be used to remove them(heading 500)
@@ -53,7 +50,7 @@ def getLatency(inputLatencyFile):
 #thread_ThreadCount    
 def getSysUsage(sysUsageFile):
 
-    #os.chdir("C:\\baoying.wang\\ws\\gitnas\\OrderBook\\build\\libs\\log")
+
     #time,cpu ProcessCpuLoad,cpu SystemLoadAverage,gc ConcurrentMarkSweep CollectionCount,gc ConcurrentMarkSweep CollectionTime,gc ParNew CollectionCount,gc ParNew CollectionTime,heapMemory Committed,heapMemory Init,heapMemory Max,heapMemory Used,non-heapMemory Committed,non-heapMemory Init,non-heapMemory Max,non-heapMemory Used,thread ThreadCount
     #2017-12-26T06:23:57.323Z,60.00,1.35,0,14,1,26,1056309248,1073741824,1056309248,64060352,42807296,2555904,-1,41957960,9
     #2017-12-26T06:24:02.320Z,65.70,1.33,1,68,1,26,1056309248,1073741824,1056309248,135747440,49889280,2555904,-1,48575024,30
@@ -70,7 +67,6 @@ def getSysUsage(sysUsageFile):
     
 def getVmstat(inputVmstatFile):
     
-    #os.chdir("C:\\baoying.wang\\ws\\gitnas\\OrderBook\\build\\libs\\log")
     df=pd.read_csv(inputVmstatFile)
     
     #procs_r,procs_b,memory_swpd,memory_free,memory_buff,memory_cache,swap_si,swap_so,io_bi,io_bo,system_in,system_cs,system_us,system_sy,system_id,system_wa,system_st,timestamp_day,timestamp_time
