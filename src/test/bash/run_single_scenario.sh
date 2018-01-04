@@ -64,9 +64,12 @@ function warmupOrder(){
     local tmp_warmup_duration_in_seconds=${2:-15}
 
     echo "begin sending warmup orders - ${tmp_warmup_duration_in_seconds} seconds"
-    local warmup_rate_per_min_single_side=$((${tmp_warmup_duration_in_seconds}/2))
+    local warmup_rate_per_min_single_side=$((${tmp_warmup_duration_in_seconds}/4))
     java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_warmup_rate_per_min} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${warmup_rate_per_min_single_side}
     java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_warmup_rate_per_min} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${warmup_rate_per_min_single_side}
+
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_warmup_rate_per_min} -client_prefix LxTxCx_FIX_WMUPB -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${warmup_rate_per_min_single_side}
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_warmup_rate_per_min} -client_prefix LxTxCx_FIX_WMUPO -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${warmup_rate_per_min_single_side}
 }
 
 function startBackgroundOrder(){
@@ -88,8 +91,8 @@ function startLatencyOrder(){
     local tmp_latency_rate_per_min_single_side=${1:-60}
     echo "begin sending latency orders - tmp_latency_rate_per_min_single_side:${tmp_latency_rate_per_min_single_side}"
 
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 
@@ -100,7 +103,11 @@ case $OSTYPE in
 		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 		;;
 	msis*)
-		echo "TODO fiture out how to kill java process on windows"
+	
+		#tasklist  | grep java |  sed 's/^ *//;s/ *$//;s/\ \+/ /g' |cut -d' ' -f2 | xargs kill -9
+		#taskkill /PID 10208 /F  the /PID is identified as :ERROR: Invalid argument/option - 'C:/baoying.wang/program/Git/PID'.
+		#https://stackoverflow.com/questions/11865085/out-of-a-git-console-how-do-i-execute-a-batch-file-and-then-return-to-git-conso
+		cmd "/C TASKKILL /F /IM java.exe /T"
 		;;
 esac		
 
@@ -112,7 +119,7 @@ case $OSTYPE in
 				vmstat 5 -t >> vmstat_since$(date '+%Y%m%d').log &
 		fi
 		;;
-	msis*)
+	msys*)
 		echo "no vmstat on windows"
 		;;
 esac
@@ -132,7 +139,7 @@ populateOB
 JVMOptions_sending="-Xmx128M -Dlog4j.configurationFile=log4j2_testtool.xml"
 
 tmp_warmup_rate_per_min=$((60*20))
-tmp_warmup_duration_in_seconds=30
+tmp_warmup_duration_in_seconds=40
 warmupOrder $tmp_warmup_rate_per_min $tmp_warmup_duration_in_seconds
 
 startBackgroundOrder $background_rate_per_min
@@ -157,7 +164,7 @@ case $OSTYPE in
 		#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
 		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 		;;
-	msis*)
-		echo "TODO fiture out how to kill java process on windows"
+	msys*)
+		cmd "/C TASKKILL /F /IM java.exe /T"
 		;;
 esac	

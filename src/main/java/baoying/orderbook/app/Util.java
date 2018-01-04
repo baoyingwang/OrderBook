@@ -17,7 +17,7 @@ public class Util {
     static final DateTimeFormatter fileNameFormatter =
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss.SSS'Z'").withZone( ZoneOffset.UTC );
 
-    static final DateTimeFormatter formterOfOutputTime =
+    public static final DateTimeFormatter formterOfOutputTime =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
                     .withZone(ZoneId.of("UTC")) ;
 

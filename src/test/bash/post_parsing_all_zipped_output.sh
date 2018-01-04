@@ -14,26 +14,34 @@ function parseZipFile(){
 	unzip -p $zipfile $name/log/GC.summary.csv              > $name.GC.summary.csv
 	unzip -p $zipfile $name/log/MatchingEngine.console.log  > $name.MatchingEngine.console.log
 
-	python_script_file=parseLatencyData.py
-	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
+	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
+    head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp                 > $name.e2e_LxTxCx_FIX_RT.csv
+    grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp >> $name.e2e_LxTxCx_FIX_RT.csv
+    rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
+
+	#python_script_file=parseLatencyData.py
+	python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
 	python ${python_script_file} $name.latency.data.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
 
 }
 
 #
 #bash /c/baoying.wang/ws/gitnas/OrderBook/src/test/bash/post_parsing_all_zipped_output.sh \
-# vmstat_since20171231.log  zipped
+# . vmstat_since20171231.log
 #
 SCRIPT_START_DIR=`pwd`
 DIRNAMECMD="/usr/bin/dirname"
 MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
 
-vmstat_file=$1
-zipfies_dir=${2:-${SCRIPT_START_DIR}}
+zipfies_dir=${1:-${SCRIPT_START_DIR}}
+vmstat_file=$2
+
 
 
 vm_output_csv=${vmstat_file}.csv
-bash $MYSCRIPTDIR/vm.output.to.csv.sh $vmstat_file > ${vm_output_csv}
+if [[ -e ${vmstat_file} ]]; then
+    bash $MYSCRIPTDIR/vm.output.to.csv.sh $vmstat_file > ${vm_output_csv}
+fi
 
 ls -l ${zipfies_dir} | grep zip | awk '{print $NF }' | while read zipfile_name
 do

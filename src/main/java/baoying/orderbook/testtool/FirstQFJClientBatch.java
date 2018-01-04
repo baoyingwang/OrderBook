@@ -1,6 +1,8 @@
 package baoying.orderbook.testtool;
 
+import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.app.MatchingEngineFIXWrapper;
+import baoying.orderbook.app.UniqIDGenerator;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.base.Charsets;
@@ -61,7 +63,15 @@ public class FirstQFJClientBatch {
             IntStream.range(0, fixClientNum).forEach(it -> clientIDs.add(clientCompIDPrefix + String.valueOf(it)));
         }
         String qfjConfigContent = getQFJConfigContent(clientIDs);
-        Application application = new FirstMessageCallback();
+        final Application application;
+        {
+            if(clientCompIDPrefix.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+                application= new LatencyMessageCallback();
+            }else{
+                application= new FirstMessageCallback();
+            }
+
+        }
         SessionSettings settings = new SessionSettings(new ByteArrayInputStream(qfjConfigContent.getBytes())) ;
         MessageStoreFactory storeFactory = new FileStoreFactory(settings);
         LogFactory logFactory = new SLF4JLogFactory(settings);
@@ -144,8 +154,10 @@ public class FirstQFJClientBatch {
                             return;
                         }
 
+                        String clientOrdID = clientCompID+ UniqIDGenerator.next();
                         try {
-                            Message order = FIXOrderBuilder.buildNewOrderSingle(clientCompID,
+                            Message order = FIXOrderBuilder.buildNewOrderSingle(clientOrdID,
+                                    clientCompID,
                                     symbol,
                                     price,
                                     qty,

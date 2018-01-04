@@ -10,7 +10,9 @@ import java.time.ZoneOffset;
 
 public class FIXOrderBuilder {
 
-    static Message buildNewOrderSingle(String clientCompID,
+    static Message buildNewOrderSingle(
+                                        String clientOrdID,
+                                        String clientCompID,
                                        String symbol,
                                        String price,
                                        String qty,
@@ -32,7 +34,7 @@ public class FIXOrderBuilder {
         //newOrderSingle.getHeader().setString(8, "FIXT.1.1");
 
         newOrderSingle.getHeader().setString(35, "D");
-        newOrderSingle.setString(11, clientCompID+ UniqIDGenerator.next());
+        newOrderSingle.setString(11, clientOrdID);
         newOrderSingle.setString(55, symbol); // non-repeating group
         newOrderSingle.setString(44, price); //
         // instrument->Symbol 55

@@ -1,6 +1,7 @@
 import sys
 from by_common_import import *
-import re
+import os
+import re #regex
 from datetime import datetime
 
 
@@ -77,6 +78,9 @@ def getVmstat(inputVmstatFile):
     
 
 def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):
+
+    if df_vmstat.size<1:
+        return vmstat_row_start_index
 
     #procs_r,procs_b,memory_swpd,memory_free,memory_buff,memory_cache,swap_si,swap_so,io_bi,io_bo,system_in,system_cs,cpu_us,cpu_sy,cpu_id,cpu_wa,cpu_st,timestamp_day,timestamp_time
     #0,0,0,5605964,35796,257216,0,0,1492,85,225,853,3,4,92,1,0,2017-12-26,05:50:22
@@ -227,16 +231,14 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     plt.text(0, 0 ,"".join(osLineList) + "".join(gcLineList))
 
 
-    ignore_runtime_prefix_list = ["runtime BootClassPath",  #too long - cannot fit
-                                  "runtime SystemProperties"    ,  #too long - cannot fit
-                                  "runtime StartTime"           ,  #not useful, save plot space
-                                  "runtime Uptime"              ,  #not useful, save plot space
-                                  "runtime ManagementSpecVersion",
-                                  "runtime SpecName"             ,
-                                  "runtime SpecVendor"           ,
-                                  "runtime SpecVersion"         ]
+    runtime_prefix_list = ["runtime ClassPath",
+                                  "runtime InputArguments" ,
+                                  "runtime Name"           ,
+                                  "runtime VmName"         ,
+                                  "runtime VmVendor",
+                                  "runtime VmVersion"  ]
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
-    runtimeLineList = ['\n          '.join(x[i:i+100] for i in range(0, len(x), 100)) for x in sysInfoContentList if x.startswith("runtime ") and not x.split(":")[0] in ignore_runtime_prefix_list]
+    runtimeLineList = ['\n          '.join(x[i:i+100] for i in range(0, len(x), 100)) for x in sysInfoContentList if x.startswith("runtime ") and x.split(":")[0] in runtime_prefix_list]
 
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
     #the ? is for non-greedy - https://docs.python.org/3/library/re.html
@@ -294,9 +296,13 @@ output_file_prefix  = sys.argv[5]
 df_latency=getLatency(inputLatencyFile)
 df_sysUsage=getSysUsage(inputSysUsageFile)
 
-df_vmstat=getVmstat(inputVmstatFile)
-df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] < df_sysUsage["time_datetime"].min()].index, inplace=True) #remove those before engine up
-df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] > df_sysUsage["time_datetime"].max()].index, inplace=True) #remove those after  engine down
+if ( os.path.isfile(inputVmstatFile)):
+    df_vmstat=getVmstat(inputVmstatFile)
+    df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] < df_sysUsage["time_datetime"].min()].index, inplace=True) #remove those before engine up
+    df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] > df_sysUsage["time_datetime"].max()].index, inplace=True) #remove those after  engine down
+else:
+    df_vmstat = pd.DataFrame()
+
 
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
 with open(inputSysInfoFile) as f:
