@@ -12,25 +12,41 @@ from datetime import datetime
 #pickFromOutputQ_us
 def getLatency(inputLatencyFile):
 
+    print("load latency csv file" + inputLatencyFile +" to dataframe")
+
     df_latency=pd.read_csv(inputLatencyFile)
-    
+
     #the heading lines are always bad performance(why?warm up?), below can be used to remove them(heading 500)
     #df_latency=df_latency[51:df_latency.size]
-    
-    df_latency["put2InputQ_us"]=df_latency["put2InputQ"]/1000
-    df_latency["pickFromInputQ_us"]=df_latency["pickFromInputQ"]/1000
-    df_latency["match_us"]=df_latency["match"]/1000
-    df_latency["pickFromOutputQ_us"]=df_latency["pickFromOutputQ"]/1000
+
+    df_latency["put2InputQ_us"]     = df_latency["put2InputQ"]/1000
+    df_latency["pickFromInputQ_us"] = df_latency["pickFromInputQ"]/1000
+    df_latency["match_us"]          = df_latency["match"]/1000
+    df_latency["pickFromOutputQ_us"]= df_latency["pickFromOutputQ"]/1000
     df_latency.drop(['put2InputQ', 'pickFromInputQ', 'match', 'pickFromOutputQ'], axis=1, inplace=True)
 
     #TODO remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
     df_latency.drop(['put2InputQ_us'], axis=1, inplace=True)
- 
-    
+
+
     #https://stackoverflow.com/questions/19079143/how-to-plot-time-series-in-python
     df_latency['recvTime_datetime'] = df_latency['recvTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
-    
+
     return df_latency
+
+def getE2E(inputE2EFile):
+
+    print("load e2e csv file" + inputE2EFile +" to dataframe")
+
+    df=pd.read_csv(inputE2EFile)
+
+    df["newER_us"          ] = df["newER"]/1000
+    df["matchER_us"]         = df["matchER"]/1000
+    df.drop(['newER', 'matchER'], axis=1, inplace=True)
+
+    df['sendTime_datetime' ] = df['sendTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
+
+    return df
 
 
 #time_datetime
@@ -51,12 +67,13 @@ def getLatency(inputLatencyFile):
 #thread_ThreadCount    
 def getSysUsage(sysUsageFile):
 
+    print("load sys usage csv file " + sysUsageFile +" to dataframe")
 
     #time,cpu ProcessCpuLoad,cpu SystemLoadAverage,gc ConcurrentMarkSweep CollectionCount,gc ConcurrentMarkSweep CollectionTime,gc ParNew CollectionCount,gc ParNew CollectionTime,heapMemory Committed,heapMemory Init,heapMemory Max,heapMemory Used,non-heapMemory Committed,non-heapMemory Init,non-heapMemory Max,non-heapMemory Used,thread ThreadCount
     #2017-12-26T06:23:57.323Z,60.00,1.35,0,14,1,26,1056309248,1073741824,1056309248,64060352,42807296,2555904,-1,41957960,9
     #2017-12-26T06:24:02.320Z,65.70,1.33,1,68,1,26,1056309248,1073741824,1056309248,135747440,49889280,2555904,-1,48575024,30
     df=pd.read_csv(sysUsageFile)
-    
+
     #replace the space with understand in column name - https://github.com/pandas-dev/pandas/issues/6508
     cols = df.columns
     cols = cols.map(lambda x: x.replace(' ', '_') )
@@ -65,17 +82,19 @@ def getSysUsage(sysUsageFile):
     df['time_datetime'] = df['time'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
     return df
 
-    
+
 def getVmstat(inputVmstatFile):
-    
+
+    print("load sys vmstat csv file " + inputVmstatFile +" to dataframe")
+
     df=pd.read_csv(inputVmstatFile)
-    
+
     #procs_r,procs_b,memory_swpd,memory_free,memory_buff,memory_cache,swap_si,swap_so,io_bi,io_bo,system_in,system_cs,system_us,system_sy,system_id,system_wa,system_st,timestamp_day,timestamp_time
     #0,0,0,5605964,35796,257216,0,0,1492,85,225,853,3,4,92,1,0,2017-12-26,05:50:22
     df['time']=df['timestamp_day']+'T'+df['timestamp_time']+'Z'
     df['time_datetime'] = df['time'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%SZ"))
     return df
-    
+
 
 def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):
 
@@ -193,11 +212,11 @@ def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle, outpu
     #plt.title(u"put2InputQ_us")
     #plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(row_start_index,0), colspan=2)
+    plt.subplot2grid(shape,(row_start_index,0), colspan=3)
     #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
     describeResult = df_latency.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    plt.text(0, 0 ,describeResult.to_string())
-    plt.title(plotTitle + " latency summary" )
+    plt.text(0, 0 ,plotTitle + "\n" + describeResult.to_string())
+    #plt.title(plotTitle + " latency summary" ) #remove because of overallp on png. Add to text.
     describeResult.to_csv(output_file_prefix+"_latency_describe.csv")
 
     plt.subplot2grid(shape,(row_start_index+1,0))
@@ -221,6 +240,32 @@ def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle, outpu
 
     return row_start_index + 1 +1
 
+def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
+
+
+    plt.subplot2grid(shape,(row_start_index,0))
+    #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
+    describeResult = df_e2e.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
+    plt.text(0, 0 ,describeResult.to_string())
+    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
+    describeResult.to_csv(output_file_prefix+"_e2e_describe.csv")
+
+    plt.subplot2grid(shape,(row_start_index,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["newER_us"]  , label="newER_ack_us" , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"newER_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index,2))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["matchER_us"]  , label="matchER_ack_us" , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"matchER_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    return row_start_index + 1
+
 def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
 
     #https://stackoverflow.com/questions/3013449/list-filtering-list-comprehension-vs-lambda-filter
@@ -232,11 +277,11 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
 
 
     runtime_prefix_list = ["runtime ClassPath",
-                                  "runtime InputArguments" ,
-                                  "runtime Name"           ,
-                                  "runtime VmName"         ,
-                                  "runtime VmVendor",
-                                  "runtime VmVersion"  ]
+                           "runtime InputArguments" ,
+                           "runtime Name"           ,
+                           "runtime VmName"         ,
+                           "runtime VmVendor",
+                           "runtime VmVersion"  ]
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
     runtimeLineList = ['\n          '.join(x[i:i+100] for i in range(0, len(x), 100)) for x in sysInfoContentList if x.startswith("runtime ") and x.split(":")[0] in runtime_prefix_list]
 
@@ -251,7 +296,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+1
 
 
-def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
+def genPlot(plotTitle,df_latency,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -266,10 +311,11 @@ def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, out
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
     #https://matplotlib.org/users/gridspec.html
     #================================df_latency==============================
-    shape=(8,3)
+    shape=(9,4)
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
     next_row_index = genPlotLatencyData(plt, shape, next_row_index, df_latency , plotTitle, output_file_prefix)
+    next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
 
@@ -287,14 +333,16 @@ def genPlot(plotTitle,df_latency,df_sysUsage, df_vmstat, sysInfoContentList, out
 
 #http://www.diveintopython.net/scripts_and_streams/command_line_arguments.html
 inputLatencyFile    = sys.argv[1]
-inputSysUsageFile   = sys.argv[2]
-inputSysInfoFile    = sys.argv[3]
-inputVmstatFile     = sys.argv[4]
-output_file_prefix  = sys.argv[5]
+inputE2EFile        = sys.argv[2]
+inputSysUsageFile   = sys.argv[3]
+inputSysInfoFile    = sys.argv[4]
+inputVmstatFile     = sys.argv[5]
+output_file_prefix  = sys.argv[6]
 
 
-df_latency=getLatency(inputLatencyFile)
-df_sysUsage=getSysUsage(inputSysUsageFile)
+df_latency  = getLatency(inputLatencyFile)
+df_sysUsage = getSysUsage(inputSysUsageFile)
+df_e2e      = getE2E(inputE2EFile)
 
 if ( os.path.isfile(inputVmstatFile)):
     df_vmstat=getVmstat(inputVmstatFile)
@@ -311,6 +359,6 @@ with open(inputSysInfoFile) as f:
 #sysInfoContentList = [x.strip() for x in sysInfoContentList]
 
 
-genPlot(inputLatencyFile,df_latency,df_sysUsage,df_vmstat,sysInfoContentList,output_file_prefix)
+genPlot(inputLatencyFile,df_latency,df_e2e,df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
 
 

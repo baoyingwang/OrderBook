@@ -19,9 +19,9 @@ function parseZipFile(){
     grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp >> $name.e2e_LxTxCx_FIX_RT.csv
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
 
-	#python_script_file=parseLatencyData.py
-	python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
-	python ${python_script_file} $name.latency.data.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
+	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
+	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
+	python ${python_script_file} $name.latency.data.csv $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
 
 }
 
@@ -43,7 +43,7 @@ if [[ -e ${vmstat_file} ]]; then
     bash $MYSCRIPTDIR/vm.output.to.csv.sh $vmstat_file > ${vm_output_csv}
 fi
 
-ls -l ${zipfies_dir} | grep zip | awk '{print $NF }' | while read zipfile_name
+ls -l ${zipfies_dir} | grep "zip_" | awk '{print $NF }' | while read zipfile_name
 do
 
     echo "processing ${zipfile_name}"
