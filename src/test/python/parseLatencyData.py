@@ -5,48 +5,45 @@ import re #regex
 from datetime import datetime
 
 
-#recvTime_datetime    
-#put2InputQ_us
-#pickFromInputQ_us
-#match_us
-#pickFromOutputQ_us
-def getLatency(inputLatencyFile):
-
-    print("load latency csv file" + inputLatencyFile +" to dataframe")
-
-    df_latency=pd.read_csv(inputLatencyFile)
-
-    #the heading lines are always bad performance(why?warm up?), below can be used to remove them(heading 500)
-    #df_latency=df_latency[51:df_latency.size]
-
-    df_latency["put2InputQ_us"]     = df_latency["put2InputQ"]/1000
-    df_latency["pickFromInputQ_us"] = df_latency["pickFromInputQ"]/1000
-    df_latency["match_us"]          = df_latency["match"]/1000
-    df_latency["pickFromOutputQ_us"]= df_latency["pickFromOutputQ"]/1000
-    df_latency.drop(['put2InputQ', 'pickFromInputQ', 'match', 'pickFromOutputQ'], axis=1, inplace=True)
-
-    #TODO remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
-    df_latency.drop(['put2InputQ_us'], axis=1, inplace=True)
-
-
-    #https://stackoverflow.com/questions/19079143/how-to-plot-time-series-in-python
-    df_latency['recvTime_datetime'] = df_latency['recvTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
-
-    return df_latency
-
+#===input===
+#clientOrdID
+#sendTime
+#sendTimeNano
+#recvFromClient_sysNano
+#enterInputQ_sysNano
+#pickFromInputQ_sysNano
+#matched_sysNano
+#pickedFromOutputBus_nano
+#newER
+#matchER
+#
+#===output===
+#
 def getE2E(inputE2EFile):
 
     print("load e2e csv file" + inputE2EFile +" to dataframe")
 
     df=pd.read_csv(inputE2EFile)
 
-    df["newER_us"          ] = df["newER"]/1000
-    df["matchER_us"]         = df["matchER"]/1000
-    df.drop(['newER', 'matchER'], axis=1, inplace=True)
+    df["e2e_new_ms"   ] = (df["newER"    ] - df["sendTimeNano" ]            )/1000000
+    df["e2e_match_ms" ] = (df["matchER"  ] - df["sendTimeNano" ]            )/1000000
+
+    df["i_mar_trans_unmar_ms" ] = (df["recvFromClient_sysNano"  ] - df["sendTimeNano" ]            )/1000000
+    df["obj_process_ms"       ] = (df["pickedFromOutputBus_nano"] - df["recvFromClient_sysNano"]   )/1000000
+    df["o_mar_trans_unmar_ms" ] = (df["matchER"                 ] - df["pickedFromOutputBus_nano"] )/1000000
+
+    df["pick_inQ_us" ] = (df["pickFromInputQ_sysNano"  ] - df["recvFromClient_sysNano" ]  )/1000
+    df["matching_us" ] = (df["matched_sysNano"]          - df["pickFromInputQ_sysNano"]   )/1000
+    df["pick_outQ_us"] = (df["pickedFromOutputBus_nano" ] - df["matched_sysNano"]         )/1000
 
     df['sendTime_datetime' ] = df['sendTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
 
-    return df
+    result_df = df[['sendTime_datetime',
+                    'e2e_new_ms','e2e_match_ms',
+                    'i_mar_trans_unmar_ms', 'obj_process_ms', 'o_mar_trans_unmar_ms',
+                    'pick_inQ_us','matching_us','pick_outQ_us']]
+
+    return result_df
 
 
 #time_datetime
@@ -64,7 +61,7 @@ def getE2E(inputE2EFile):
 #non-heapMemory_Init
 #non-heapMemory_Max
 #non-heapMemory_Used
-#thread_ThreadCount    
+#thread_ThreadCount
 def getSysUsage(sysUsageFile):
 
     print("load sys usage csv file " + sysUsageFile +" to dataframe")
@@ -203,68 +200,85 @@ def genPlotSysUsage(plt, shape, sys_usage_row_start_index, df_sysUsage):
     next_row_index_for_plot=sys_usage_row_start_index + 2 +1
     return next_row_index_for_plot
 
-def genPlotLatencyData(plt, shape, row_start_index, df_latency, plotTitle, output_file_prefix):
-
-    #note remove put2InputQ_us, since it is NOT important value. It maybe confuse reader.
-    #plt.subplot2grid(shape,(0,2))
-    #plt.plot(df_latency["recvTime_datetime"], df_latency["put2InputQ_us"]  , label="put2InputQ_us" ,  marker='h' )
-    #plt.ylabel(u"us")
-    #plt.title(u"put2InputQ_us")
-    #plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index,0), colspan=3)
-    #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
-    describeResult = df_latency.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    plt.text(0, 0 ,plotTitle + "\n" + describeResult.to_string())
-    #plt.title(plotTitle + " latency summary" ) #remove because of overallp on png. Add to text.
-    describeResult.to_csv(output_file_prefix+"_latency_describe.csv")
-
-    plt.subplot2grid(shape,(row_start_index+1,0))
-    plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromInputQ_us"]  , label="pickFromInputQ_us" , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"pickFromInputQ_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+1,1))
-    plt.plot(df_latency["recvTime_datetime"], df_latency["match_us"]  , label="match_us" ,  marker='h' )
-    plt.ylabel(u"us")
-    plt.title(u"match_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+1,2))
-    plt.plot(df_latency["recvTime_datetime"], df_latency["pickFromOutputQ_us"] , label="pickFromOutputQ_us",  marker='h')
-    plt.ylabel(u"us")
-    plt.title(u"pickFromOutputQ_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    return row_start_index + 1 +1
 
 def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
 
-
-    plt.subplot2grid(shape,(row_start_index,0))
     #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
     describeResult = df_e2e.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    plt.text(0, 0 ,describeResult.to_string())
-    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
     describeResult.to_csv(output_file_prefix+"_e2e_describe.csv")
 
-    plt.subplot2grid(shape,(row_start_index,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["newER_us"]  , label="newER_ack_us" , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"newER_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+    describeResult_1 = df_e2e[[ 'e2e_new_ms','e2e_match_ms', 'i_mar_trans_unmar_ms', 'obj_process_ms', 'o_mar_trans_unmar_ms']].describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
+    plt.subplot2grid(shape,(row_start_index,0), colspan=2)
+    plt.text(0, 0 ,describeResult_1.to_string())
+    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
 
+    describeResult_2 = df_e2e[[ 'pick_inQ_us','matching_us','pick_outQ_us']].describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
     plt.subplot2grid(shape,(row_start_index,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["matchER_us"]  , label="matchER_ack_us" , marker='h' )
+    plt.text(0, 0 ,describeResult_2.to_string())
+    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
+
+    plt.subplot2grid(shape,(row_start_index+1,0))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_new_ms"]   , label="e2e_new_ms"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"matchER_us")
+    plt.ylabel(u"ms")
+    plt.title(u"e2e_new_ms")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    return row_start_index + 1
+    plt.subplot2grid(shape,(row_start_index+1,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_match_ms"] , label="e2e_match_ms" , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"e2e_match_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    #------------------
+
+    plt.subplot2grid(shape,(row_start_index+2,0))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["i_mar_trans_unmar_ms"]   , label="i_mar_trans_unmar_ms"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"overall 3 phases: #1 i_mar_trans_unmar_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+2,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["obj_process_ms"]   , label="obj_process_ms"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"overall 3 phases: #2 obj_process_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+2,2))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["o_mar_trans_unmar_ms"]   , label="o_mar_trans_unmar_ms"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"overall 3 phases: #3 o_mar_trans_unmar_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+
+    #----------------------
+
+    plt.subplot2grid(shape,(row_start_index+3,0))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["pick_inQ_us"]   , label="pick_inQ_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.title(u"interal 3 steps: #1 pick_inQ_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+3,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["matching_us"]                  , label="matching_us"                  , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.title(u"interal 3 steps: #2 matching_us")
+    plt.ylabel(u"us")
+
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+3,2))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["pick_outQ_us"]  , label="pick_outQ_us"  , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"interal 3 steps: #3 pick_outQ_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    return row_start_index + 3 + 1
 
 def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
 
@@ -296,7 +310,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+1
 
 
-def genPlot(plotTitle,df_latency,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
+def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -314,7 +328,6 @@ def genPlot(plotTitle,df_latency,df_e2e,df_sysUsage, df_vmstat, sysInfoContentLi
     shape=(9,4)
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
-    next_row_index = genPlotLatencyData(plt, shape, next_row_index, df_latency , plotTitle, output_file_prefix)
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
@@ -332,19 +345,16 @@ def genPlot(plotTitle,df_latency,df_e2e,df_sysUsage, df_vmstat, sysInfoContentLi
 #    output_file_prefix
 
 #http://www.diveintopython.net/scripts_and_streams/command_line_arguments.html
-inputLatencyFile    = sys.argv[1]
-inputE2EFile        = sys.argv[2]
-inputSysUsageFile   = sys.argv[3]
-inputSysInfoFile    = sys.argv[4]
-inputVmstatFile     = sys.argv[5]
-output_file_prefix  = sys.argv[6]
+inputE2EFile        = sys.argv[1]
+inputSysUsageFile   = sys.argv[2]
+inputSysInfoFile    = sys.argv[3]
+inputVmstatFile     = sys.argv[4]
+output_file_prefix  = sys.argv[5]
 
-
-df_latency  = getLatency(inputLatencyFile)
 df_sysUsage = getSysUsage(inputSysUsageFile)
 df_e2e      = getE2E(inputE2EFile)
 
-if ( os.path.isfile(inputVmstatFile)):
+if os.path.isfile(inputVmstatFile):
     df_vmstat=getVmstat(inputVmstatFile)
     df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] < df_sysUsage["time_datetime"].min()].index, inplace=True) #remove those before engine up
     df_vmstat.drop( df_vmstat[df_vmstat["time_datetime"] > df_sysUsage["time_datetime"].max()].index, inplace=True) #remove those after  engine down
@@ -358,7 +368,7 @@ with open(inputSysInfoFile) as f:
 # you may also want to remove whitespace characters like `\n` at the end of each line
 #sysInfoContentList = [x.strip() for x in sysInfoContentList]
 
-
-genPlot(inputLatencyFile,df_latency,df_e2e,df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
+plotTitle=output_file_prefix
+genPlot(plotTitle,df_e2e,df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
 
 

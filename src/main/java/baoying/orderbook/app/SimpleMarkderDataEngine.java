@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class SimpleMarkderDataEngine {
 
@@ -17,9 +18,9 @@ public class SimpleMarkderDataEngine {
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
 
-    SimpleMarkderDataEngine(MatchingEngine engine){
+    SimpleMarkderDataEngine(MatchingEngine engine, int _snapshotRequestIntervalInSecond){
         orderbookBySymbol = new ConcurrentHashMap<>();
-        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engine);
+        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engine, _snapshotRequestIntervalInSecond);
     }
 
     MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
@@ -45,10 +46,12 @@ public class SimpleMarkderDataEngine {
 
         private volatile boolean _stopFlag = false;
         private MatchingEngine _engine;
+        private int _periodInSecond;
 
-        InternalTriggerOrderBookThread(String threadName, MatchingEngine engine) {
+        InternalTriggerOrderBookThread(String threadName, MatchingEngine engine, int periodInSecond) {
             super(threadName);
             _engine = engine;
+            _periodInSecond = periodInSecond;
         }
 
         @Override
@@ -61,7 +64,7 @@ public class SimpleMarkderDataEngine {
                 }
 
                 try {
-                    Thread.sleep(1000);
+                    TimeUnit.SECONDS.sleep(_periodInSecond);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

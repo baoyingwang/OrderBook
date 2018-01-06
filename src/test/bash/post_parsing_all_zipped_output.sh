@@ -6,8 +6,6 @@ function parseZipFile(){
     name=$2
     vm_output_csv=$3
 
-	unzip -p $zipfile $name/log/LatencyData_test.start*     > $name.latency.data.csv
-	unzip -p $zipfile $name/log/LatencySummary_test.start*  > $name.latency.summary.json.txt
 	unzip -p $zipfile $name/log/sysUsage*                   > $name.sysUsage.csv
 	unzip -p $zipfile $name/log/sysInfo*                    > $name.sysInfo.txt
 	unzip -p $zipfile $name/log/GC.txt                      > $name.GC.txt
@@ -20,7 +18,7 @@ function parseZipFile(){
 
 	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
 	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
-	python ${python_script_file} $name.latency.data.csv $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
+	python ${python_script_file} $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
 
 }
 

@@ -38,6 +38,7 @@ public class MatchingEngineApp {
     private static String _queueType;
     private static String _disruptorStrategy;
     private static int _queueSize;
+    private static int _snapshotRequestIntervalInSecond;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
 
@@ -144,7 +145,7 @@ public class MatchingEngineApp {
             }
 
             _simpleOMSEngine = new SimpleOMSEngine();
-            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engine);
+            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engine, _snapshotRequestIntervalInSecond);
             _executionReportsBus.register(_simpleOMSEngine);
             _marketDataBus.register(_simpleMarkderDataEngine);
 
@@ -190,6 +191,10 @@ public class MatchingEngineApp {
 
         @Parameter(names = {"--queue_size", "-qs"}, description = "queue size. default : 65536. 2^x is required for Disruptor Q type")
         private int queueSize = 65536;
+
+        @Parameter(names = {"--snapshot_interval_in_second"}, description = "the internal simple market data engine will request snaphost periodically . default : 1")
+        private int snapshotRequestIntervalInSecond = 1;
+
     }
 
     public static void main(String[] args) {
@@ -201,6 +206,7 @@ public class MatchingEngineApp {
         _disruptorStrategy = argsO.disruptorStrategy;
         _queueSize = argsO.queueSize;
         _symbolList = argsO.symbols;
+        _snapshotRequestIntervalInSecond = argsO.snapshotRequestIntervalInSecond;
 
         SpringApplication.run(MatchingEngineApp.class);
     }

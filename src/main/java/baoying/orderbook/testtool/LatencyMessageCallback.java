@@ -40,7 +40,7 @@ public class LatencyMessageCallback extends FirstMessageCallback {
             String clientCompmID = paramMessage.getHeader().getString(56);
             Path e2eTimeFile = Paths.get("log/e2e_"+clientCompmID+".csv");
             if (!Files.exists(e2eTimeFile)) {
-                Files.write(e2eTimeFile, ("clientOrdID,sendTimeEpochMS,sendTimeNano,_recvFromClient_sysNano,enterInputQ_sysNano,pickFromInputQ_sysNano,matched_sysNano,pickedFromOutputBus_nano,newER,matchER" + "\n").getBytes(), APPEND, CREATE);
+                Files.write(e2eTimeFile, ("clientOrdID,sendTime,sendTimeNano,recvFromClient_sysNano,enterInputQ_sysNano,pickFromInputQ_sysNano,matched_sysNano,pickedFromOutputBus_nano,newER,matchER" + "\n").getBytes(), APPEND, CREATE);
             }
 
             List<Long> times = erAckTimes.get(clientOrdID);
@@ -68,9 +68,9 @@ public class LatencyMessageCallback extends FirstMessageCallback {
         try{
             log.debug("toApp session send : {} ", message);
 
-            long sendTimeEpochMS = System.currentTimeMillis();
+            String sendTimeString = Util.formterOfOutputTime.format(Instant.now());
             long sendTimeNano = System.nanoTime();
-            message.setString(latencyTimesField, String.valueOf(sendTimeEpochMS)+","+String.valueOf(sendTimeNano));
+            message.setString(latencyTimesField, sendTimeString +","+String.valueOf(sendTimeNano));
 
         }catch(Exception e){
             log.error("",e);
