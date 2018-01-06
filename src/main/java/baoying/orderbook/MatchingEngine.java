@@ -11,7 +11,10 @@ import com.lmax.disruptor.dsl.ProducerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -20,7 +23,8 @@ public class MatchingEngine {
     public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
     private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
-	private final OrderBook _orderBook;
+    public final List<String> _symbols;
+	private final Map<String, OrderBook> _orderBooks;
 
 	//Assumption: our message generation speed will NOT be faster than 1000,000,000/second.
 	private final long _msgIDBase = System.nanoTime();
@@ -41,10 +45,17 @@ public class MatchingEngine {
 		DISRUPTOR, BLOCKING_QUEUE;
 	}
 
-	public MatchingEngine(OrderBook orderBook,
+
+	public MatchingEngine(List<String> symbols,
 						  AsyncEventBus outputExecutionReportsBus,
 						  AsyncEventBus outputMarketDataBus,
 						  int bufferSize){
+
+        _symbols = Collections.unmodifiableList(symbols);
+        _orderBooks = new HashMap<>();
+        for(String symbol: symbols){
+            _orderBooks.put(symbol, new OrderBook(symbol));
+        }
 
 		log.info("BlockingQueue with buffer size:{}", bufferSize);
 
@@ -52,7 +63,6 @@ public class MatchingEngine {
 		_inputMessageDisruptor = null;
 		_inputMessageRingBuffer = null;
 
-		_orderBook = orderBook;
 		_outputExecutionReportsBus = outputExecutionReportsBus;
 		_outputMarketDataBus = outputMarketDataBus;
 
@@ -80,17 +90,23 @@ public class MatchingEngine {
 			}
 		});
 	}
-	public MatchingEngine(OrderBook orderBook,
+	public MatchingEngine(List<String> symbols,
 						  AsyncEventBus outputExecutionReportsBus,
 						  AsyncEventBus outputMarketDataBus,
                           int disruptorBufferSize,
 						  WaitStrategy waitStrategy) {
 
+	    //TODO dupliate codes
+        _symbols = Collections.unmodifiableList(symbols);
+        _orderBooks = new HashMap<>();
+        for(String symbol: symbols){
+            _orderBooks.put(symbol, new OrderBook(symbol));
+        }
+
 		log.info("DISRUPTOR with buffer size:{}, and strategy:{}", disruptorBufferSize, waitStrategy.toString());
 		_QueueType = QueueType.DISRUPTOR;
 		_inputMessagesBlockingQueue = null;
 
-		_orderBook = orderBook;
 		_outputExecutionReportsBus = outputExecutionReportsBus;
 		_outputMarketDataBus = outputMarketDataBus;
 
@@ -128,9 +144,7 @@ public class MatchingEngine {
 	// check matching result(ExecutionReport) from _processResult
 	public SingleSideExecutionReport addOrder(OriginalOrder order) {
 
-		if (!_orderBook._symbol.equals(order._symbol)) {	// it should never reach here
-			throw new RuntimeException("not the expected symbol, expect:"+ _orderBook._symbol+", by it is:"+order._symbol+", client_entity:"+order._clientEntityID+" client ord id:"+order._clientOrdID);
-		}
+        OrderBook orderBook = orderBook(order._symbol);
 
 		if(order._clientEntityID.startsWith(LATENCY_ENTITY_PREFIX)){
 			order._enterInputQ_sysNano_test = System.nanoTime();
@@ -184,9 +198,14 @@ public class MatchingEngine {
 
 	void processInputMessage(OrderBook.MatchingEngineInputMessageFlag originalOrderORAggBookRequest)
 	{
+
+
 		if (originalOrderORAggBookRequest instanceof OriginalOrder) {
 
+
 			OriginalOrder order = (OriginalOrder) originalOrderORAggBookRequest;
+            OrderBook _orderBook = orderBook(order._symbol);
+
 			OrderBook.ExecutingOrder executingOrder = new OrderBook.ExecutingOrder(order);
 			if(order._isLatencyTestOrder){
 				executingOrder._pickFromInputQ_sysNano_test = System.nanoTime();
@@ -204,14 +223,26 @@ public class MatchingEngine {
 			} );
 
 		} else if (originalOrderORAggBookRequest instanceof AggregatedOrderBookRequest) {
+
 			AggregatedOrderBookRequest aggOrdBookRequest = (AggregatedOrderBookRequest) originalOrderORAggBookRequest;
-			MarketDataMessage.AggregatedOrderBook aggOrderBook = _orderBook.buildAggregatedOrderBook(aggOrdBookRequest._depth);
+            OrderBook orderBook = orderBook(aggOrdBookRequest._symbol);
+			MarketDataMessage.AggregatedOrderBook aggOrderBook = orderBook.buildAggregatedOrderBook(aggOrdBookRequest._depth);
 			_outputMarketDataBus.post(aggOrderBook);
 		} else {
 			log.error("received unknown type : {}",
 					originalOrderORAggBookRequest.getClass().toGenericString());
 		}
 	}
+
+	private OrderBook orderBook(String symbol){
+
+	     OrderBook ob = _orderBooks.get(symbol);
+
+	     if(ob == null){
+	         throw new RuntimeException("cannot identify related order book from symbol:"+symbol);
+         }
+         return  ob;
+    }
 
 
 	private static class MatchingEngineInputMessageEvent

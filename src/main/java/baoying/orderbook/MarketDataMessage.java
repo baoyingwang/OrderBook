@@ -44,10 +44,13 @@ public class MarketDataMessage {
 	}
 
 	public static class AggregatedOrderBookRequest implements MatchingEngineInputMessageFlag{
-		String _requestID;
-		int _depth;
-		public AggregatedOrderBookRequest(String requestID, int depth){
+
+		final String _requestID;
+		final String _symbol;
+		final int _depth;
+		public AggregatedOrderBookRequest(String requestID,String symbol, int depth){
 			_requestID = requestID;
+			_symbol = symbol;
 			_depth = depth;
 		}
 	}

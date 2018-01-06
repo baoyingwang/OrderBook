@@ -28,18 +28,18 @@ public class MatchingEngineWebWrapper {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
-    private final Map<String,MatchingEngine> _enginesBySimbol;
+    private final MatchingEngine _engine;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
-    MatchingEngineWebWrapper(Map<String,MatchingEngine> engines,
+    MatchingEngineWebWrapper(MatchingEngine engine,
                              SimpleOMSEngine simpleOMSEngine,
                              SimpleMarkderDataEngine simpleMarkderDataEngine){
 
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
-        _enginesBySimbol = engines;
+        _engine = engine;
 
     }
 
@@ -75,13 +75,7 @@ public class MatchingEngineWebWrapper {
             originalOrder._recvFromClient_sysNano_test = System.nanoTime();
         }
 
-        MatchingEngine engine = _enginesBySimbol.get(originalOrder._symbol);
-        if(engine == null){
-            log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
-            return "ERROR - wrong symbol - MORE DETAIL TO BE PROVIDED";
-        }
-
-        TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+        TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
         _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
 
         Gson gson = new GsonBuilder().create();

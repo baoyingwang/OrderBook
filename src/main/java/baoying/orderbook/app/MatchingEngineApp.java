@@ -62,13 +62,11 @@ public class MatchingEngineApp {
     }
 
     @Bean
-    Map<String, MatchingEngine> createEnginesBySymbol() { return _internalMatchingEngineApp._enginesBySymbol;}
+    MatchingEngine engine() { return _internalMatchingEngineApp._engine;}
 
     class InternalMatchingEngineApp {
 
-
-        private final List<MatchingEngine> _engines = new ArrayList<>();
-        private final Map<String, MatchingEngine> _enginesBySymbol = new HashMap<>();
+        private final MatchingEngine _engine;
 
         private final AsyncEventBus _marketDataBus;
         private final AsyncEventBus _executionReportsBus;
@@ -135,34 +133,27 @@ public class MatchingEngineApp {
 
                     }
 
-                    symbols.forEach(symbol -> {
-                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
-                        _engines.add(engine);
-                        _enginesBySymbol.put(symbol, engine);
-                    });
+                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
                     break;
+
                 case "BlockingQueue":
-                    symbols.forEach(symbol -> {
-                        MatchingEngine engine = new MatchingEngine(new OrderBook(symbol), _executionReportsBus, _marketDataBus, _queueSize);
-                        _engines.add(engine);
-                        _enginesBySymbol.put(symbol, engine);
-                    });
+                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize);
                     break;
                 default:
                     throw new RuntimeException("unknown queue type:" + _queueType + ". Only Disruptor and BlockingQueue is supported.");
             }
 
             _simpleOMSEngine = new SimpleOMSEngine();
-            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engines);
+            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engine);
             _executionReportsBus.register(_simpleOMSEngine);
             _marketDataBus.register(_simpleMarkderDataEngine);
 
 
-            _webWrapper = new MatchingEngineWebWrapper(_enginesBySymbol,
+            _webWrapper = new MatchingEngineWebWrapper(_engine,
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine);
 
-            _fixWrapper = new MatchingEngineFIXWrapper(_enginesBySymbol,
+            _fixWrapper = new MatchingEngineFIXWrapper(_engine,
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
@@ -173,7 +164,7 @@ public class MatchingEngineApp {
         public void start() throws Exception {
 
             log.info("start the MatchingEngineApp");
-            _engines.forEach(engine -> engine.start());
+            _engine.start();
             _simpleMarkderDataEngine.start();
 
             _fixWrapper.start();

@@ -17,9 +17,9 @@ public class SimpleMarkderDataEngine {
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
 
-    SimpleMarkderDataEngine(List<MatchingEngine> engineInputAcceptors){
+    SimpleMarkderDataEngine(MatchingEngine engine){
         orderbookBySymbol = new ConcurrentHashMap<>();
-        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engineInputAcceptors);
+        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engine);
     }
 
     MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
@@ -44,11 +44,11 @@ public class SimpleMarkderDataEngine {
     class InternalTriggerOrderBookThread extends Thread {
 
         private volatile boolean _stopFlag = false;
-        private List<MatchingEngine> _engineInputAcceptors;
+        private MatchingEngine _engine;
 
-        InternalTriggerOrderBookThread(String threadName, List<MatchingEngine> engines) {
+        InternalTriggerOrderBookThread(String threadName, MatchingEngine engine) {
             super(threadName);
-            _engineInputAcceptors = engines;
+            _engine = engine;
         }
 
         @Override
@@ -56,8 +56,8 @@ public class SimpleMarkderDataEngine {
 
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
-                for(MatchingEngine engineInputAcceptor: _engineInputAcceptors){
-                    engineInputAcceptor.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), 5));
+                for(String symbol: _engine._symbols){
+                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
                 }
 
                 try {

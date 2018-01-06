@@ -26,7 +26,7 @@ public class MatchingEngineFIXWrapper {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineFIXWrapper.class);
 
-    private final Map<String,MatchingEngine> _enginesBySimbol;
+    private final MatchingEngine _engine;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
@@ -45,14 +45,14 @@ public class MatchingEngineFIXWrapper {
             );
 
 
-    MatchingEngineFIXWrapper(Map<String,MatchingEngine> engines,
+    MatchingEngineFIXWrapper(MatchingEngine engine,
                              SimpleOMSEngine simpleOMSEngine,
                              SimpleMarkderDataEngine simpleMarkderDataEngine,
                              String appConfigInClasspath) throws Exception{
 
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
-        _enginesBySimbol = engines;
+        _engine = engine;
 
 
         _appConfigInClasspath = appConfigInClasspath;
@@ -166,13 +166,7 @@ public class MatchingEngineFIXWrapper {
                     String orderID = UniqIDGenerator.next();
                     TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
 
-                    MatchingEngine engine = _enginesBySimbol.get(originalOrder._symbol);
-                    if(engine == null){
-                        log.error("cannot identify the engine from symbol:{}", originalOrder._symbol);
-                        return ;
-                    }
-
-                    TradeMessage.SingleSideExecutionReport erNew = engine.addOrder(originalOrder);
+                    TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
                     _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
 
                     final Message fixNewER = buildFIXExecutionReport(erNew);
