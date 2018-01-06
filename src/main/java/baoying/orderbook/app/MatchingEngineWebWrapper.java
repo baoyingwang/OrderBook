@@ -10,16 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.nio.file.StandardOpenOption.APPEND;
-import static java.nio.file.StandardOpenOption.CREATE;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
 @RestController
@@ -76,7 +68,7 @@ public class MatchingEngineWebWrapper {
         }
 
         TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-        _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
+        _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(erNew);
@@ -113,7 +105,7 @@ public class MatchingEngineWebWrapper {
 
     @RequestMapping("/reset_test_data")
     public String resetBeforeTest(){
-        _simpleOMSEngine._perfTestData.resetBeforeTest();
+        _simpleOMSEngine.perfTestDataForWeb.resetBeforeTest();
         log.info("===============reset_test_data===============");
         return "reset done";
     }
@@ -126,7 +118,7 @@ public class MatchingEngineWebWrapper {
             log.info("get_test_summary enter");
             Map<String, Object> data = new HashMap<>();
 
-            long allOrderCount = _simpleOMSEngine._perfTestData.count();
+            long allOrderCount = _simpleOMSEngine.perfTestDataForWeb.count();
             data.put("order_count", allOrderCount);
 
             if (allOrderCount < 2) {
@@ -134,7 +126,7 @@ public class MatchingEngineWebWrapper {
                 return "ERROR - not calculate summary if order count less than 2, now:" + allOrderCount;
             }
 
-            long startTimeInEpochMS = _simpleOMSEngine._perfTestData.startInEpochMS();
+            long startTimeInEpochMS = _simpleOMSEngine.perfTestDataForWeb.startInEpochMS();
             Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
             data.put("start_time", instantStart.toString());
             log.info("get_test_summary - start_time");
@@ -142,7 +134,7 @@ public class MatchingEngineWebWrapper {
             final Instant instantEnd;
             final long endTimeInEpochMS;
             {
-                endTimeInEpochMS = _simpleOMSEngine._perfTestData.lastInEpochMS();
+                endTimeInEpochMS = _simpleOMSEngine.perfTestDataForWeb.lastInEpochMS();
                 instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
             }
             data.put("end_time", instantEnd.toString());
@@ -159,43 +151,15 @@ public class MatchingEngineWebWrapper {
             final double ratePerSecond = allOrderCount * 1.0 / durationInSecond;
             data.put("rate_per_second", String.format("%.2f", ratePerSecond));
 
-            final List<long[]> deltaLatencyData = _simpleOMSEngine.drainTestTimeDataQueue();
-            data.put("drained_latency_data", deltaLatencyData.size());
+            final long latency_data_count_all = _simpleOMSEngine.perfTestDataForWeb.latencyOrdCount();
+            data.put("latency_data_count", latency_data_count_all);
+            data.put("latency_data_rate_per_second", String.format("%.2f",latency_data_count_all*1.0/durationInSecond));
 
-            //https://stackoverflow.com/questions/30307382/how-to-append-text-to-file-in-java-8-using-specified-charset
-            Path outputAppendingLatencyDataFile = Paths.get("log/LatencyData_test.start" + Util.fileNameFormatter.format(instantStart) + ".csv");
-            //https://stackoverflow.com/questions/19676750/using-the-features-in-java-8-what-is-the-most-concise-way-of-transforming-all-t
-            List<String> latencyDataCSVLines = deltaLatencyData.stream()
-                    .map(it -> Util.formterOfOutputTime.format(Instant.ofEpochMilli(it[0])) + "," + Util.toCsvString(it, 1, it.length)).collect(Collectors.toList());
-            if (!Files.exists(outputAppendingLatencyDataFile)) {
-                Files.createFile(outputAppendingLatencyDataFile); //need create in advance because the following check line count requires it.
-                Files.write(outputAppendingLatencyDataFile, ("recvTime,put2InputQ,pickFromInputQ,match,pickFromOutputQ" + "\n").getBytes(), APPEND, CREATE);
-            }
-            Files.write(outputAppendingLatencyDataFile, latencyDataCSVLines, UTF_8, APPEND, CREATE);
-            log.info("get_test_summary - outputAppendingLatencyDataFile");
-
-            final long latency_data_count_all = java.nio.file.Files.lines(outputAppendingLatencyDataFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
-            data.put("latency_data_count", latency_data_count_all-1);
-            data.put("latency_data_rate_per_second", String.format("%.2f",(latency_data_count_all-1)*1.0/durationInSecond));
-
-            List<String[]> tailResponseLatencyData = Util.loadTailCsvLines(outputAppendingLatencyDataFile, 100, latency_data_count_all);
+            List<long[]> tailResponseLatencyData = _simpleOMSEngine.perfTestDataForWeb.getListCopy();
             data.put("latency_data", tailResponseLatencyData);
 
-            try {
-                //bad performance to process the same lines many times
-                GCLogUtil.main(new String[]{"log/GC.txt", "log/GC.summary.csv"});
-                List<String[]> tailGCTookData = Util.loadTailCsvLines(Paths.get("log/GC.summary.csv"), 100);
-                data.put("gc_took", tailGCTookData);
-            }catch (Exception e2){
-                log.error("",e2);
-            }
-            //the last line is the latest information
-            Path outputAppendingLatencySummaryFile = Paths.get("log/LatencySummary_test.start" + Util.fileNameFormatter.format(instantStart) + ".json.txt");
             Gson gson = new GsonBuilder().create();
             jsonString = gson.toJson(data);
-            Files.write(outputAppendingLatencySummaryFile, (Util.formterOfOutputTime.format(Instant.now())+" "+jsonString + "\n").getBytes(), APPEND, CREATE);
-
-            log.info("get_test_summary json generated");
 
             log.info("get_test_summary end");
         }catch(Exception e){

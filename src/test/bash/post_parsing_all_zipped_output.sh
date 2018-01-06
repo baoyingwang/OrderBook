@@ -11,7 +11,6 @@ function parseZipFile(){
 	unzip -p $zipfile $name/log/sysUsage*                   > $name.sysUsage.csv
 	unzip -p $zipfile $name/log/sysInfo*                    > $name.sysInfo.txt
 	unzip -p $zipfile $name/log/GC.txt                      > $name.GC.txt
-	unzip -p $zipfile $name/log/GC.summary.csv              > $name.GC.summary.csv
 	unzip -p $zipfile $name/log/MatchingEngine.console.log  > $name.MatchingEngine.console.log
 
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp

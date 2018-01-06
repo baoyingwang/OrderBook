@@ -89,33 +89,6 @@
             </table>
         </div>
 
-
-        <h3>GC Took Chart</h3>
-        <div id="gc_took_chart"></div>
-        Show GC took time Detail Data: <input type="checkbox" checked="true"  ng-model="gcTookTimeChecked" aria-label="Toggle ngShow"><br />
-        <div ng-show="gcTookTimeChecked">
-            <table>
-
-                <tr>
-                    <td>time</td>
-                    <td>tookInMacroSeconds</td>
-                    <td>type</td>
-                </tr>
-                <tr ng-repeat = "one_record in test_summary.gc_took ">
-                    <!--
-                    https://docs.angularjs.org/api/ng/filter/number - this link tells how to format the number in js and html.GOOD.
-                    https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
-                    -->
-                    <td align="right">{{ one_record[0] }}</td>
-                    <td align="right">{{ one_record[1] | number : 0}}</td>
-                    <td align="right">{{ one_record[2] }}</td>
-
-                </tr>
-            </table>
-        </div>
-    </div>
-
-
     <p id="console_container"></p>
 
         <script>
@@ -140,24 +113,6 @@
 				ids: ['data1']
 			});
 
-            var gc_took_chart = c3.generate({
-                bindto: '#gc_took_chart',
-                data: {
-                    x : 'x',
-                    columns:  [
-                        ['x','x1','x2','x3'],
-                        ['data1',1,2,3]
-                    ]
-                },
-                axis: {
-                    x: {
-                        type: 'category' // this needed to load string x value
-                    }
-                }
-            });
-            gc_took_chart.unload({
-				ids: ['data1']
-			});
 
             var mainApp = angular.module("mainApp", []);
 
@@ -187,22 +142,9 @@
                         });
 
 
-                        var gc_data_copy = new Array(response.data['gc_took'].length);
-                        for(var i = 0; i < response.data['gc_took'].length; i++){	gc_data_copy[i] = response.data['gc_took'][i].slice(0);}
-                        var columnGCTookData = gc_data_copy[0].map((col, i) => gc_data_copy.map(row => row[i]));
-                        columnGCTookData[0].unshift('x'); //categary - recvTime
-                        columnGCTookData[1].unshift('took_us');
-                        columnGCTookData[2].unshift('type');
-                        gc_took_chart.load({
-                            columns: [
-                                columnGCTookData[0],
-                                columnGCTookData[1],
-                                columnGCTookData[2],
-                            ]
-                        });
-
                     });
 
+                //remove un-expected values(latency_data', 'gc_took') from the summary table. Too many data there.
                 //https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
                 //it is not easy to filter map(but easy to filter a plain value - http://docs.angularjs.org/api/ng.filter:filter)
                 $scope.filterOutLatencyDataFromMap = function(items) {

@@ -17,12 +17,17 @@ public class SimpleOMSEngine {
 
     public static final String IGNORE_ENTITY_PREFIX ="BACKGROUND";
 
-    PerfTestData _perfTestData = new PerfTestData();
-    class PerfTestData{
+    PerfTestDataForWeb perfTestDataForWeb = new PerfTestDataForWeb();
+    class PerfTestDataForWeb {
 
         AtomicLong _placedOrderCounter = new AtomicLong(0);
+        AtomicLong _latencyOrderCounter = new AtomicLong(0);
         TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
         TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
+
+        private BlockingQueue<long[]> _testTimeDataQueue = new LinkedBlockingQueue<long[]>();
+        int maxQueueSize = 80;
+        int popSizeAfterFull = 30;
 
         void resetBeforeTest(){
             _placedOrderCounter.set(0);
@@ -35,6 +40,17 @@ public class SimpleOMSEngine {
         //TODO will thread issue? since maybe multi threads call this method.
         void recordNewOrder(TradeMessage.OriginalOrder originalOrder){
             long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
+
+            if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+                _latencyOrderCounter.incrementAndGet();
+            }
+
+            if(_testTimeDataQueue.size() >= maxQueueSize){ //not the nthOrderSinceTest, since the nthOrderSinceTest can be drained.
+                for(int i=0; i<popSizeAfterFull; i++ ){
+                    _testTimeDataQueue.poll();
+                }
+            }
+
             if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
             else{_lastOriginalOrderSinceTest = originalOrder;}
         }
@@ -43,6 +59,9 @@ public class SimpleOMSEngine {
             return _placedOrderCounter.get();
         }
 
+        long latencyOrdCount(){
+            return _latencyOrderCounter.get();
+        }
         long startInEpochMS(){
             if(_firstOriginalOrderSinceTest == null){
                 throw new RuntimeException("fail to get start in MS");
@@ -56,25 +75,22 @@ public class SimpleOMSEngine {
             }
             return _lastOriginalOrderSinceTest._recvFromClientEpochMS;
         }
+
+        List<long[]> getListCopy(){
+             return new ArrayList<>(_testTimeDataQueue);
+        }
     }
 
     //value: list of execution report(as Map<String, String)
     private final Map<String, List<Map<String, String>>> executionReportsByOrderID;
-    private final BlockingQueue<long[]> _testTimeDataQueue;
+
 
     SimpleOMSEngine(){
-        _testTimeDataQueue = new LinkedBlockingQueue<long[]>();
         executionReportsByOrderID = new ConcurrentHashMap<>();
     }
 
     List<Map<String, String>> getERsByOrderID(String orderID){
         return executionReportsByOrderID.get(orderID);
-    }
-
-    List<long[]> drainTestTimeDataQueue(){
-        final List<long[]> deltaLatencyData = new ArrayList<>();
-        _testTimeDataQueue.drainTo(deltaLatencyData);
-        return deltaLatencyData;
     }
 
 
@@ -99,7 +115,7 @@ public class SimpleOMSEngine {
         //ignore maker side, because maker orders always sit in book during test
         if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
             long outputConsumingNanoTime = System.nanoTime();
-            _testTimeDataQueue.add(new long[]{
+            perfTestDataForWeb._testTimeDataQueue.add(new long[]{
                     matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
                     matchedExecutionReport._taker_enterInputQ_sysNano_test
                             - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test,
@@ -107,10 +123,10 @@ public class SimpleOMSEngine {
                     matchedExecutionReport._taker_pickFromInputQ_sysNano_test
                             - matchedExecutionReport._taker_enterInputQ_sysNano_test,
 
-                    matchedExecutionReport._matching_sysNano_test
+                    matchedExecutionReport._matched_sysNano_test
                             - matchedExecutionReport._taker_pickFromInputQ_sysNano_test,
 
-                    outputConsumingNanoTime - matchedExecutionReport._matching_sysNano_test});
+                    outputConsumingNanoTime - matchedExecutionReport._matched_sysNano_test});
         }
 
         if(! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)

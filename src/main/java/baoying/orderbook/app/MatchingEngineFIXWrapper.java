@@ -3,6 +3,7 @@ package baoying.orderbook.app;
 import baoying.orderbook.CommonMessage;
 import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.TradeMessage;
+import baoying.orderbook.testtool.LatencyMessageCallback;
 import com.google.common.eventbus.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +115,21 @@ public class MatchingEngineFIXWrapper {
 
 
         Message er = buildExternalERfromInternalER(matchedExecutionReport, maker_taker);
+
+
+        //TODO move before build ER
+        if(originalOrder._isLatencyTestOrder) {
+            long pickedFromOutputBus_nano = System.nanoTime();
+            String latencyTimes = originalOrder._latencyTimesFromClient
+                    + "," + matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test
+                    + "," + matchedExecutionReport._taker_enterInputQ_sysNano_test
+                    + "," + matchedExecutionReport._taker_pickFromInputQ_sysNano_test
+                    + "," + matchedExecutionReport._matched_sysNano_test
+                    + "," + pickedFromOutputBus_nano;
+            er.setString(LatencyMessageCallback.latencyTimesField, latencyTimes);
+        }
+
+
         sendER(er, originalOrder._clientEntityID);
 
     }
@@ -146,13 +162,12 @@ public class MatchingEngineFIXWrapper {
     class InternalQFJApplicationCallback implements Application {
 
             @Override
-            public void fromAdmin(Message message, SessionID sessionId)
-            throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon {
+            public void fromAdmin(Message message, SessionID sessionId) {
                 log.debug("fromAdmin session:{}, received : {} ", sessionId, message);
             }
 
             @Override
-            public void fromApp(final Message paramMessage, final SessionID paramSessionID) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
+            public void fromApp(final Message paramMessage, final SessionID paramSessionID)  {
                 log.debug("fromApp session:{}, received : {} ", paramSessionID, paramMessage);
 
                 try {
@@ -165,9 +180,18 @@ public class MatchingEngineFIXWrapper {
 
                     String orderID = UniqIDGenerator.next();
                     TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
+                    if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+                        originalOrder._isLatencyTestOrder = true;
+                        originalOrder._recvFromClient_sysNano_test = System.nanoTime();
+
+                        if(paramMessage.isSetField(LatencyMessageCallback.latencyTimesField)){
+                            originalOrder._latencyTimesFromClient = paramMessage.getString(LatencyMessageCallback.latencyTimesField);
+                        }
+                    }
+
 
                     TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-                    _simpleOMSEngine._perfTestData.recordNewOrder(originalOrder);
+                    _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
 
                     final Message fixNewER = buildFIXExecutionReport(erNew);
                     sendER(fixNewER, paramSessionID);
@@ -230,9 +254,6 @@ public class MatchingEngineFIXWrapper {
         int qty = paramMessage.getInt(38);
 
         TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide ,ordType, price, qty, orderID, clientOrdID, clientEntity);
-        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
-        }
 
         return originalOrder;
     }
