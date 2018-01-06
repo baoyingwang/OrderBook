@@ -155,8 +155,7 @@ curl http://localhost:8080/matching/reset_test_data | cut -c1-150
 
 for i in {1..10}
 do
-	curl http://localhost:8080/matching/get_test_summary | cut -c1-150
-	echo "$i/10 - ${test_name} sleep every $(($duration_in_second/10)) seconds, and trigger the dump latency data later"
+	echo "$(date '+%Y%m%d_%H%M%S') $i/10 - ${test_name} sleep every $(($duration_in_second/10)) seconds before exit"
 	sleep $(($duration_in_second/10))
 
 done
