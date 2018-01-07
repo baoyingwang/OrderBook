@@ -92,7 +92,8 @@ function startBackgroundOrder(){
 
 function startLatencyOrder(){
 
-    local tmp_latency_rate_per_min_single_side=${1:-60}
+    local tmp_latency_rate_per_min=${1:-60}
+    local tmp_latency_rate_per_min_single_side=$((${tmp_latency_rate_per_min}/2))
     echo "begin sending latency orders - tmp_latency_rate_per_min_single_side:${tmp_latency_rate_per_min_single_side}"
 
     java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &

@@ -25,6 +25,8 @@ def getE2E(inputE2EFile):
 
     df=pd.read_csv(inputE2EFile)
 
+    df.describe()
+
     df["e2e_new_ms"   ] = (df["newER"    ] - df["sendTimeNano" ]            )/1000000
     df["e2e_match_ms" ] = (df["matchER"  ] - df["sendTimeNano" ]            )/1000000
 
@@ -286,15 +288,16 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     #https://stackoverflow.com/questions/16522111/python-syntax-for-if-a-or-b-or-c-but-not-all-of-them
     osLineList      = [x for x in sysInfoContentList if x.startswith("os ")]
     gcLineList      = [x for x in sysInfoContentList if x.startswith("gc ")]
+    os_gc_text = "".join(osLineList) + "".join(gcLineList)
     plt.subplot2grid(shape,(row_start_index,0))
-    plt.text(0, 0 ,"".join(osLineList) + "".join(gcLineList))
+    plt.text(0, 0 , os_gc_text[ :-1])#string[:-1] remove the last carriage return character
 
 
     runtime_prefix_list = ["runtime ClassPath",
                            "runtime InputArguments" ,
-                           "runtime Name"           ,
+                           #"runtime Name"           ,
                            "runtime VmName"         ,
-                           "runtime VmVendor",
+                           #"runtime VmVendor",
                            "runtime VmVersion"  ]
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
     runtimeLineList = ['\n          '.join(x[i:i+100] for i in range(0, len(x), 100)) for x in sysInfoContentList if x.startswith("runtime ") and x.split(":")[0] in runtime_prefix_list]
@@ -304,8 +307,9 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     java_command = [re.findall('sun.java.command=.+?,', x)[0] for x in sysInfoContentList if x.startswith("runtime SystemProperties")]
     java_command_string = '\n          '.join(java_command[0][i:i+100] for i in range(0, len(java_command[0]), 100))
 
+    text = java_command_string + '\n' + ( "".join(runtimeLineList))
     plt.subplot2grid(shape,(row_start_index,1), colspan=2)
-    plt.text(0, 0 ,  java_command_string + '\n' + ( "".join(runtimeLineList)) )
+    plt.text(0, 0 ,  text[:-1] ) #text[:-1] remove the last carriage return character
 
     return row_start_index+1
 
@@ -325,7 +329,7 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
     #https://matplotlib.org/users/gridspec.html
     #================================df_latency==============================
-    shape=(9,4)
+    shape=(10,4)
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
@@ -338,9 +342,9 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_
 
 
 #python /c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py \
-#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.latency.data.csv \
-#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.sysUsage.csv \
-#    BlockingQueue_X_bg5000perSec_20171229_022833_duration600Sec.sysInfo.txt \
+#    BlockingQueue_X_bg50perSec_lt60perMin_duration600sec_20180107_115910.e2e_LxTxCx_FIX_RT.csv \
+#    BlockingQueue_X_bg50perSec_lt60perMin_duration600sec_20180107_115910.sysUsage.csv \
+#    BlockingQueue_X_bg50perSec_lt60perMin_duration600sec_20180107_115910.sysInfo.txt \
 #    vmstat_since20171229.log.csv \
 #    output_file_prefix
 
@@ -369,6 +373,7 @@ with open(inputSysInfoFile) as f:
 #sysInfoContentList = [x.strip() for x in sysInfoContentList]
 
 plotTitle=output_file_prefix
-genPlot(plotTitle,df_e2e,df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
+#df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
+genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
 
 

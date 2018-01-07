@@ -40,7 +40,7 @@ public class LatencyMessageCallback extends FirstMessageCallback {
             String clientCompmID = paramMessage.getHeader().getString(56);
             Path e2eTimeFile = Paths.get("log/e2e_"+clientCompmID+".csv");
             if (!Files.exists(e2eTimeFile)) {
-                Files.write(e2eTimeFile, ("clientOrdID,sendTime,sendTimeNano,recvFromClient_sysNano,enterInputQ_sysNano,pickFromInputQ_sysNano,matched_sysNano,pickedFromOutputBus_nano,newER,matchER" + "\n").getBytes(), APPEND, CREATE);
+                Files.write(e2eTimeFile, ("sendTime,sendTimeNano,recvFromClient_sysNano,enterInputQ_sysNano,pickFromInputQ_sysNano,matched_sysNano,pickedFromOutputBus_nano,newER,matchER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
             }
 
             List<Long> times = erAckTimes.get(clientOrdID);
@@ -49,7 +49,7 @@ public class LatencyMessageCallback extends FirstMessageCallback {
                 String serverTimes = paramMessage.getString(latencyTimesField);
                 long newAck =times.get(0) ;
                 long matchAck = times.get(1);
-                Files.write(e2eTimeFile, (clientOrdID+","+serverTimes+","+newAck+","+matchAck+"\n").getBytes(), APPEND, CREATE);
+                Files.write(e2eTimeFile, (serverTimes+","+newAck+","+matchAck+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
                 erAckTimes.removeAll(clientOrdID);
             }
 

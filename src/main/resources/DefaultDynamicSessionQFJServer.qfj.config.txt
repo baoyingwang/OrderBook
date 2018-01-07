@@ -8,7 +8,10 @@ ReconnectInterval=5
 #http://www.quickfixj.org/quickfixj/usermanual/1.5.0/usage/configuration.html#Logging
 #SLFJ is used, see log4j2.xml.
 
-PersistMessages=Y
+#Persist is disabled for ultra performance. OMS(or post trade) should be used to query possible loss data if there is disconnection.
+#You can set it to Y and assign FileStorePath if you still expect FIX re-send gap messages.
+PersistMessages=N
+#FileStorePath is still required for seq number etc(?)
 FileStorePath=./log/engineQFJFileStore
 
 SocketAcceptAddress=localhost

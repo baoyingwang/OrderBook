@@ -13,7 +13,8 @@ function parseZipFile(){
 
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
     head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp                 > $name.e2e_LxTxCx_FIX_RT.csv
-    grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp >> $name.e2e_LxTxCx_FIX_RT.csv
+    #Sort to avoid possible diagram problem. sendTime(YYY-MM-DD...) is the first column.
+    sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)  >> $name.e2e_LxTxCx_FIX_RT.csv
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
 
 	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
