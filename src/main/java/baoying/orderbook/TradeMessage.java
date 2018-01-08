@@ -36,9 +36,9 @@ public class TradeMessage {
         public final String _clientEntityID; // to avoid execution with himself
 
 		public boolean _isLatencyTestOrder= false;
-		public long _recvFromClient_sysNano_test;
-		public long _enterInputQ_sysNano_test;
 		public String _latencyTimesFromClient="";
+		public long _recvFromClient_sysNano_test=-1;
+        public long _matched_sysNano_test=-1;
 	}
 
 	//https://stackoverflow.com/questions/8157755/how-to-convert-enum-value-to-int
@@ -112,10 +112,6 @@ public class TradeMessage {
         public final int _makerLeavesQty;
         public final int _takerLeavesQty;
 
-		public final long _matched_sysNano_test;
-        public final long _taker_enterInputQ_sysNano_test;
-        public final long _taker_pickFromInputQ_sysNano_test;
-
         public MatchedExecutionReport(long matchID,
                                       long matchingEpochMS,
                                       double lastPrice, int lastQty,
@@ -152,9 +148,6 @@ public class TradeMessage {
 			_makerLeavesQty = makerLeavesQty;
 			_takerLeavesQty = takerLeavesQty;
 
-            _taker_enterInputQ_sysNano_test =taker_enterInputQ_sysNano_test;
-            _taker_pickFromInputQ_sysNano_test = taker_pickFromInputQ_sysNano_test;
-            _matched_sysNano_test = matchingSysNanoTime;
 		}
 	}
 

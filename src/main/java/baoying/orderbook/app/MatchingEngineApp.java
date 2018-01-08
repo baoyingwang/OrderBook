@@ -35,9 +35,6 @@ public class MatchingEngineApp {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineApp.class);
     private static List<String> _symbolList;
-    private static String _queueType;
-    private static String _disruptorStrategy;
-    private static int _queueSize;
     private static int _snapshotRequestIntervalInSecond;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
@@ -116,36 +113,10 @@ public class MatchingEngineApp {
             )
             );
 
-            switch (_queueType) {
-                case "Disruptor":
-                    final WaitStrategy waitStrategy;
-                    switch (_disruptorStrategy) {
-                        case "SleepingWaitStrategy":
-                            waitStrategy = new SleepingWaitStrategy();
-                            break;
-                        case "YieldingWaitStrategy":
-                            waitStrategy = new YieldingWaitStrategy();
-                            break;
-                        case "BusySpinWaitStrategy":
-                            waitStrategy = new BusySpinWaitStrategy();
-                            break;
-                        default:
-                            throw new RuntimeException("unknown disruptor strategy:" + _disruptorStrategy + ". Only SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy  is supported.");
-
-                    }
-
-                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
-                    break;
-
-                case "BlockingQueue":
-                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize);
-                    break;
-                default:
-                    throw new RuntimeException("unknown queue type:" + _queueType + ". Only Disruptor and BlockingQueue is supported.");
-            }
+            _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus);
 
             _simpleOMSEngine = new SimpleOMSEngine();
-            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engine, _snapshotRequestIntervalInSecond);
+            _simpleMarkderDataEngine = new SimpleMarkderDataEngine( _snapshotRequestIntervalInSecond);
             _executionReportsBus.register(_simpleOMSEngine);
             _marketDataBus.register(_simpleMarkderDataEngine);
 
@@ -158,16 +129,13 @@ public class MatchingEngineApp {
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
-            //register FIX, for streaming output
-            _executionReportsBus.register(_fixWrapper);
+
         }
 
         public void start() throws Exception {
 
             log.info("start the MatchingEngineApp");
-            _engine.start();
             _simpleMarkderDataEngine.start();
-
             _fixWrapper.start();
         }
     }
@@ -183,15 +151,6 @@ public class MatchingEngineApp {
         @Parameter(names = {"--symbols", "-s"}, listConverter = CSVListConverter.class)
         List<String> symbols = Arrays.asList(new String[]{"USDJPY"});
 
-        @Parameter(names = {"--queue_type", "-qt"}, description = "queue type: BlockingQueue(default), Disruptor")
-        private String queueType = "BlockingQueue";
-
-        @Parameter(names = {"--strategy", "-sn"}, description = "strategy for Disruptor : SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy")
-        private String disruptorStrategy = "SleepingWaitStrategy";
-
-        @Parameter(names = {"--queue_size", "-qs"}, description = "queue size. default : 65536. 2^x is required for Disruptor Q type")
-        private int queueSize = 65536;
-
         @Parameter(names = {"--snapshot_interval_in_second"}, description = "the internal simple market data engine will request snaphost periodically . default : 1")
         private int snapshotRequestIntervalInSecond = 1;
 
@@ -202,9 +161,6 @@ public class MatchingEngineApp {
         JCommander.newBuilder().addObject(argsO).build().parse(args);
 
         //TODO how to pass the argument in to MatchingEngineApp? right now, static fields are used
-        _queueType = argsO.queueType;
-        _disruptorStrategy = argsO.disruptorStrategy;
-        _queueSize = argsO.queueSize;
         _symbolList = argsO.symbols;
         _snapshotRequestIntervalInSecond = argsO.snapshotRequestIntervalInSecond;
 

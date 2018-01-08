@@ -10,11 +10,7 @@ from datetime import datetime
 #sendTime
 #sendTimeNano
 #recvFromClient_sysNano
-#enterInputQ_sysNano
-#pickFromInputQ_sysNano
 #matched_sysNano
-#pickedFromOutputBus_nano
-#newER
 #matchER
 #
 #===output===
@@ -27,26 +23,80 @@ def getE2E(inputE2EFile):
 
     df.describe()
 
-    df["e2e_new_ms"   ] = (df["newER"    ] - df["sendTimeNano" ]            )/1000000
     df["e2e_match_ms" ] = (df["matchER"  ] - df["sendTimeNano" ]            )/1000000
 
-    df["i_mar_trans_unmar_ms" ] = (df["recvFromClient_sysNano"  ] - df["sendTimeNano" ]            )/1000000
-    df["obj_process_ms"       ] = (df["pickedFromOutputBus_nano"] - df["recvFromClient_sysNano"]   )/1000000
-    df["o_mar_trans_unmar_ms" ] = (df["matchER"                 ] - df["pickedFromOutputBus_nano"] )/1000000
+    df["i_mar_trans_unmar_ms" ] = (df["recvFromClient_sysNano"  ] - df["sendTimeNano" ]          )/1000000
+    df["obj_process_us"       ] = (df["fixERTranslated"         ] - df["recvFromClient_sysNano"] )/1000
+    df["o_mar_trans_unmar_ms" ] = (df["matchER"                 ] - df["matched_sysNano"]        )/1000000
 
-    df["pick_inQ_us" ] = (df["pickFromInputQ_sysNano"  ] - df["recvFromClient_sysNano" ]  )/1000
-    df["matching_us" ] = (df["matched_sysNano"]          - df["pickFromInputQ_sysNano"]   )/1000
-    df["pick_outQ_us"] = (df["pickedFromOutputBus_nano" ] - df["matched_sysNano"]         )/1000
+    df["only_match_us"        ] = (df["matched_sysNano"         ] - df["recvFromClient_sysNano"] )/1000
+    df["FIX_ER_translate_us"  ] = (df["fixERTranslated"         ] - df["matched_sysNano"]        )/1000
 
     df['sendTime_datetime' ] = df['sendTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
 
     result_df = df[['sendTime_datetime',
-                    'e2e_new_ms','e2e_match_ms',
-                    'i_mar_trans_unmar_ms', 'obj_process_ms', 'o_mar_trans_unmar_ms',
-                    'pick_inQ_us','matching_us','pick_outQ_us']]
+                    'e2e_match_ms',
+                    'i_mar_trans_unmar_ms', 'obj_process_us', 'o_mar_trans_unmar_ms',
+                    'only_match_us','FIX_ER_translate_us']]
 
     return result_df
 
+def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
+
+    #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
+    describeResult = df_e2e.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
+    describeResult.to_csv(output_file_prefix+"_e2e_describe.csv")
+
+    plt.subplot2grid(shape,(row_start_index,0), colspan=2)
+    plt.text(0, 0 ,describeResult.to_string())
+    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
+
+    plt.subplot2grid(shape,(row_start_index,2))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_match_ms"] , label="e2e_match_ms" , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"e2e_match_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    #------------------
+
+    plt.subplot2grid(shape,(row_start_index+1,0))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["i_mar_trans_unmar_ms"]   , label="i_mar_trans_unmar_ms"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"overall 3 phases: #1 i_mar_trans_unmar_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+1,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["obj_process_us"]   , label="obj_process_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"overall 3 phases: #2 obj_process_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+1,2))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["o_mar_trans_unmar_ms"]   , label="o_mar_trans_unmar_ms"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"ms")
+    plt.title(u"overall 3 phases: #3 o_mar_trans_unmar_ms")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+2,0))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["only_match_us"]   , label="only_match_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"only_match_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    plt.subplot2grid(shape,(row_start_index+2,1))
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["FIX_ER_translate_us"]   , label="FIX_ER_translate_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.ylabel(u"us")
+    plt.title(u"FIX_ER_translate_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+
+    return (row_start_index + 2) + 1
 
 #time_datetime
 #cpu_ProcessCpuLoad
@@ -203,84 +253,6 @@ def genPlotSysUsage(plt, shape, sys_usage_row_start_index, df_sysUsage):
     return next_row_index_for_plot
 
 
-def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
-
-    #https://stackoverflow.com/questions/31247198/python-pandas-write-content-of-dataframe-into-text-file
-    describeResult = df_e2e.describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    describeResult.to_csv(output_file_prefix+"_e2e_describe.csv")
-
-    describeResult_1 = df_e2e[[ 'e2e_new_ms','e2e_match_ms', 'i_mar_trans_unmar_ms', 'obj_process_ms', 'o_mar_trans_unmar_ms']].describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    plt.subplot2grid(shape,(row_start_index,0), colspan=2)
-    plt.text(0, 0 ,describeResult_1.to_string())
-    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
-
-    describeResult_2 = df_e2e[[ 'pick_inQ_us','matching_us','pick_outQ_us']].describe(percentiles=[.25,.5,.75,.9, .95, .99 ])
-    plt.subplot2grid(shape,(row_start_index,2))
-    plt.text(0, 0 ,describeResult_2.to_string())
-    #plt.title(" e2e summary" ) #remove title because of overlap on diagram
-
-    plt.subplot2grid(shape,(row_start_index+1,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_new_ms"]   , label="e2e_new_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"e2e_new_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+1,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_match_ms"] , label="e2e_match_ms" , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"e2e_match_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    #------------------
-
-    plt.subplot2grid(shape,(row_start_index+2,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["i_mar_trans_unmar_ms"]   , label="i_mar_trans_unmar_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"overall 3 phases: #1 i_mar_trans_unmar_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+2,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["obj_process_ms"]   , label="obj_process_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"overall 3 phases: #2 obj_process_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+2,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["o_mar_trans_unmar_ms"]   , label="o_mar_trans_unmar_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"overall 3 phases: #3 o_mar_trans_unmar_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-
-    #----------------------
-
-    plt.subplot2grid(shape,(row_start_index+3,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["pick_inQ_us"]   , label="pick_inQ_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"interal 3 steps: #1 pick_inQ_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+3,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["matching_us"]                  , label="matching_us"                  , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"interal 3 steps: #2 matching_us")
-    plt.ylabel(u"us")
-
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+3,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["pick_outQ_us"]  , label="pick_outQ_us"  , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"interal 3 steps: #3 pick_outQ_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    return row_start_index + 3 + 1
 
 def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
 

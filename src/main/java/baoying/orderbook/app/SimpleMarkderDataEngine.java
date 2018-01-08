@@ -18,9 +18,9 @@ public class SimpleMarkderDataEngine {
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
     private InternalTriggerOrderBookThread _internalTriggerOrderBookThread;
 
-    SimpleMarkderDataEngine(MatchingEngine engine, int _snapshotRequestIntervalInSecond){
+    SimpleMarkderDataEngine(int _snapshotRequestIntervalInSecond){
         orderbookBySymbol = new ConcurrentHashMap<>();
-        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread",engine, _snapshotRequestIntervalInSecond);
+        _internalTriggerOrderBookThread =  new InternalTriggerOrderBookThread("InternalTriggerOrderBookThread", _snapshotRequestIntervalInSecond);
     }
 
     MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
@@ -45,12 +45,10 @@ public class SimpleMarkderDataEngine {
     class InternalTriggerOrderBookThread extends Thread {
 
         private volatile boolean _stopFlag = false;
-        private MatchingEngine _engine;
         private int _periodInSecond;
 
-        InternalTriggerOrderBookThread(String threadName, MatchingEngine engine, int periodInSecond) {
+        InternalTriggerOrderBookThread(String threadName, int periodInSecond) {
             super(threadName);
-            _engine = engine;
             _periodInSecond = periodInSecond;
         }
 
@@ -59,9 +57,11 @@ public class SimpleMarkderDataEngine {
 
             while (!Thread.currentThread().isInterrupted() && !_stopFlag) {
 
-                for(String symbol: _engine._symbols){
-                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
-                }
+//                for(String symbol: _engine._symbols){
+//                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+//                }
+
+                log.warn("TODO : send snapshot request to engine via FIX connection");
 
                 try {
                     TimeUnit.SECONDS.sleep(_periodInSecond);

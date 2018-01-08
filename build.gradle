@@ -6,9 +6,7 @@ apply plugin: 'java'
 // intestingly, repositories {jcenter()} cannot work - from http://imperceptiblethoughts.com/shadow/
 buildscript {
     repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
+        maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
         classpath "com.github.jengelman.gradle.plugins:shadow:2.0.1"
@@ -18,6 +16,7 @@ apply plugin: "com.github.johnrengelman.shadow"
 
 repositories {
 	 mavenCentral()
+	 maven { url "https://jcenter.bintray.com" } //add for btrace - https://github.com/btraceio/btrace-maven
 } 
 
 dependencies {
@@ -38,6 +37,9 @@ dependencies {
 	compile("org.quickfixj:quickfixj-core:2.0.0")
 
     compile group: 'com.beust', name: 'jcommander', version: '1.72' //http://jcommander.org/ https://mvnrepository.com/artifact/com.beust/jcommander/1.72
+
+	//i am not very clear with the diff between btrace-agent and btrace-maven
+    compile 'com.sun.tools.btrace:btrace-agent:1.3.10.1' //https://bintray.com/btraceio/maven/btrace, https://github.com/btraceio/btrace-maven, https://bintray.com/btraceio/maven/btrace-maven
 
 	testCompile 'junit:junit:4.8.2'
  }
@@ -87,7 +89,7 @@ task taskA{
    }
 
 
-version = new Date().format('yyyy-MM-dd_HHmmss.S')
+version = 'v1.1_'+new Date().format('yyyy-MM-dd_HHmmss.S')
 
 
 

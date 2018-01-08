@@ -2,6 +2,7 @@ package baoying.orderbook.app;
 
 import baoying.orderbook.CommonMessage;
 import baoying.orderbook.MatchingEngine;
+import baoying.orderbook.OrderBook;
 import baoying.orderbook.TradeMessage;
 import baoying.orderbook.testtool.LatencyMessageCallback;
 import com.google.common.eventbus.Subscribe;
@@ -70,27 +71,27 @@ public class MatchingEngineFIXWrapper {
         log.info("start the MatchingEngineFIXWrapper - done");
     }
 
-    @Subscribe
-    public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        if(!_triedLogonClientCompIDs.contains(singleSideExecutionReport._originOrder._clientEntityID)){
-            //orders from web/jmeter(etc) could also reach here
-            return;
-        }
+    public Message translate(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
         final SessionID sessionID ;
         Message er = buildFIXExecutionReport(singleSideExecutionReport);
-        sendER(er, singleSideExecutionReport._originOrder._clientEntityID);
+        //sendER(er, singleSideExecutionReport._originOrder._clientEntityID);
+        return er;
 
     }
 
-    @Subscribe
-    public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
-        processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.MAKER);
-        processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.TAKER);
+
+    public List<Util.Tuple<Message,TradeMessage.OriginalOrder>> translate(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
+        List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixExecutionReports = new ArrayList<>();
+
+        fixExecutionReports.add(processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.MAKER));
+        fixExecutionReports.add(processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.TAKER));
+
+        return fixExecutionReports;
     }
 
-    public void processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
+    public Util.Tuple<Message,TradeMessage.OriginalOrder> processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
 
         final TradeMessage.OriginalOrder originalOrder;
         switch(maker_taker){
@@ -104,38 +105,17 @@ public class MatchingEngineFIXWrapper {
                 throw new RuntimeException("unknown side : "+maker_taker);
         }
 
-        if(!_triedLogonClientCompIDs.contains(originalOrder._clientEntityID)){
-            //orders from web/jmeter(etc) could also reach here
-            return;
-        }
-
-        if( originalOrder._clientEntityID.startsWith(SimpleOMSEngine.IGNORE_ENTITY_PREFIX)) {
-            return;
-        }
-
-
         Message er = buildExternalERfromInternalER(matchedExecutionReport, maker_taker);
-
-
-        //TODO move before build ER
-        if(originalOrder._isLatencyTestOrder) {
-            long pickedFromOutputBus_nano = System.nanoTime();
-            String latencyTimes = originalOrder._latencyTimesFromClient
-                    + "," + matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test
-                    + "," + matchedExecutionReport._taker_enterInputQ_sysNano_test
-                    + "," + matchedExecutionReport._taker_pickFromInputQ_sysNano_test
-                    + "," + matchedExecutionReport._matched_sysNano_test
-                    + "," + pickedFromOutputBus_nano;
-            er.setString(LatencyMessageCallback.latencyTimesField, latencyTimes);
-        }
-
-
-        sendER(er, originalOrder._clientEntityID);
+        return new Util.Tuple<Message,TradeMessage.OriginalOrder>(er,originalOrder);
 
     }
 
     private void sendER(Message er, String clientEntityID){
 
+        if(clientEntityID.startsWith(SimpleOMSEngine.IGNORE_ENTITY_PREFIX)){
+            log.debug("ignore the ER sending since {} is with the prefix:{}", clientEntityID, SimpleOMSEngine.IGNORE_ENTITY_PREFIX);
+            return;
+        }
         SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
         sendER(er, sessionID);
     }
@@ -180,21 +160,44 @@ public class MatchingEngineFIXWrapper {
 
                     String orderID = UniqIDGenerator.next();
                     TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
-                    if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-                        originalOrder._isLatencyTestOrder = true;
-                        originalOrder._recvFromClient_sysNano_test = System.nanoTime();
+                    recordPerformanceData(paramMessage, originalOrder);
 
-                        if(paramMessage.isSetField(LatencyMessageCallback.latencyTimesField)){
-                            originalOrder._latencyTimesFromClient = paramMessage.getString(LatencyMessageCallback.latencyTimesField);
+                    List<OrderBook.MatchingEnginOutputMessageFlag> executionReports = _engine.addOrder(originalOrder);
+                    for (OrderBook.MatchingEnginOutputMessageFlag executionReport : executionReports) {
+
+                        if(executionReport instanceof TradeMessage.SingleSideExecutionReport ){
+
+                            TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport)executionReport;
+                            Message fixER = translate(singleSideExecutionReport);
+                            sendER(fixER, singleSideExecutionReport._originOrder._clientEntityID);
+
+                        }else if(executionReport instanceof TradeMessage.MatchedExecutionReport){
+                            TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)executionReport;
+
+                            if(matchedExecutionReport._takerOriginOrder._isLatencyTestOrder){
+                                matchedExecutionReport._takerOriginOrder._matched_sysNano_test=System.nanoTime();
+                            }
+                            List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs = translate(matchedExecutionReport);
+
+                            for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER : fixERs){
+
+                                if(fixER._2._isLatencyTestOrder){
+                                    long fixERTranslated_sysNano_test = System.nanoTime();
+                                    String latencyTimes = originalOrder._latencyTimesFromClient
+                                            +","+originalOrder._recvFromClient_sysNano_test
+                                            +","+originalOrder._matched_sysNano_test
+                                            +","+ fixERTranslated_sysNano_test ;
+                                    fixER._1.setString(LatencyMessageCallback.latencyTimesField, latencyTimes);
+                                }
+
+                                sendER(fixER._1, fixER._2._clientEntityID);
+                            }
+
+                        }else{
+                            log.error("unknown type: " + executionReport);
                         }
                     }
 
-
-                    TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-                    _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
-
-                    final Message fixNewER = buildFIXExecutionReport(erNew);
-                    sendER(fixNewER, paramSessionID);
 
                 }catch (Exception e){
                     log.error("failure", e);
@@ -205,7 +208,19 @@ public class MatchingEngineFIXWrapper {
 
             }
 
-            @Override
+        private void recordPerformanceData(Message paramMessage, TradeMessage.OriginalOrder originalOrder) throws FieldNotFound {
+            if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+                originalOrder._isLatencyTestOrder = true;
+                originalOrder._recvFromClient_sysNano_test = System.nanoTime();
+
+                if(paramMessage.isSetField(LatencyMessageCallback.latencyTimesField)){
+                    originalOrder._latencyTimesFromClient = paramMessage.getString(LatencyMessageCallback.latencyTimesField);
+                }
+            }
+            _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
+        }
+
+        @Override
             public void onCreate(SessionID paramSessionID) {
                 log.debug("onCreate session:{}", paramSessionID);
             }

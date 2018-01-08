@@ -1,15 +1,12 @@
 #!/bin/bash
 
-#bash $0 Disruptor_BusySpinWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  BusySpinWaitStrategy   $((60*100)) 600 
-#bash $0 Disruptor_SleepingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  SleepingWaitStrategy   $((60*100)) 600 
-#bash $0 Disruptor_YieldingWaitStrategy_$(date '+%Y%m%d_%H%M%S') ${jarfile} Disruptor  YieldingWaitStrategy   $((60*100)) 600 
-#bash $0 BlockingQueue_X_bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} BlockingQueue  X                  $((60*100)) 600 
+#bash $0 bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} $((60*100)) 600
 
 function startMachineEngine(){
     mkdir -p ${test_name}/log
     cd ${test_name}
 
-    arguments="--queue_type ${queue_type} --strategy ${strategy} --symbols USDJPY --queue_size 65536 --snapshot_interval_in_second 3600"
+    arguments="--symbols USDJPY --snapshot_interval_in_second 3600"
     #VisualVMOptions="-Dcom.sun.management.jmxremote.port=3333  -Dcom.sun.management.jmxremote.ssl=false  -Dcom.sun.management.jmxremote.authenticate=false"
     GCPrintOptions="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGC -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:log/GC.txt"
     JVMOptions="${VisualVMOptions} -XX:+PrintSafepointStatistics -XX:-UseBiasedLocking -XX:+UnlockDiagnosticVMOptions -XX:GuaranteedSafepointInterval=300000 -XX:NewRatio=1 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -Xmx3072M -Xms3072M ${GCPrintOptions}"
@@ -125,18 +122,16 @@ case $OSTYPE in
 		fi
 		;;
 	msys*)
-		echo "no vmstat on windows"
+		echo "***remember start the performance monitor manually***, since no vmstat on windows"
 		;;
 esac
 	
 
 test_name=$1
 jarfile=$2
-queue_type=$3
-strategy=$4
-background_rate_per_min=$5
-duration_in_second=$6
-latency_rate_per_min=${7:-60}
+background_rate_per_min=$3
+duration_in_second=$4
+latency_rate_per_min=${5:-60}
 
 startMachineEngine
 populateOB

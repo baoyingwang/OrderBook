@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
 
+import baoying.orderbook.app.Util;
 import org.junit.Test;
 
 import baoying.orderbook.CommonMessage.Side;
@@ -112,7 +113,7 @@ public class OrderBookTest {
 		
 		OriginalOrder bid_145_1point5Mio = new OriginalOrder( System.currentTimeMillis(),symbol, CommonMessage.Side.BID,CommonMessage.OrderType.LIMIT, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
 
-		OrderBook.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
+		Util.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
 		List<MatchingEnginOutputMessageFlag> reports = result._1;
 		List<OrderBookDelta> orderbookDeltas = result._2;
 		for(MatchingEnginOutputMessageFlag r : reports){

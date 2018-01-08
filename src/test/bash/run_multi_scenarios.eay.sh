@@ -12,12 +12,9 @@ duration_in_seconds=600
 for bg_rate_per_second in 50 1000 5000
 do
 
-#	bash run_multi_scenarios.sh BaoyingOrderBookFat-2017-12-28_134458.706-all.jar  \
-#	"Disruptor,BusySpinWaitStrategy,${bg_rate_per_second},${duration_in_seconds};Disruptor,SleepingWaitStrategy,${bg_rate_per_second},${duration_in_seconds};BlockingQueue,X,${bg_rate_per_second},${duration_in_seconds}"
     #for lt_rate_per_min in 5 10 50 100
     for lt_rate_per_min in 60
     do
-	    bash run_multi_scenarios.sh $jarfile  \
-	    "Disruptor,BusySpinWaitStrategy,${bg_rate_per_second},${duration_in_seconds},${lt_rate_per_min};BlockingQueue,X,${bg_rate_per_second},${duration_in_seconds},${lt_rate_per_min}"
+	    bash run_multi_scenarios.sh $jarfile "${bg_rate_per_second},${duration_in_seconds},${lt_rate_per_min}"
 	done
 done

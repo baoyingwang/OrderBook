@@ -117,16 +117,7 @@ public class SimpleOMSEngine {
             long outputConsumingNanoTime = System.nanoTime();
             perfTestDataForWeb._testTimeDataQueue.add(new long[]{
                     matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
-                    matchedExecutionReport._taker_enterInputQ_sysNano_test
-                            - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test,
-
-                    matchedExecutionReport._taker_pickFromInputQ_sysNano_test
-                            - matchedExecutionReport._taker_enterInputQ_sysNano_test,
-
-                    matchedExecutionReport._matched_sysNano_test
-                            - matchedExecutionReport._taker_pickFromInputQ_sysNano_test,
-
-                    outputConsumingNanoTime - matchedExecutionReport._matched_sysNano_test});
+                    outputConsumingNanoTime - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test});
         }
 
         if(! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)

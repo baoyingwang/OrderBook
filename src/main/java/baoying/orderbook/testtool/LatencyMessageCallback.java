@@ -23,8 +23,6 @@ public class LatencyMessageCallback extends FirstMessageCallback {
 
     public static int latencyTimesField=58;
 
-    ListMultimap<String, Long> erAckTimes = ArrayListMultimap.create();
-
     @Override
     public void fromApp(Message paramMessage, SessionID paramSessionID) {
         log.debug("fromApp session received : {} " , paramMessage);
@@ -34,24 +32,17 @@ public class LatencyMessageCallback extends FirstMessageCallback {
 
             long erTimeNano = System.nanoTime();
             String clientOrdID = paramMessage.getString(11);
-            erAckTimes.put(clientOrdID, erTimeNano);
 
             //don't worry about multi-thread issue, since each client has its own thread.
             String clientCompmID = paramMessage.getHeader().getString(56);
             Path e2eTimeFile = Paths.get("log/e2e_"+clientCompmID+".csv");
             if (!Files.exists(e2eTimeFile)) {
-                Files.write(e2eTimeFile, ("sendTime,sendTimeNano,recvFromClient_sysNano,enterInputQ_sysNano,pickFromInputQ_sysNano,matched_sysNano,pickedFromOutputBus_nano,newER,matchER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
+                Files.write(e2eTimeFile, ("sendTime,sendTimeNano,recvFromClient_sysNano,matched_sysNano,fixERTranslated,matchER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
             }
 
-            List<Long> times = erAckTimes.get(clientOrdID);
-            if(times.size() == 2){
+            String serverTimes = paramMessage.getString(latencyTimesField);
+            Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
 
-                String serverTimes = paramMessage.getString(latencyTimesField);
-                long newAck =times.get(0) ;
-                long matchAck = times.get(1);
-                Files.write(e2eTimeFile, (serverTimes+","+newAck+","+matchAck+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
-                erAckTimes.removeAll(clientOrdID);
-            }
 
 
         }catch(Exception e){

@@ -46,7 +46,7 @@ public class MatchingEngineWebWrapper {
                              @RequestParam(value = "side", defaultValue="Bid") String side,
                              @RequestParam(value = "price", defaultValue="126.0") double price,
                              @RequestParam(value = "qty", defaultValue = "5000") int qty){
-
+/*
         final String clientOrdID = clientEntity+"_"+ UniqIDGenerator.next();
         final String orderID = symbol+"_"+clientEntity+"_"+ UniqIDGenerator.next();
 
@@ -73,6 +73,8 @@ public class MatchingEngineWebWrapper {
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(erNew);
         return jsonString;
+*/
+        return "";
 
     }
 
