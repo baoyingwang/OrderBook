@@ -41,7 +41,7 @@ public class SimpleOMSEngine {
         void recordNewOrder(TradeMessage.OriginalOrder originalOrder){
             long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
 
-            if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+            if(originalOrder._clientEntityID.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)){
                 _latencyOrderCounter.incrementAndGet();
             }
 
@@ -97,7 +97,7 @@ public class SimpleOMSEngine {
     @Subscribe
     public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)) {
             List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
             List<Map<String, String>> originalReportsNew = new ArrayList<>();
             if (originalReports != null) {
@@ -113,7 +113,7 @@ public class SimpleOMSEngine {
     public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
 
         //ignore maker side, because maker orders always sit in book during test
-        if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+        if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)) {
             long outputConsumingNanoTime = System.nanoTime();
             perfTestDataForWeb._testTimeDataQueue.add(new long[]{
                     matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
@@ -121,12 +121,12 @@ public class SimpleOMSEngine {
         }
 
         if(! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)
-                && matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+                && matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)) {
             addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
         }
 
         if(! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)
-                && ! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)) {
+                && ! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)) {
             addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
         }
 

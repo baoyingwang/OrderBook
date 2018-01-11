@@ -65,7 +65,7 @@ public class FirstQFJClientBatch {
         String qfjConfigContent = getQFJConfigContent(clientIDs);
         final Application application;
         {
-            if(clientCompIDPrefix.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
+            if(clientCompIDPrefix.startsWith(MatchingEngineFIXWrapper.LATENCY_ENTITY_PREFIX)){
                 application= new LatencyMessageCallback();
             }else{
                 application= new FirstMessageCallback();
@@ -86,7 +86,7 @@ public class FirstQFJClientBatch {
         // messages.
         // in production code, you should check the response Logon message.
         // Refer: DefaultQFJSingSessionInitiator.java
-        TimeUnit.SECONDS.sleep(5);
+        TimeUnit.SECONDS.sleep(3);
 
         final int period;
         final TimeUnit unit;

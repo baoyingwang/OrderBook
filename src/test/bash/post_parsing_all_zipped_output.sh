@@ -9,6 +9,7 @@ function parseZipFile(){
 	unzip -p $zipfile $name/log/sysUsage*                   > $name.sysUsage.csv
 	unzip -p $zipfile $name/log/sysInfo*                    > $name.sysInfo.txt
 	unzip -p $zipfile $name/log/GC.txt                      > $name.GC.txt
+	unzip -p $zipfile $name/log/btrace.csv                  > $name.btrace.csv
 	unzip -p $zipfile $name/log/MatchingEngine.console.log  > $name.MatchingEngine.console.log
 
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
@@ -17,9 +18,21 @@ function parseZipFile(){
     sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)  >> $name.e2e_LxTxCx_FIX_RT.csv
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
 
+    echo "match_ns"                    > $name.btrace.match_ns.txt
+    grep "^match_ns" $name.btrace.csv >> $name.btrace.match_ns.txt
+
+    echo "publish2bus_ns"                    > $name.btrace.publish2bus_ns.txt
+    grep "^publish2bus_ns" $name.btrace.csv >> $name.btrace.publish2bus_ns.txt
+
+    echo "match_publish2bus_ns"                    > $name.btrace.match_publish2bus_ns.txt
+    grep "^match_publish2bus_ns" $name.btrace.csv >> $name.btrace.match_publish2bus_ns.txt
+
+    echo "fix_processIncomingOrder_ns"                    > $name.btrace.fix_processIncomingOrder_ns.txt
+    grep "^fix_processIncomingOrder_ns" $name.btrace.csv >> $name.btrace.fix_processIncomingOrder_ns.txt
+
 	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
 	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
-	python ${python_script_file} $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name
+	python ${python_script_file} $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name.btrace $name
 
 }
 

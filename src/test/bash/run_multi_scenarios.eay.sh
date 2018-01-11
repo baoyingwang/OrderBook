@@ -18,3 +18,6 @@ do
 	    bash run_multi_scenarios.sh $jarfile "${bg_rate_per_second},${duration_in_seconds},${lt_rate_per_min}"
 	done
 done
+
+
+bash post_parsing_all_zipped_output.sh

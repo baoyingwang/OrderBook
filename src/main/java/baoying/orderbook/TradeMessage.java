@@ -1,11 +1,10 @@
 package baoying.orderbook;
 
 import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
-import baoying.orderbook.OrderBook.MatchingEngineInputMessageFlag;
+import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 
 public class TradeMessage {
-    public static class OriginalOrder implements MatchingEngineInputMessageFlag {
+    public static class OriginalOrder{
 
 		/**
 		 * price is ignored, if orderType is Market.
@@ -38,7 +37,6 @@ public class TradeMessage {
 		public boolean _isLatencyTestOrder= false;
 		public String _latencyTimesFromClient="";
 		public long _recvFromClient_sysNano_test=-1;
-        public long _matched_sysNano_test=-1;
 	}
 
 	//https://stackoverflow.com/questions/8157755/how-to-convert-enum-value-to-int
@@ -79,7 +77,7 @@ public class TradeMessage {
         }
     }
 	// maker: who sit in the book
-    public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
+    public static class SingleSideExecutionReport implements MEExecutionReportMessageFlag{
 
         public final long _msgID;
 		public final long _msgEpochMS;
@@ -98,7 +96,7 @@ public class TradeMessage {
 		}
 	}
 	// maker: who sit in the book
-    public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
+    public static class MatchedExecutionReport implements MEExecutionReportMessageFlag{
 
         public final long _matchID;
 		public final long _matchingEpochMS;

@@ -37,7 +37,7 @@ public class LatencyMessageCallback extends FirstMessageCallback {
             String clientCompmID = paramMessage.getHeader().getString(56);
             Path e2eTimeFile = Paths.get("log/e2e_"+clientCompmID+".csv");
             if (!Files.exists(e2eTimeFile)) {
-                Files.write(e2eTimeFile, ("sendTime,sendTimeNano,recvFromClient_sysNano,matched_sysNano,fixERTranslated,matchER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
+                Files.write(e2eTimeFile, ("sendTime,clientSendNano,svrRecvOrdNano,svrMatchedNano,clientRecvER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
             }
 
             String serverTimes = paramMessage.getString(latencyTimesField);

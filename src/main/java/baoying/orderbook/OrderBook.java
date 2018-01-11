@@ -53,7 +53,7 @@ public class OrderBook {
 		_offerBook = createAskBook();
 	}
 
-    Util.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>  processInputOrder(ExecutingOrder executingOrder) {
+    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(ExecutingOrder executingOrder) {
 
 		final PriorityQueue<ExecutingOrder> contraSideBook;
 		final PriorityQueue<ExecutingOrder> sameSideBook;
@@ -72,7 +72,7 @@ public class OrderBook {
 			}
 		}
 
-		Util.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
+		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
 
 		return matchResult;
 	}
@@ -82,11 +82,11 @@ public class OrderBook {
 	 * - TODO all clients could trade with each other. There is NO relationship/credit check. 
 	 * - not private, because of UT
 	 */
-	Util.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> match(ExecutingOrder executingOrder,
+	Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> match(ExecutingOrder executingOrder,
 																			PriorityQueue<ExecutingOrder> contraSideBook,
 	        																PriorityQueue<ExecutingOrder> sameSideBook) {
 
-		List<MatchingEnginOutputMessageFlag> execReportsAsResult = new ArrayList<>();
+		List<MEExecutionReportMessageFlag> execReportsAsResult = new ArrayList<>();
 		List<OrderBookDelta> orderbookDeltasAsResult= new ArrayList<>();
 
 		boolean rejected = false;
@@ -141,26 +141,14 @@ public class OrderBook {
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
 			final MatchedExecutionReport executionReport ;
-			if(executingOrder._origOrder._isLatencyTestOrder){
-                //only track taker side latency, since maker maybe has sit in orderbook long time
 
-				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-						System.currentTimeMillis(),
-						lastPrice,
-						lastQty,
+			executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
+					System.currentTimeMillis(),
+					lastPrice,
+					lastQty,
+					peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
+					executingOrder._origOrder, executingOrder._leavesQty);
 
-						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
-						executingOrder._origOrder, executingOrder._leavesQty);
-			}else{
-				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-						System.currentTimeMillis(),
-
-						lastPrice,
-						lastQty,
-
-						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
-						executingOrder._origOrder, executingOrder._leavesQty);
-			}
 			execReportsAsResult.add(executionReport);
 			orderbookDeltasAsResult.add(
 			        new OrderBookDelta(_symbol, peekedContraBestPriceOrder._origOrder._side, lastPrice, 0 - lastQty));
@@ -196,7 +184,7 @@ public class OrderBook {
             }
 		}
 
-		return new Util.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>(execReportsAsResult,orderbookDeltasAsResult);
+		return new Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>>(execReportsAsResult,orderbookDeltasAsResult);
 	}
 
 
@@ -273,10 +261,9 @@ public class OrderBook {
 		return bookMap;
 	}
 
-    public static interface MatchingEngineInputMessageFlag {
+	public static interface MDMarketDataMessageFlag {
 	}
-
-    public static interface MatchingEnginOutputMessageFlag {
+	public static interface MEExecutionReportMessageFlag {
 	}
 
 	static class ExecutingOrder{
@@ -336,16 +323,6 @@ public class OrderBook {
 			}
 		});
 
-	}
-
-	static class MatchingEngineInputMessageEvent
-	{
-		private MatchingEngineInputMessageFlag _value;
-
-		public void set(MatchingEngineInputMessageFlag value)
-		{
-			this._value = value;
-		}
 	}
 
 }

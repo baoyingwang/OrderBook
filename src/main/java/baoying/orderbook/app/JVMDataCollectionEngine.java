@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 
-public class SysPerfDataCollectionEngine {
+public class JVMDataCollectionEngine {
 
     private final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
     private final OperatingSystemMXBean osMXBean = ManagementFactory.getOperatingSystemMXBean();
@@ -24,19 +24,19 @@ public class SysPerfDataCollectionEngine {
     private final ScheduledExecutorService executor;
 
     //as a util, without starting executor service
-    SysPerfDataCollectionEngine(){
+    JVMDataCollectionEngine(){
         executor = null;
     }
 
-    public static SysPerfDataCollectionEngine asUtil(){
-        return new SysPerfDataCollectionEngine();
+    public static JVMDataCollectionEngine asUtil(){
+        return new JVMDataCollectionEngine();
     }
 
-    public static SysPerfDataCollectionEngine asEngine(long period, TimeUnit unit, Path usageFile)throws Exception{
-        return new SysPerfDataCollectionEngine( period,  unit,  usageFile);
+    public static JVMDataCollectionEngine asEngine(long period, TimeUnit unit, Path usageFile)throws Exception{
+        return new JVMDataCollectionEngine( period,  unit,  usageFile);
     }
 
-    private SysPerfDataCollectionEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
+    private JVMDataCollectionEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
 
         if (!Files.exists(usageFile)) {
             //Files.createFile(usageFile); TODO is it required to create here? since CREATE option is used next/while-writing?
@@ -206,7 +206,7 @@ public class SysPerfDataCollectionEngine {
     }
 
     public static void main(String[] args){
-        SysPerfDataCollectionEngine u = SysPerfDataCollectionEngine.asUtil();
+        JVMDataCollectionEngine u = JVMDataCollectionEngine.asUtil();
         u.config().forEach((k,v) ->{
             if(k.startsWith("gc")) {
                 System.out.println(k + ":" + v);

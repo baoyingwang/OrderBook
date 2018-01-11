@@ -38,9 +38,8 @@ dependencies {
 
     compile group: 'com.beust', name: 'jcommander', version: '1.72' //http://jcommander.org/ https://mvnrepository.com/artifact/com.beust/jcommander/1.72
 
-	//i am not very clear with the diff between btrace-agent and btrace-maven
-    compile 'com.sun.tools.btrace:btrace-agent:1.3.10.1' //https://bintray.com/btraceio/maven/btrace, https://github.com/btraceio/btrace-maven, https://bintray.com/btraceio/maven/btrace-maven
-
+	//TODO i am not very clear with the diff between btrace-agent and btrace-maven
+	testCompile 'com.sun.tools.btrace:btrace-agent:1.3.10.1' //https://bintray.com/btraceio/maven/btrace, https://github.com/btraceio/btrace-maven, https://bintray.com/btraceio/maven/btrace-maven
 	testCompile 'junit:junit:4.8.2'
  }
 
@@ -132,5 +131,7 @@ task buildPackage(group: 'build', type: Zip, dependsOn: shadowJar) {
 	into('jars') { from shadowJar }
     into('scripts'){from ('src/test/bash/') { include('**/*') } }
     into('scripts'){from ('src/test/python/') { include('**/*') } }
+
+	into('scripts/btrace'){from ('src/test/java/') { include('baoying/orderbook/BTrace*') } }
 }
 

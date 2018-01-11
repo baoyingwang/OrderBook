@@ -23,21 +23,17 @@ def getE2E(inputE2EFile):
 
     df.describe()
 
-    df["e2e_match_ms" ] = (df["matchER"  ] - df["sendTimeNano" ]            )/1000000
+    df["e2e_match_ms" ] = (df["clientRecvER"  ] - df["clientSendNano" ]            )/1000000
 
-    df["i_mar_trans_unmar_ms" ] = (df["recvFromClient_sysNano"  ] - df["sendTimeNano" ]          )/1000000
-    df["obj_process_us"       ] = (df["fixERTranslated"         ] - df["recvFromClient_sysNano"] )/1000
-    df["o_mar_trans_unmar_ms" ] = (df["matchER"                 ] - df["matched_sysNano"]        )/1000000
-
-    df["only_match_us"        ] = (df["matched_sysNano"         ] - df["recvFromClient_sysNano"] )/1000
-    df["FIX_ER_translate_us"  ] = (df["fixERTranslated"         ] - df["matched_sysNano"]        )/1000
+    df["input_ms"  ] = (df["svrRecvOrdNano"  ] - df["clientSendNano" ]   )/1000000 #client order -->mar-->bytes -->network-->unmar-->svr order
+    df["process_us"] = (df["svrMatchedNano"  ] - df["svrRecvOrdNano"]    )/1000
+    df["output_ms" ] = (df["clientRecvER"    ] - df["svrMatchedNano"]    )/1000000 #server ER -->mar-->bytes -->network-->unmar--> client ER
 
     df['sendTime_datetime' ] = df['sendTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
 
     result_df = df[['sendTime_datetime',
                     'e2e_match_ms',
-                    'i_mar_trans_unmar_ms', 'obj_process_us', 'o_mar_trans_unmar_ms',
-                    'only_match_us','FIX_ER_translate_us']]
+                    'input_ms', 'process_us', 'output_ms']]
 
     return result_df
 
@@ -61,42 +57,72 @@ def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
     #------------------
 
     plt.subplot2grid(shape,(row_start_index+1,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["i_mar_trans_unmar_ms"]   , label="i_mar_trans_unmar_ms"   , marker='h' )
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["input_ms"]   , label="input_ms"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
     plt.ylabel(u"ms")
-    plt.title(u"overall 3 phases: #1 i_mar_trans_unmar_ms")
+    plt.title(u"#1 client ord obj->network bytes-> svr ord obj")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
     plt.subplot2grid(shape,(row_start_index+1,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["obj_process_us"]   , label="obj_process_us"   , marker='h' )
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["process_us"]   , label="process_us"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
     plt.ylabel(u"us")
-    plt.title(u"overall 3 phases: #2 obj_process_ms")
+    plt.title(u"#2 svr process java obj")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
     plt.subplot2grid(shape,(row_start_index+1,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["o_mar_trans_unmar_ms"]   , label="o_mar_trans_unmar_ms"   , marker='h' )
+    plt.plot(df_e2e["sendTime_datetime"], df_e2e["output_ms"]   , label="output_ms"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
     plt.ylabel(u"ms")
-    plt.title(u"overall 3 phases: #3 o_mar_trans_unmar_ms")
+    plt.title(u"#3 svr ER obj->network bytes-> client ER obj")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(row_start_index+2,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["only_match_us"]   , label="only_match_us"   , marker='h' )
+
+    return (row_start_index + 1) + 1
+
+def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us):
+
+
+    plt.subplot2grid(shape,(row_start_index,0))
+    plt.plot(df_match_us['manual_index'], df_match_us["match_us"]   , label="match_us"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"only_match_us")
+    plt.title(u"match_us")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(row_start_index+2,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["FIX_ER_translate_us"]   , label="FIX_ER_translate_us"   , marker='h' )
+    df_publish2bus_us['index']=range(df_publish2bus_us["publish2bus_us"].size)
+    plt.subplot2grid(shape,(row_start_index,1))
+    plt.plot(df_publish2bus_us["index"],df_publish2bus_us["publish2bus_us"]/1000   , label="publish2bus_us"   , marker='h' )
     #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"FIX_ER_translate_us")
+    plt.title(u"publish2bus_us")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
+    df_match_publish2bus_us['index']=range(df_match_publish2bus_us["match_publish2bus_us"].size)
+    plt.subplot2grid(shape,(row_start_index,2))
+    plt.plot(df_match_publish2bus_us["index"],df_match_publish2bus_us["match_publish2bus_us"]/1000 , label="match_publish2bus_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.title(u"match_publish2bus_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    return (row_start_index + 2) + 1
+    df_fix_processIncomingOrder_us['index']=range(df_fix_processIncomingOrder_us["bt_obj_processing_us"].size)
+    plt.subplot2grid(shape,(row_start_index+1,0))
+    plt.plot(df_fix_processIncomingOrder_us["index"],df_fix_processIncomingOrder_us["bt_obj_processing_us"]/1000   , label="fix_processIncomingOrder_us"   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.title(u"fix_processIncomingOrder_us")
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+
+    min_size=min([df_match_us["match_us"].size,
+                  df_publish2bus_us["publish2bus_us"].size,
+                  df_match_publish2bus_us["match_publish2bus_us"].size,
+                  df_fix_processIncomingOrder_us["bt_obj_processing_us"].size])
+
+    #https://stackoverflow.com/questions/23668427/pandas-joining-multiple-dataframes-on-columns
+    agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index').merge(df_fix_processIncomingOrder_us[0:min_size],on='manual_index')
+    agg_df    =agg_df_tmp[['match_us','publish2bus_us','match_publish2bus_us','bt_obj_processing_us']]
+
+    plt.subplot2grid(shape,(row_start_index+1,1), colspan=2)
+    plt.text(0, 0 ,agg_df.describe(percentiles=[.25,.5,.75,.9, .95, .99 ]).to_string())
+    return (row_start_index + 1) + 1
+
 
 #time_datetime
 #cpu_ProcessCpuLoad
@@ -143,6 +169,27 @@ def getVmstat(inputVmstatFile):
     df['time']=df['timestamp_day']+'T'+df['timestamp_time']+'Z'
     df['time_datetime'] = df['time'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%SZ"))
     return df
+
+def getBTrace(btraceFilePrefix):
+
+    df_match                   =pd.read_csv(btraceFilePrefix+".match_ns.txt")
+    df_publish2bus             =pd.read_csv(btraceFilePrefix+".publish2bus_ns.txt")
+    df_match_publish2bus       =pd.read_csv(btraceFilePrefix+".match_publish2bus_ns.txt")
+    df_fix_processIncomingOrder=pd.read_csv(btraceFilePrefix+".fix_processIncomingOrder_ns.txt")
+
+    df_match['match_us']     =       df_match["match_ns"]/1000
+    df_match['manual_index'] = range(df_match.index.size) #Not df.size, because it is m*n.
+
+    df_publish2bus['publish2bus_us']     =       df_publish2bus["publish2bus_ns"]/1000
+    df_publish2bus['manual_index']       = range(df_publish2bus.index.size) #Not df.size, because it is m*n.
+
+    df_match_publish2bus['match_publish2bus_us']  =       df_match_publish2bus["match_publish2bus_ns"]/1000
+    df_match_publish2bus['manual_index']          = range(df_match_publish2bus.index.size) #Not df.size, because it is m*n.
+
+    df_fix_processIncomingOrder['bt_obj_processing_us'] =       df_fix_processIncomingOrder["fix_processIncomingOrder_ns"]/1000
+    df_fix_processIncomingOrder['manual_index']                = range(df_fix_processIncomingOrder.index.size) #Not df.size, because it is m*n.
+
+    return df_match[['manual_index','match_us']], df_publish2bus[['manual_index','publish2bus_us']],df_match_publish2bus[['manual_index','match_publish2bus_us']],df_fix_processIncomingOrder[['manual_index','bt_obj_processing_us']]
 
 
 def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):
@@ -286,7 +333,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+1
 
 
-def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_file_prefix):
+def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -305,6 +352,7 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
+    next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
 
@@ -321,11 +369,12 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, output_
 #    output_file_prefix
 
 #http://www.diveintopython.net/scripts_and_streams/command_line_arguments.html
-inputE2EFile        = sys.argv[1]
-inputSysUsageFile   = sys.argv[2]
-inputSysInfoFile    = sys.argv[3]
-inputVmstatFile     = sys.argv[4]
-output_file_prefix  = sys.argv[5]
+inputE2EFile         = sys.argv[1]
+inputSysUsageFile    = sys.argv[2]
+inputSysInfoFile     = sys.argv[3]
+inputVmstatFile      = sys.argv[4]
+inputBTraceFilePrefix= sys.argv[5]
+output_file_prefix   = sys.argv[6]
 
 df_sysUsage = getSysUsage(inputSysUsageFile)
 df_e2e      = getE2E(inputE2EFile)
@@ -338,6 +387,8 @@ else:
     df_vmstat = pd.DataFrame()
 
 
+df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us=getBTrace(inputBTraceFilePrefix)
+
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
 with open(inputSysInfoFile) as f:
     sysInfoContentList = f.readlines()
@@ -346,6 +397,6 @@ with open(inputSysInfoFile) as f:
 
 plotTitle=output_file_prefix
 #df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
-genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,output_file_prefix)
+genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us,output_file_prefix)
 
 

@@ -2,6 +2,10 @@
 
 #bash $0 bg3000perMin_$(date '+%Y%m%d_%H%M%S')   ${jarfile} $((60*100)) 600
 
+SCRIPT_START_DIR=`pwd`
+DIRNAMECMD="/usr/bin/dirname"
+MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
+
 function startMachineEngine(){
     mkdir -p ${test_name}/log
     cd ${test_name}
@@ -97,6 +101,22 @@ function startLatencyOrder(){
     java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
+function startBTrace(){
+
+    sampleMean=$1
+
+    case $OSTYPE in
+        linux*)
+            ps -ef | grep btrace.monitor.sh | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
+            ;;
+        msys*)
+            #TODO: not sure how to kill btrace.monitor.sh on windows
+            #cmd "/C TASKKILL /F /IM java.exe /T"
+            ;;
+    esac
+    bash $MYSCRIPTDIR/btrace.monitor.sh $sampleMean &
+
+}
 
 case $OSTYPE in
 	linux*) 
@@ -104,7 +124,7 @@ case $OSTYPE in
 		#trim the line is required(by sed), otherwise the -f1 maybe empty for align issue(e.g. pid 23 and 12345)
 		ps -eo pid,user,comm,pcpu | grep java | grep -v grep | sed 's/^ *//;s/ *$//'| cut -d' ' -f1 | xargs kill -9
 		;;
-	msis*)
+	msys*)
 	
 		#tasklist  | grep java |  sed 's/^ *//;s/ *$//;s/\ \+/ /g' |cut -d' ' -f2 | xargs kill -9
 		#taskkill /PID 10208 /F  the /PID is identified as :ERROR: Invalid argument/option - 'C:/baoying.wang/program/Git/PID'.
@@ -139,8 +159,12 @@ populateOB
 JVMOptions_sending="-Xmx128M -Dlog4j.configurationFile=log4j2_testtool.xml"
 
 tmp_warmup_rate_per_min=$((60*3000))
-tmp_warmup_duration_in_seconds=30
+tmp_warmup_duration_in_seconds=15
 warmupOrder $tmp_warmup_rate_per_min $tmp_warmup_duration_in_seconds
+
+
+startBTrace $(( $background_rate_per_min / 600 )) #sample 10 values per second
+sleep 5 #wait bind done, TODO: bind while jvm start? why and why not?
 
 startBackgroundOrder $background_rate_per_min
 startLatencyOrder $latency_rate_per_min

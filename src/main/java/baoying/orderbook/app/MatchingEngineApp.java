@@ -1,16 +1,10 @@
 package baoying.orderbook.app;
 
 import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
-import baoying.orderbook.testtool.FirstQFJClientBatch;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
-import com.lmax.disruptor.BusySpinWaitStrategy;
-import com.lmax.disruptor.SleepingWaitStrategy;
-import com.lmax.disruptor.WaitStrategy;
-import com.lmax.disruptor.YieldingWaitStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -75,7 +69,7 @@ public class MatchingEngineApp {
         private final MatchingEngineWebWrapper _webWrapper;
         private final MatchingEngineFIXWrapper _fixWrapper;
 
-        private final SysPerfDataCollectionEngine sysPerfEngine;
+        private final JVMDataCollectionEngine sysPerfEngine;
 
 
 
@@ -85,7 +79,7 @@ public class MatchingEngineApp {
             String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
             Path usageFile = Paths.get("log/sysUsage_app.start" + startTimeAsFileName + ".csv");
             Path sysInfoFile = Paths.get("log/sysInfo_app.start" + startTimeAsFileName + ".txt");
-            sysPerfEngine = SysPerfDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
+            sysPerfEngine = JVMDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
             Map<String, String> config = sysPerfEngine.config();
             config.forEach((k, v) -> {
                 try {
@@ -126,8 +120,6 @@ public class MatchingEngineApp {
                     _simpleMarkderDataEngine);
 
             _fixWrapper = new MatchingEngineFIXWrapper(_engine,
-                    _simpleOMSEngine,
-                    _simpleMarkderDataEngine,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
 
         }

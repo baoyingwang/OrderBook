@@ -3,6 +3,8 @@ package baoying.orderbook;
 import baoying.orderbook.MarketDataMessage.AggregatedOrderBookRequest;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 import baoying.orderbook.app.Util;
+import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
+import baoying.orderbook.MarketDataMessage.OrderBookDelta;
 import com.google.common.eventbus.AsyncEventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,11 +13,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class MatchingEngine {
 
-    public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
     private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
     public final List<String> _symbols;
@@ -40,15 +40,20 @@ public class MatchingEngine {
 
 	}
 
-	// check matching result(ExecutionReport) from _processResult
-	public List<OrderBook.MatchingEnginOutputMessageFlag> addOrder(OriginalOrder order) {
+	public List<MEExecutionReportMessageFlag> matchOrder(OriginalOrder order) {
 
 		OrderBook orderBook = orderBook(order._symbol);
-
 		OrderBook.ExecutingOrder executingOrder = new OrderBook.ExecutingOrder(order);
 
-		Util.Tuple<List<OrderBook.MatchingEnginOutputMessageFlag>, List<MarketDataMessage.OrderBookDelta>> matchResult
-				= orderBook.processInputOrder(executingOrder);
+		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchResult
+				= orderBook.matchOrder(executingOrder);
+
+		sendToBus(matchResult);
+
+		return matchResult._1;
+    }
+
+	private void sendToBus(Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchResult) {
 
 		matchResult._1.forEach( execRpt ->{
 			_outputExecutionReportsBus.post(execRpt);
@@ -58,17 +63,14 @@ public class MatchingEngine {
 			_outputMarketDataBus.post(ordBookDelta);
 		} );
 
-		return matchResult._1;
-    }
+	}
 
-    public void addAggOrdBookRequest(AggregatedOrderBookRequest aggOrdBookRequest) {
+	public void addAggOrdBookRequest(AggregatedOrderBookRequest aggOrdBookRequest) {
 
 		OrderBook orderBook = orderBook(aggOrdBookRequest._symbol);
 		MarketDataMessage.AggregatedOrderBook aggOrderBook = orderBook.buildAggregatedOrderBook(aggOrdBookRequest._depth);
 		_outputMarketDataBus.post(aggOrderBook);
     }
-
-
 
 	private OrderBook orderBook(String symbol){
 
