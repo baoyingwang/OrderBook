@@ -30,7 +30,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_prepare -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_prepare -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
         sleep 20
     done
@@ -44,7 +44,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_prepare -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_prepare -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
 
         sleep 20
@@ -67,11 +67,11 @@ function warmupOrder(){
 
     echo "begin sending warmup orders - ${tmp_warmup_duration_in_seconds} seconds - warmup bg rate:$tmp_warmup_rate_per_min per min, warmup latency rate:$latency_rate_per_min per min"
     local warmup_rate_per_min_single_side=$((${tmp_warmup_duration_in_seconds}/2))
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
 
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUPB -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUPO -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUPB -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUPO -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
 
     #addtional 20 seconds to 1) make sure FIX setup and exit 2) make sure all warmup messages are consumed
     sleep $(($tmp_warmup_duration_in_seconds + 20))
@@ -87,8 +87,8 @@ function startBackgroundOrder(){
 
     echo "begin sending background orders"
     local background_rate_per_min_single_side=$((${tmp_background_rate_per_min}/2))
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 function startLatencyOrder(){
@@ -97,8 +97,8 @@ function startLatencyOrder(){
     local tmp_latency_rate_per_min_single_side=$((${tmp_latency_rate_per_min}/2))
     echo "begin sending latency orders - tmp_latency_rate_per_min_single_side:${tmp_latency_rate_per_min_single_side}"
 
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} baoying.orderbook.testtool.qfj.FirstQFJClientBatch -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 function startBTrace(){

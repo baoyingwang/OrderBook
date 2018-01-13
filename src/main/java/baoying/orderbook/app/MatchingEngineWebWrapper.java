@@ -3,6 +3,8 @@ package baoying.orderbook.app;
 import baoying.orderbook.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,17 +23,22 @@ public class MatchingEngineWebWrapper {
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
     private final MatchingEngine _engine;
+
+    private final Vertx _vertx;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
     MatchingEngineWebWrapper(MatchingEngine engine,
+                             Vertx vertx,
                              SimpleOMSEngine simpleOMSEngine,
                              SimpleMarkderDataEngine simpleMarkderDataEngine){
 
+        _engine = engine;
+        _vertx = vertx;
+
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
-        _engine = engine;
 
     }
 
@@ -46,7 +53,7 @@ public class MatchingEngineWebWrapper {
                              @RequestParam(value = "side", defaultValue="Bid") String side,
                              @RequestParam(value = "price", defaultValue="126.0") double price,
                              @RequestParam(value = "qty", defaultValue = "5000") int qty){
-/*
+
         final String clientOrdID = clientEntity+"_"+ UniqIDGenerator.next();
         final String orderID = symbol+"_"+clientEntity+"_"+ UniqIDGenerator.next();
 
@@ -63,18 +70,18 @@ public class MatchingEngineWebWrapper {
 
 
         TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
-        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
-        }
+        _vertx.runOnContext((v)->{
 
-        TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-        _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
+            final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
 
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(erNew);
-        return jsonString;
-*/
-        return "";
+
+
+        });
+
+        //Gson gson = new GsonBuilder().create();
+        //String jsonString = gson.toJson(erNew);
+        return "place order done, orderID:" + orderID;
+
 
     }
 

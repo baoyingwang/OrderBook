@@ -38,6 +38,8 @@ dependencies {
 
     compile group: 'com.beust', name: 'jcommander', version: '1.72' //http://jcommander.org/ https://mvnrepository.com/artifact/com.beust/jcommander/1.72
 
+	compile 'io.vertx:vertx-core:3.5.0'
+
 	//TODO i am not very clear with the diff between btrace-agent and btrace-maven
 	testCompile 'com.sun.tools.btrace:btrace-agent:1.3.10.1' //https://bintray.com/btraceio/maven/btrace, https://github.com/btraceio/btrace-maven, https://bintray.com/btraceio/maven/btrace-maven
 	testCompile 'junit:junit:4.8.2'

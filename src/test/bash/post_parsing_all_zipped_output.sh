@@ -19,16 +19,16 @@ function parseZipFile(){
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
 
     echo "match_ns"                    > $name.btrace.match_ns.txt
-    grep "^match_ns" $name.btrace.csv >> $name.btrace.match_ns.txt
+    grep "^match_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.match_ns.txt
 
     echo "publish2bus_ns"                    > $name.btrace.publish2bus_ns.txt
-    grep "^publish2bus_ns" $name.btrace.csv >> $name.btrace.publish2bus_ns.txt
+    grep "^publish2bus_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.publish2bus_ns.txt
 
     echo "match_publish2bus_ns"                    > $name.btrace.match_publish2bus_ns.txt
-    grep "^match_publish2bus_ns" $name.btrace.csv >> $name.btrace.match_publish2bus_ns.txt
+    grep "^match_publish2bus_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.match_publish2bus_ns.txt
 
     echo "fix_processIncomingOrder_ns"                    > $name.btrace.fix_processIncomingOrder_ns.txt
-    grep "^fix_processIncomingOrder_ns" $name.btrace.csv >> $name.btrace.fix_processIncomingOrder_ns.txt
+    grep "^fix_processIncomingOrder_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.fix_processIncomingOrder_ns.txt
 
 	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
 	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py

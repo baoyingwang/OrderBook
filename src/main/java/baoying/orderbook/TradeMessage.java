@@ -4,13 +4,17 @@ import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 
 public class TradeMessage {
+
     public static class OriginalOrder{
 
 		/**
 		 * price is ignored, if orderType is Market.
          */
-		public OriginalOrder(long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+		public OriginalOrder(CommonMessage.ExternalSource source,
+                             long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
 		        String clientOrdID, String clientEntityID) {
+
+            _source = source;
             _recvFromClientEpochMS = recvFromClientEpochMS;
 			_symbol = symbol;
 			_side = side;
@@ -22,6 +26,24 @@ public class TradeMessage {
 			_clientEntityID = clientEntityID;
 		}
 
+        public OriginalOrder(
+                             long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+                             String clientOrdID, String clientEntityID) {
+
+		    //TODO - high - remove this default
+            _source = CommonMessage.ExternalSource.VertxTCP;
+            _recvFromClientEpochMS = recvFromClientEpochMS;
+            _symbol = symbol;
+            _side = side;
+            _type = type;
+            _price = price;
+            _qty = qty;
+            _orderID = orderID;
+            _clientOrdID = clientOrdID;
+            _clientEntityID = clientEntityID;
+        }
+
+		public final CommonMessage.ExternalSource _source;
         public final String _symbol;
 
         public final Side _side;

@@ -34,9 +34,7 @@ public class BTracePerformance {
     public static void match_ns(@Duration long duration){
 
         try {
-            output.write("match_ns,".getBytes());
-            output.write(String.valueOf(duration).getBytes());
-            output.write('\n');
+            output.write(("match_ns,"+duration+"\n").getBytes());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -50,10 +48,7 @@ public class BTracePerformance {
     public static void publish2bus_ns(@Duration long duration){
 
         try {
-            output.write("publish2bus_ns,".getBytes());
-            output.write(String.valueOf(duration).getBytes());
-            output.write('\n');
-
+            output.write(("publish2bus_ns,"+duration+"\n").getBytes());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -68,9 +63,7 @@ public class BTracePerformance {
     public static void match_publish2bus_ns(@Duration long duration){
 
         try {
-            output.write("match_publish2bus_ns,".getBytes());
-            output.write(String.valueOf(duration).getBytes());
-            output.write('\n');
+            output.write(("match_publish2bus_ns,"+duration+"\n").getBytes());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -83,10 +76,7 @@ public class BTracePerformance {
     public static void fix_processIncomingOrder(@Duration long duration){
 
         try {
-            output.write("fix_processIncomingOrder_ns,".getBytes());
-            output.write(String.valueOf(duration).getBytes());
-            output.write('\n');
-
+            output.write(("fix_processIncomingOrder_ns,"+duration+"\n").getBytes());
         } catch (IOException e) {
             e.printStackTrace();
         }

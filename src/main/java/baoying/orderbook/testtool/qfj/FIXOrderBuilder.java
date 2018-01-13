@@ -1,4 +1,4 @@
-package baoying.orderbook.testtool;
+package baoying.orderbook.testtool.qfj;
 
 
 import baoying.orderbook.app.UniqIDGenerator;
@@ -10,9 +10,8 @@ import java.time.ZoneOffset;
 
 public class FIXOrderBuilder {
 
-    static Message buildNewOrderSingle(
+    public static Message buildNewOrderSingle(
                                         String clientOrdID,
-                                        String clientCompID,
                                        String symbol,
                                        String price,
                                        String qty,
