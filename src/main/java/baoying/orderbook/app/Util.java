@@ -1,8 +1,10 @@
 package baoying.orderbook.app;
 
 
+import io.vertx.core.buffer.Buffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import quickfix.Message;
 
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -60,6 +62,16 @@ public class Util {
 
         final long totalLineNum = java.nio.file.Files.lines(csvFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
         return loadTailCsvLines(csvFile,  n,totalLineNum);
+    }
+
+    public static Buffer buildBuffer(Message fixER, String tailAsDelim){
+        String fixERString = fixER.toString();
+        Buffer erBuffer = Buffer.buffer();
+        erBuffer.appendInt(fixERString.length());
+        erBuffer.appendString(fixERString);
+        erBuffer.appendString(tailAsDelim);
+
+        return erBuffer;
     }
 
     //https://dzone.com/articles/whats-wrong-java-8-part-v

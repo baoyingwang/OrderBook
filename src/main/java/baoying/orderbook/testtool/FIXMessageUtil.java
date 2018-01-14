@@ -1,16 +1,26 @@
-package baoying.orderbook.testtool.qfj;
+package baoying.orderbook.testtool;
 
 
 import baoying.orderbook.app.UniqIDGenerator;
+import baoying.orderbook.app.Util;
 import quickfix.Message;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
-public class FIXOrderBuilder {
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
+
+public class FIXMessageUtil {
+
+    public static int latencyTimesField=58;
 
     public static Message buildNewOrderSingle(
+                                        String clientCompID,
                                         String clientOrdID,
                                        String symbol,
                                        String price,
@@ -31,6 +41,10 @@ public class FIXOrderBuilder {
         // It is not required to set 8,49,56 if you know SessionID. See
         // DefaultSQFSingleSessionInitiator.java
         //newOrderSingle.getHeader().setString(8, "FIXT.1.1");
+
+        //because FIX message is also used by vertx(for now at least)
+        //client entity id is always assigned when building any FIX message.
+        newOrderSingle.getHeader().setString(49, clientCompID);
 
         newOrderSingle.getHeader().setString(35, "D");
         newOrderSingle.setString(11, clientOrdID);
@@ -76,5 +90,44 @@ public class FIXOrderBuilder {
 
         return newOrderSingle;
 
+    }
+
+    //only required for Vert.x
+    public static Message buildLogon(String clientCompID){
+
+        Message logon = new Message();
+        // It is not required to set 8,49,56 if you know SessionID. See
+        // DefaultSQFSingleSessionInitiator.java
+        //newOrderSingle.getHeader().setString(8, "FIXT.1.1");
+
+        //because FIX message is also used by vertx(for now at least)
+        //client entity id is always assigned when building any FIX message.
+        logon.getHeader().setString(49, clientCompID);
+
+        logon.getHeader().setString(35, "A");
+
+        return logon;
+    }
+
+    public static void addLatencyText(Message order){
+        String sendTimeString = Util.formterOfOutputTime.format(Instant.now());
+        long sendTimeNano = System.nanoTime();
+        order.setString(latencyTimesField, sendTimeString +","+String.valueOf(sendTimeNano));
+
+    }
+
+    public static void recordLetencyTimeStamps(Message er) throws Exception{
+        long erTimeNano = System.nanoTime();
+        String clientOrdID = er.getString(11);
+
+        //don't worry about multi-thread issue, since each client has its own thread.
+        String clientCompmID = er.getHeader().getString(56);
+        Path e2eTimeFile = Paths.get("log/e2e_"+clientCompmID+".csv");
+        if (!Files.exists(e2eTimeFile)) {
+            Files.write(e2eTimeFile, ("sendTime,clientSendNano,svrRecvOrdNano,svrMatchedNano,clientRecvER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
+        }
+
+        String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
+        Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
     }
 }

@@ -2,18 +2,12 @@ package baoying.orderbook.app;
 
 import baoying.orderbook.MarketDataMessage;
 import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
-import baoying.orderbook.TradeMessage;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.MessageConsumer;
-import io.vertx.core.net.NetServer;
-import io.vertx.core.net.NetServerOptions;
-import io.vertx.core.parsetools.RecordParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -37,12 +31,15 @@ import static java.nio.file.StandardOpenOption.CREATE;
 public class MatchingEngineApp {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineApp.class);
+
+    public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
+
     private static List<String> _symbolList;
     private static int _snapshotRequestIntervalInSecond;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
 
-    private static String vertxTCPDelimiter = "\nXYZ\n";
+
 
     MatchingEngineApp() throws Exception{
         _internalMatchingEngineApp = new InternalMatchingEngineApp(_symbolList);
@@ -75,7 +72,6 @@ public class MatchingEngineApp {
         private final MatchingEngine _engine;
 
         private final Vertx _vertx = Vertx.vertx();
-        private final EventBus _vertxEventBus;
 
         private final AsyncEventBus _marketDataBus;
         private final AsyncEventBus _executionReportsBus;
@@ -85,14 +81,13 @@ public class MatchingEngineApp {
 
         private final MatchingEngineWebWrapper _webWrapper;
         private final MatchingEngineFIXWrapper _fixWrapper;
+        private final MatchingEngineVertxWrapper _vertxWrapper;
 
         private final JVMDataCollectionEngine sysPerfEngine;
 
 
 
         public InternalMatchingEngineApp(List<String> symbols) throws Exception {
-
-            _vertxEventBus = _vertx.eventBus();
 
             //TODO configurable. It should be be printed per minute, or per 2 minutes on production
             String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
@@ -132,6 +127,7 @@ public class MatchingEngineApp {
             _simpleOMSEngine = new SimpleOMSEngine();
             _simpleMarkderDataEngine = new SimpleMarkderDataEngine();
             _executionReportsBus.register(_simpleOMSEngine);
+
             _marketDataBus.register(_simpleMarkderDataEngine);
 
 
@@ -144,29 +140,10 @@ public class MatchingEngineApp {
                     _vertx,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
 
+            _executionReportsBus.register(_fixWrapper);
 
 
-            NetServerOptions options = new NetServerOptions().setTcpNoDelay(true);
-            NetServer server = _vertx.createNetServer(options);
-            server.connectHandler(socket -> {
-                //http://vertx.io/docs/vertx-core/java/#_record_parser
-                final RecordParser parser = RecordParser.newDelimited(vertxTCPDelimiter, buffer -> {
-
-                });
-
-                socket.handler(buffer -> {
-                    parser.handle(buffer);
-
-                });
-            });
-            server.listen(10005, "localhost", res -> {
-                if (res.succeeded()) {
-                    System.out.println("Vertx TCP Server is now listening!");
-                } else {
-                    System.out.println("Failed to bind!");
-                }
-            });
-
+            _vertxWrapper = new MatchingEngineVertxWrapper(_engine,_vertx);
 
         }
 
@@ -181,6 +158,8 @@ public class MatchingEngineApp {
                     _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
                 }
             });
+
+            _vertxWrapper.start();
         }
     }
     class CSVListConverter implements IStringConverter<List<String>> {
@@ -201,9 +180,6 @@ public class MatchingEngineApp {
     }
 
     public static void main(String[] args) {
-
-
-
 
         Args argsO = new Args();
         JCommander.newBuilder().addObject(argsO).build().parse(args);

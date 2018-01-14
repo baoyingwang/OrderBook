@@ -80,7 +80,7 @@ def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
 
     return (row_start_index + 1) + 1
 
-def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us):
+def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us):
 
 
     plt.subplot2grid(shape,(row_start_index,0))
@@ -103,21 +103,13 @@ def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,d
     plt.title(u"match_publish2bus_us")
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    df_fix_processIncomingOrder_us['index']=range(df_fix_processIncomingOrder_us["bt_obj_processing_us"].size)
-    plt.subplot2grid(shape,(row_start_index+1,0))
-    plt.plot(df_fix_processIncomingOrder_us["index"],df_fix_processIncomingOrder_us["bt_obj_processing_us"]/1000   , label="fix_processIncomingOrder_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"fix_processIncomingOrder_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
     min_size=min([df_match_us["match_us"].size,
                   df_publish2bus_us["publish2bus_us"].size,
-                  df_match_publish2bus_us["match_publish2bus_us"].size,
-                  df_fix_processIncomingOrder_us["bt_obj_processing_us"].size])
+                  df_match_publish2bus_us["match_publish2bus_us"].size)
 
     #https://stackoverflow.com/questions/23668427/pandas-joining-multiple-dataframes-on-columns
-    agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index').merge(df_fix_processIncomingOrder_us[0:min_size],on='manual_index')
-    agg_df    =agg_df_tmp[['match_us','publish2bus_us','match_publish2bus_us','bt_obj_processing_us']]
+    agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index')
+    agg_df    =agg_df_tmp[['match_us','publish2bus_us','match_publish2bus_us']]
 
     plt.subplot2grid(shape,(row_start_index+1,1), colspan=2)
     plt.text(0, 0 ,agg_df.describe(percentiles=[.25,.5,.75,.9, .95, .99 ]).to_string())
@@ -175,7 +167,6 @@ def getBTrace(btraceFilePrefix):
     df_match                   =pd.read_csv(btraceFilePrefix+".match_ns.txt")
     df_publish2bus             =pd.read_csv(btraceFilePrefix+".publish2bus_ns.txt")
     df_match_publish2bus       =pd.read_csv(btraceFilePrefix+".match_publish2bus_ns.txt")
-    df_fix_processIncomingOrder=pd.read_csv(btraceFilePrefix+".fix_processIncomingOrder_ns.txt")
 
     df_match['match_us']     =       df_match["match_ns"]/1000
     df_match['manual_index'] = range(df_match.index.size) #Not df.size, because it is m*n.
@@ -186,10 +177,7 @@ def getBTrace(btraceFilePrefix):
     df_match_publish2bus['match_publish2bus_us']  =       df_match_publish2bus["match_publish2bus_ns"]/1000
     df_match_publish2bus['manual_index']          = range(df_match_publish2bus.index.size) #Not df.size, because it is m*n.
 
-    df_fix_processIncomingOrder['bt_obj_processing_us'] =       df_fix_processIncomingOrder["fix_processIncomingOrder_ns"]/1000
-    df_fix_processIncomingOrder['manual_index']                = range(df_fix_processIncomingOrder.index.size) #Not df.size, because it is m*n.
-
-    return df_match[['manual_index','match_us']], df_publish2bus[['manual_index','publish2bus_us']],df_match_publish2bus[['manual_index','match_publish2bus_us']],df_fix_processIncomingOrder[['manual_index','bt_obj_processing_us']]
+    return df_match[['manual_index','match_us']], df_publish2bus[['manual_index','publish2bus_us']],df_match_publish2bus[['manual_index','match_publish2bus_us']]
 
 
 def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):

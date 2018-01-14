@@ -6,7 +6,9 @@ import baoying.orderbook.OrderBook;
 import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 import baoying.orderbook.TradeMessage;
 import baoying.orderbook.qfj.QFJDynamicSessionAcceptor;
+import baoying.orderbook.testtool.FIXMessageUtil;
 import baoying.orderbook.testtool.qfj.LatencyMessageCallback;
+import com.google.common.eventbus.Subscribe;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +22,7 @@ import java.util.concurrent.ThreadFactory;
 //https://www.java2blog.com/spring-boot-web-application-example/
 public class MatchingEngineFIXWrapper {
 
-    public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
+
 
     //warn : should be exactly same with the value in the quickfix configuration file
     public static String serverCompID = "BaoyingMatchingCompID";
@@ -64,6 +66,56 @@ public class MatchingEngineFIXWrapper {
         _QFJDynamicSessionAcceptor.start();
 
         log.info("start the MatchingEngineFIXWrapper - done");
+    }
+
+    @Subscribe
+    public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
+
+        _fixProcessMatchResult.submit(()->{
+            if(! (singleSideExecutionReport._originOrder._source == CommonMessage.ExternalSource.FIX)){
+                return;
+            }
+
+            Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
+            try {
+                sendER(fixER, singleSideExecutionReport._originOrder._clientEntityID);
+            } catch (Exception e) {
+                log.error("problem while processing:"+fixER.toString(),e);
+            }
+        });
+
+
+    }
+
+    @Subscribe
+    public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport){
+
+
+        _fixProcessMatchResult.submit(()->{
+
+            List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
+                    = MatchingEngineFIXHelper.translateMatchedER(
+                            CommonMessage.ExternalSource.FIX,
+                            matchedExecutionReport);
+
+            for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : fixERs){
+
+                if(fixER_ord._2._isLatencyTestOrder){
+                    long order_process_done_sysNano_test = System.nanoTime();
+                    String latencyTimes = fixER_ord._2._latencyTimesFromClient
+                            +","+fixER_ord._2._recvFromClient_sysNano_test
+                            +","+ order_process_done_sysNano_test ;
+                    fixER_ord._1.setString(FIXMessageUtil.latencyTimesField, latencyTimes);
+                }
+
+                try {
+                    sendER(fixER_ord._1, fixER_ord._2._clientEntityID);
+                } catch (Exception e) {
+                    log.error("problem while processing:"+fixER_ord._1.toString(),e);
+               }
+            }
+
+        });
     }
 
 
@@ -204,138 +256,18 @@ public class MatchingEngineFIXWrapper {
 
         String orderID = UniqIDGenerator.next();
 
-        final TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
-
-        if(originalOrder._clientEntityID.startsWith(LATENCY_ENTITY_PREFIX)){
-            originalOrder._isLatencyTestOrder = true;
-            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
-            if(paramMessage.isSetField(LatencyMessageCallback.latencyTimesField)) {
-                originalOrder._latencyTimesFromClient = paramMessage.getString(LatencyMessageCallback.latencyTimesField);
-            }
-        }
+        final TradeMessage.OriginalOrder originalOrder
+                = MatchingEngineFIXHelper.buildOriginalOrder(
+                        CommonMessage.ExternalSource.FIX,
+                        paramMessage,
+                        orderID);
 
         _vertx.runOnContext((v)->{
 
             final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
-
-            _fixProcessMatchResult.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try{
-                        processMatchResult(matchResult);
-                    }catch (Exception e){
-                        log.error("failure", e);
-                    }
-                }
-            });
-
+            //NOT process the match result here for FIX, because maybe the counterparty is on other interfaces(e.g. vertx).
         });
-
-
-
-
     }
 
-    void processMatchResult(List<MEExecutionReportMessageFlag> matchResult) throws Exception{
 
-        for (MEExecutionReportMessageFlag executionReport : matchResult) {
-
-            List<Util.Tuple<Message,TradeMessage.OriginalOrder>> translatedFIXERs = new ArrayList<>();
-
-            if(executionReport instanceof TradeMessage.SingleSideExecutionReport ){
-
-                TradeMessage.SingleSideExecutionReport singleSideExecutionReport = (TradeMessage.SingleSideExecutionReport)executionReport;
-
-                if(! (singleSideExecutionReport._originOrder._source == CommonMessage.ExternalSource.FIX)){
-                    continue;
-                }
-
-                Message fixER = translateSingeSideER(singleSideExecutionReport);
-                translatedFIXERs.add(new Util.Tuple<>(fixER, singleSideExecutionReport._originOrder));
-
-            }else if(executionReport instanceof TradeMessage.MatchedExecutionReport){
-
-                TradeMessage.MatchedExecutionReport matchedExecutionReport = (TradeMessage.MatchedExecutionReport)executionReport;
-                List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs = translateMatchedER(matchedExecutionReport);
-                translatedFIXERs.addAll(fixERs);
-
-            }else{
-                log.error("unknown type: " + executionReport);
-            }
-
-            for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : translatedFIXERs){
-
-                if(fixER_ord._2._isLatencyTestOrder){
-                    long order_process_done_sysNano_test = System.nanoTime();
-                    String latencyTimes = fixER_ord._2._latencyTimesFromClient
-                            +","+fixER_ord._2._recvFromClient_sysNano_test
-                            +","+ order_process_done_sysNano_test ;
-                    fixER_ord._1.setString(LatencyMessageCallback.latencyTimesField, latencyTimes);
-                }
-
-                sendER(fixER_ord._1, fixER_ord._2._clientEntityID);
-            }
-        }
-    }
-    TradeMessage.OriginalOrder buildOriginalOrder(Message paramMessage, String orderID)throws Exception{
-
-        String symbol = paramMessage.getString(55);
-        String clientEntity = paramMessage.getHeader().getString(49);
-        CommonMessage.Side orderSide = CommonMessage.Side.fixValueOf(paramMessage.getChar(54));  //1 buy, 2 sell
-        String clientOrdID = paramMessage.getString(11);
-
-        final double price; //Price
-        if(paramMessage.isSetField(44)){
-            price = paramMessage.getDouble(44); //Price
-        }else{
-            price = -1;
-        }
-        CommonMessage.OrderType ordType = CommonMessage.OrderType.fixValueOf(paramMessage.getChar(40)); //OrdType 1:Market, 2:Limit
-        int qty = paramMessage.getInt(38);
-
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder(
-                CommonMessage.ExternalSource.FIX,
-                System.currentTimeMillis(),symbol,orderSide ,ordType, price, qty,
-                orderID, clientOrdID, clientEntity);
-
-        return originalOrder;
-    }
-
-    public List<Util.Tuple<Message,TradeMessage.OriginalOrder>> translateMatchedER(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
-        List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixExecutionReports = new ArrayList<>();
-
-        if(matchedExecutionReport._makerOriginOrder._source == CommonMessage.ExternalSource.FIX) {
-            fixExecutionReports.add(processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.MAKER));
-        }
-
-        if(matchedExecutionReport._takerOriginOrder._source == CommonMessage.ExternalSource.FIX)
-        {
-            fixExecutionReports.add(processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.TAKER));
-        }
-        return fixExecutionReports;
-    }
-
-    Message translateSingeSideER(TradeMessage.SingleSideExecutionReport singleSideER){
-
-        Message executionReport = new Message();
-        executionReport.getHeader().setString(35, "8"); // ExecutionReport
-        executionReport.setString(37, singleSideER._originOrder._orderID); //OrderID
-        executionReport.setString(17, String.valueOf(singleSideER._msgID)); //ExecID
-        executionReport.setChar(150, singleSideER._type.getFIX150Type()); // ExecType http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_150.html
-
-        final TradeMessage.OrderStatus ordStatus;
-        switch (singleSideER._type){
-            case NEW : ordStatus = TradeMessage.OrderStatus.NEW; break;
-            case CANCELLED: ordStatus = TradeMessage.OrderStatus.CANCELLED; break;
-            case  REJECTED: ordStatus = TradeMessage.OrderStatus.REJECTED; break;
-            default: throw new RuntimeException("Cannot translateMatchedER execType:"+singleSideER._type.toString()+" to order status" );
-        }
-        executionReport.setChar(39, ordStatus.getFIX39OrdStatus()); // NEW //OrderStatus http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_39.html
-        executionReport.setString(55, singleSideER._originOrder._symbol); // non-repeating group
-        executionReport.setChar(54, singleSideER._originOrder._side.getFIX54Side());// Side 54 - 1:buy, 2:sell
-        executionReport.setInt(151, singleSideER._leavesQty);// LeavesQty
-        executionReport.setInt(14, singleSideER._originOrder._qty - singleSideER._leavesQty);
-        executionReport.setString(11, singleSideER._originOrder._clientOrdID);
-        return executionReport;
-    }
 }

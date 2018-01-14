@@ -27,9 +27,6 @@ function parseZipFile(){
     echo "match_publish2bus_ns"                    > $name.btrace.match_publish2bus_ns.txt
     grep "^match_publish2bus_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.match_publish2bus_ns.txt
 
-    echo "fix_processIncomingOrder_ns"                    > $name.btrace.fix_processIncomingOrder_ns.txt
-    grep "^fix_processIncomingOrder_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.fix_processIncomingOrder_ns.txt
-
 	python_script_file=$MYSCRIPTDIR/parseLatencyData.py
 	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
 	python ${python_script_file} $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name.btrace $name
