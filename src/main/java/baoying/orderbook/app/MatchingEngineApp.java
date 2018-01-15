@@ -7,7 +7,6 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -21,6 +20,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -36,6 +36,7 @@ public class MatchingEngineApp {
 
     private static List<String> _symbolList;
     private static int _snapshotRequestIntervalInSecond;
+    private static int _vertx_tcp_port;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
 
@@ -84,8 +85,6 @@ public class MatchingEngineApp {
         private final MatchingEngineVertxWrapper _vertxWrapper;
 
         private final JVMDataCollectionEngine sysPerfEngine;
-
-
 
         public InternalMatchingEngineApp(List<String> symbols) throws Exception {
 
@@ -143,7 +142,8 @@ public class MatchingEngineApp {
             _executionReportsBus.register(_fixWrapper);
 
 
-            _vertxWrapper = new MatchingEngineVertxWrapper(_engine,_vertx);
+            _vertxWrapper = new MatchingEngineVertxWrapper(_engine,_vertx, _vertx_tcp_port);
+            _executionReportsBus.register(_vertxWrapper);
 
         }
 
@@ -170,7 +170,12 @@ public class MatchingEngineApp {
             return Arrays.asList(values);
         }
     }
+
     static class Args {
+
+        @Parameter(names = {"--vertx_tcp_port", "-v_p"})
+        int vertx_tcp_port = 10005;
+
         @Parameter(names = {"--symbols", "-s"}, listConverter = CSVListConverter.class)
         List<String> symbols = Arrays.asList(new String[]{"USDJPY"});
 
@@ -187,6 +192,8 @@ public class MatchingEngineApp {
         //TODO how to pass the argument in to MatchingEngineApp? right now, static fields are used
         _symbolList = argsO.symbols;
         _snapshotRequestIntervalInSecond = argsO.snapshotRequestIntervalInSecond;
+        _vertx_tcp_port = argsO.vertx_tcp_port;
+
 
         SpringApplication.run(MatchingEngineApp.class);
     }

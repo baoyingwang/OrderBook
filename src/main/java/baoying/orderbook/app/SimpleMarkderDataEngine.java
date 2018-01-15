@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 
 public class SimpleMarkderDataEngine {
@@ -17,7 +17,9 @@ public class SimpleMarkderDataEngine {
 
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
 
+
     SimpleMarkderDataEngine(){
+
         orderbookBySymbol = new ConcurrentHashMap<>();
     }
 

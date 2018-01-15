@@ -1,6 +1,5 @@
 package baoying.orderbook.testtool.vertx;
 
-import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.app.*;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import baoying.orderbook.testtool.ScheduleSender;
@@ -20,6 +19,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -33,6 +35,18 @@ public class VertxClientBatch {
     private final Vertx _vertx = Vertx.vertx();
 
     private final Map<String, NetSocket> sockets = new HashMap<>();
+
+    private final ExecutorService _fixERResult = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r, "Thread - testtool processes ER result");
+        }
+    });
+
+    private  final int _vertx_tcp_port;
+    VertxClientBatch(int vertx_tcp_port){
+        _vertx_tcp_port = vertx_tcp_port;
+    }
 
     public void execute( String symbol,
                             String price,
@@ -54,14 +68,12 @@ public class VertxClientBatch {
                 .setConnectTimeout(10000)
                 .setTcpNoDelay(true);
 
-
-        int port = MatchingEngineVertxWrapper.port;
         for(String clientID: clientIDs){
 
             NetClient client = _vertx.createNetClient(options);
-            client.connect(port, "localhost", res -> {
+            client.connect(_vertx_tcp_port, "localhost", res -> {
                 if (res.succeeded()) {
-                    log.info("vertx client csonnected!");
+                    log.info("vertx client csonnected on port:{}", _vertx_tcp_port);
                     NetSocket socket = res.result();
 
                     sockets.put(clientID, socket);
@@ -72,7 +84,11 @@ public class VertxClientBatch {
 
                     //http://vertx.io/docs/vertx-core/java/#_record_parser
                     final RecordParser parser = RecordParser.newDelimited(MatchingEngineVertxWrapper.vertxTCPDelimiter, buffer -> {
-                        handleMessage(buffer);
+
+                        long erTimeNano = System.nanoTime();
+                        _fixERResult.submit(()->{
+                            handleMessage(buffer, erTimeNano);
+                        });
                     });
 
                     socket.handler(buffer -> {
@@ -106,13 +122,7 @@ public class VertxClientBatch {
 
                 String clientOrdID = clientCompID+ UniqIDGenerator.next();
                 try {
-                    Message order = FIXMessageUtil.buildNewOrderSingle(clientCompID,
-                            clientOrdID,
-                            symbol,
-                            price,
-                            qty,
-                            ordType,
-                            side);
+                    Message order = FIXMessageUtil.buildNewOrderSingle(clientCompID,clientOrdID,symbol,price,qty,ordType,side);
 
                     if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
                         FIXMessageUtil.addLatencyText(order);
@@ -135,20 +145,28 @@ public class VertxClientBatch {
 
     }
 
-    void handleMessage(Buffer messageAsBuffer){
+    void handleMessage(Buffer messageAsBuffer, long erTimeNano){
+
+
         try {
             int length = messageAsBuffer.getInt(0);
-            String erString = messageAsBuffer.getString(4, length);
+            String erString = messageAsBuffer.getString(4, length+4);
+            log.debug("test tool received fix:{}",erString);
 
             DataDictionary dd = null;
 
-                dd = new DataDictionary("FIX50SP1.xml");
+            dd = new DataDictionary("FIX50SP1.xml");
 
             boolean doValidation = false;
             Message er = new Message();
             er.fromString(erString,dd,doValidation);
 
-            FIXMessageUtil.recordLetencyTimeStamps(er);
+            String clientCompID = er.getHeader().getString(56);
+            if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
+                FIXMessageUtil.recordLetencyTimeStamps(er, erTimeNano);
+            }
+
+
         } catch (Exception e) {
             log.error("", e);
         }
@@ -173,7 +191,7 @@ public class VertxClientBatch {
         int clientNum = testToolArgsO.numOfClients;
         int ratePerMinute = testToolArgsO.ratePerMinute;
 
-        VertxClientBatch vertxClientBatch = new VertxClientBatch();
+        VertxClientBatch vertxClientBatch = new VertxClientBatch(testToolArgsO.vertx_tcp_port);
 
         vertxClientBatch.execute( symbol,price,qty ,ordType, side   ,clientCompIDPrefix  ,clientNum,ratePerMinute);
 

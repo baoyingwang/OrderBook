@@ -27,7 +27,7 @@ public class LatencyMessageCallback extends FirstMessageCallback {
 
         try {
 
-            FIXMessageUtil.recordLetencyTimeStamps(paramMessage);
+            FIXMessageUtil.recordLetencyTimeStamps(paramMessage, System.nanoTime());
 
         }catch(Exception e){
             log.error("",e);

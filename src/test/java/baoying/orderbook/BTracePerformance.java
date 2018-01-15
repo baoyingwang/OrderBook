@@ -69,19 +69,6 @@ public class BTracePerformance {
         }
     }
 
-    @OnMethod(clazz = "baoying.orderbook.app.MatchingEngineFIXWrapper",
-            location=@Location(Kind.RETURN),
-            method = "processIncomingOrder")
-    @Sampled(kind = Sampled.Sampler.Const, mean=sampleMean)
-    public static void fix_processIncomingOrder(@Duration long duration){
-
-        try {
-            output.write(("fix_processIncomingOrder_ns,"+duration+"\n").getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
 
     @OnTimer(30000) //in MS
     public static void flush(){

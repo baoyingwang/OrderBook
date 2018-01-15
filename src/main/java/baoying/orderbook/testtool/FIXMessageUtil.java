@@ -5,6 +5,7 @@ import baoying.orderbook.app.UniqIDGenerator;
 import baoying.orderbook.app.Util;
 import quickfix.Message;
 
+import java.io.BufferedOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -116,8 +117,8 @@ public class FIXMessageUtil {
 
     }
 
-    public static void recordLetencyTimeStamps(Message er) throws Exception{
-        long erTimeNano = System.nanoTime();
+    public static void recordLetencyTimeStamps(Message er, long erTimeNano) throws Exception{
+
         String clientOrdID = er.getString(11);
 
         //don't worry about multi-thread issue, since each client has its own thread.
@@ -129,5 +130,14 @@ public class FIXMessageUtil {
 
         String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
         Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
+    }
+
+    public static void recordLetencyTimeStamps(Message er, long erTimeNano, BufferedOutputStream outputStream) throws Exception{
+
+        String clientOrdID = er.getString(11);
+
+        String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
+        outputStream.write((serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes());
+        //Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
     }
 }

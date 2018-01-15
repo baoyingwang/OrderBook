@@ -35,4 +35,8 @@ public class TestToolArgs {
 
     @Parameter(names =  "-d", description = "duration in second, after the X second, shutdown")
     public int durationInSecond = 60;
+
+    @Parameter(names = {"--vertx_tcp_port", "-v_p"})
+    public int vertx_tcp_port = 10005;
+
 }

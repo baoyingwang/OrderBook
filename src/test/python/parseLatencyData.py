@@ -105,7 +105,7 @@ def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,d
 
     min_size=min([df_match_us["match_us"].size,
                   df_publish2bus_us["publish2bus_us"].size,
-                  df_match_publish2bus_us["match_publish2bus_us"].size)
+                  df_match_publish2bus_us["match_publish2bus_us"].size])
 
     #https://stackoverflow.com/questions/23668427/pandas-joining-multiple-dataframes-on-columns
     agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index')
@@ -321,7 +321,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+1
 
 
-def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us, output_file_prefix):
+def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, df_publish2bus_us,df_match_publish2bus_us, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -340,7 +340,7 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_matc
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
-    next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us)
+    next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
 
@@ -375,7 +375,7 @@ else:
     df_vmstat = pd.DataFrame()
 
 
-df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us=getBTrace(inputBTraceFilePrefix)
+df_match_us, df_publish2bus_us,df_match_publish2bus_us=getBTrace(inputBTraceFilePrefix)
 
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
 with open(inputSysInfoFile) as f:
@@ -385,6 +385,6 @@ with open(inputSysInfoFile) as f:
 
 plotTitle=output_file_prefix
 #df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
-genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us, df_publish2bus_us,df_match_publish2bus_us,df_fix_processIncomingOrder_us,output_file_prefix)
+genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us, df_publish2bus_us,df_match_publish2bus_us,output_file_prefix)
 
 

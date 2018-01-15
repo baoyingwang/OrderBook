@@ -71,10 +71,11 @@ public class MatchingEngineFIXWrapper {
     @Subscribe
     public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
+        if(! (singleSideExecutionReport._originOrder._source == CommonMessage.ExternalSource.FIX)){
+            return;
+        }
+
         _fixProcessMatchResult.submit(()->{
-            if(! (singleSideExecutionReport._originOrder._source == CommonMessage.ExternalSource.FIX)){
-                return;
-            }
 
             Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
             try {
@@ -173,12 +174,14 @@ public class MatchingEngineFIXWrapper {
 
     private void sendER(Message er, String clientEntityID) throws Exception{
 
-        if(clientEntityID.startsWith(SimpleOMSEngine.IGNORE_ENTITY_PREFIX)){
-            log.debug("ignore the ER sending since {} is with the prefix:{}", clientEntityID, SimpleOMSEngine.IGNORE_ENTITY_PREFIX);
+        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
+        if(! Session.doesSessionExist(sessionID)){
+            log.debug("FIX : not sending ER to {}, since it is off now", clientEntityID);
             return;
         }
-        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
+
         sendER(er, sessionID);
+
     }
 
     private void sendER(Message er, SessionID sessionID) throws Exception{
