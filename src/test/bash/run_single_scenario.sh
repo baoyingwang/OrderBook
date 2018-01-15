@@ -159,10 +159,10 @@ testToolMainClass=baoying.orderbook.testtool.vertx.VertxClientRoundBatch
 startMachineEngine
 populateOB
 
-JVMOptions_sending="-Xmx128M -Dlog4j.configurationFile=log4j2_testtool.xml"
+JVMOptions_sending="-Xmx256M -Dlog4j.configurationFile=log4j2_testtool.xml"
 
 tmp_warmup_rate_per_min=$((60*3000))
-tmp_warmup_duration_in_seconds=40
+tmp_warmup_duration_in_seconds=20
 warmupOrder $tmp_warmup_rate_per_min $tmp_warmup_duration_in_seconds
 
 
