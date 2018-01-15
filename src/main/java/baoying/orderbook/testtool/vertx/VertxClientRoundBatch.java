@@ -2,7 +2,6 @@ package baoying.orderbook.testtool.vertx;
 
 import baoying.orderbook.app.MatchingEngineApp;
 import baoying.orderbook.app.MatchingEngineVertxWrapper;
-import baoying.orderbook.app.UniqIDGenerator;
 import baoying.orderbook.app.Util;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import baoying.orderbook.testtool.ScheduleSender;
@@ -51,7 +50,7 @@ public class VertxClientRoundBatch {
     private final String _clientCompIDPrefix;
     private String _latencyDataFile ;
 
-    private final ExecutorService _fixERResult = Executors.newSingleThreadExecutor(new ThreadFactory() {
+    private final ExecutorService _fixERResult = Executors.newFixedThreadPool(4,new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
             return new Thread(r, "Thread - testtool processes ER result");
@@ -105,7 +104,7 @@ public class VertxClientRoundBatch {
 
         ScheduleSender sender = new ScheduleSender();
         ScheduleSender.BatchConfig c = sender.getBatchConfig(ratePerMinute);
-        log.info("testool - _clientCompIDPrefix - schedule config:{}", c);
+        log.info("testool - {} - schedule config:{}",_clientCompIDPrefix, c);
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
@@ -122,7 +121,7 @@ public class VertxClientRoundBatch {
             NetClient client = _vertx.createNetClient(options);
             client.connect(_vertx_tcp_port, "localhost", res -> {
                 if (res.succeeded()) {
-                    log.info("vertx client connected on port:{}", _vertx_tcp_port);
+                    log.info("{} - vertx client connected on port:{}", _clientCompIDPrefix, _vertx_tcp_port);
 
                     NetSocket socket = res.result();
 
@@ -137,9 +136,17 @@ public class VertxClientRoundBatch {
 
                         int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
                         long erTimeNano = System.nanoTime();
-                        _fixERResult.submit(()->{
-                            handleMessage(buffer, erTimeNano);
-                        });
+
+                        int length = buffer.getInt(0);
+                        String erString = buffer.getString(4, length+4);
+                        log.debug("test tool received fix:{}",erString);
+
+                        //TODO add SOH in the index
+                        if(erString.indexOf("56="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
+                            _fixERResult.submit(()->{
+                                writeLatencyData(erString, erTimeNano);
+                            });
+                        }
 
                         if(completedInCurrentPeriod < c._msgNumPerPeriod) {
                             int nextClientCompIDIndex = totalSent.get() % fixClientNum;
@@ -173,7 +180,7 @@ public class VertxClientRoundBatch {
 
 
                 } else {
-                    log.error("Failed to connect, reason:{} ", res.cause().getMessage());
+                    log.error("{} - Failed to connect, reason:{} ", _clientCompIDPrefix, res.cause().getMessage());
                     System.exit(-1);
                 }
             });
@@ -189,7 +196,7 @@ public class VertxClientRoundBatch {
 
         }
 
-        log.info(_clientCompIDPrefix+" all connections ready");
+        log.info("{} all connections ready", _clientCompIDPrefix);
 
 
         Runnable command = ()-> {
@@ -210,7 +217,7 @@ public class VertxClientRoundBatch {
         executor.scheduleAtFixedRate( command,  initialDelay, c._period,   c._unit);
 
         start = Instant.now();
-        _vertx.setPeriodic(10 * 1000, (v)->{
+        _vertx.setPeriodic(30 * 1000, (v)->{
             printCurrentStatistics();
         });
 
@@ -233,13 +240,9 @@ public class VertxClientRoundBatch {
         return orderAsBuffer;
     }
 
-    void handleMessage(Buffer messageAsBuffer, long erTimeNano){
-
+    void writeLatencyData(String erString, long erTimeNano){
 
         try {
-            int length = messageAsBuffer.getInt(0);
-            String erString = messageAsBuffer.getString(4, length+4);
-            log.debug("test tool received fix:{}",erString);
 
             DataDictionary dd = null;
 

@@ -132,7 +132,7 @@ public class FIXMessageUtil {
         Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
     }
 
-    public static void recordLetencyTimeStamps(Message er, long erTimeNano, BufferedOutputStream outputStream) throws Exception{
+    public synchronized static void recordLetencyTimeStamps(Message er, long erTimeNano, BufferedOutputStream outputStream) throws Exception{
 
         String clientOrdID = er.getString(11);
 
