@@ -25,15 +25,17 @@
             </PatternLayout>
         </RandomAccessFile>
 
-        <Async name="Async" bufferSize="262144">
+        <Async name="Async" bufferSize="8192000">
             <AppenderRef ref="RollingFile"/>
             <LinkedTransferQueue/>
         </Async>
     </Appenders>
 
     <Loggers>
-        <Root level="info">
+        <Root level="warn">
+            
             <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
         </Root>
     </Loggers>
 

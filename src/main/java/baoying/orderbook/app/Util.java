@@ -64,14 +64,16 @@ public class Util {
         return loadTailCsvLines(csvFile,  n,totalLineNum);
     }
 
-    public static Buffer buildBuffer(Message fixER, String tailAsDelim){
-        String fixERString = fixER.toString();
-        Buffer erBuffer = Buffer.buffer();
-        erBuffer.appendInt(fixERString.length());
-        erBuffer.appendString(fixERString);
-        erBuffer.appendString(tailAsDelim);
+    public static Buffer buildBuffer(Message fixMsg, String tailAsDelim){
 
-        return erBuffer;
+        String fixString = fixMsg.toString();
+
+        Buffer buffer = Buffer.buffer();
+        buffer.appendInt(fixString.length());
+        buffer.appendString(fixString);
+        buffer.appendString(tailAsDelim);
+
+        return buffer;
     }
 
     //https://dzone.com/articles/whats-wrong-java-8-part-v

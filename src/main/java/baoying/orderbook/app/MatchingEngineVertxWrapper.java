@@ -33,8 +33,8 @@ public class MatchingEngineVertxWrapper {
     private final Vertx _vertx;
     private final int _vertx_tcp_port;
 
-    private final BiMap<String, NetSocket> _triedLogonClientCompIDs = HashBiMap.create();
-    private final BiMap<NetSocket, String> _triedLogonSockets = _triedLogonClientCompIDs.inverse();
+    private final BiMap<String, NetSocket> _liveClientCompIDs = HashBiMap.create();
+    //private final BiMap<NetSocket, String> _liveSockets = _liveClientCompIDs.inverse();
 
     MatchingEngineVertxWrapper(MatchingEngine engine,
                                Vertx vertx, int vertx_tcp_port) throws Exception{
@@ -63,7 +63,7 @@ public class MatchingEngineVertxWrapper {
             });
 
             socket.closeHandler(v -> {
-                String clientCompID = _triedLogonSockets.remove(socket);
+                String clientCompID = _liveClientCompIDs.inverse().remove(socket);
                 log.info("The socket has been closed for:{}", clientCompID);
             });
         });
@@ -114,8 +114,11 @@ public class MatchingEngineVertxWrapper {
     private void processIncomingLogon(final Message logon, NetSocket socket) throws Exception{
 
         String clientEntity = logon.getHeader().getString(49);
-        _triedLogonClientCompIDs.put(clientEntity, socket);
+        _liveClientCompIDs.put(clientEntity, socket);
 
+        Message ackLogon = FIXMessageUtil.buildLogon(MatchingEngineFIXWrapper.serverCompID, clientEntity);
+        Buffer buffer = Util.buildBuffer(ackLogon, vertxTCPDelimiter);
+        socket.write(buffer);
     }
 
     private void processIncomingOrder(final Message newSingleOrder) throws Exception{
@@ -145,7 +148,7 @@ public class MatchingEngineVertxWrapper {
         }
 
         String clientEntityID = singleSideExecutionReport._originOrder._clientEntityID;
-        NetSocket socket = this._triedLogonClientCompIDs.get(clientEntityID);
+        NetSocket socket = this._liveClientCompIDs.get(clientEntityID);
         if(socket == null){
             log.debug("cannot find the live vertx socket for result client:{}, on clientOrdID:{}",clientEntityID,singleSideExecutionReport._originOrder._clientOrdID);
             return;
@@ -154,6 +157,9 @@ public class MatchingEngineVertxWrapper {
         _vertx.runOnContext((v)->{
 
             Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
+
+            log.debug("TX:{}", fixER);
+
             Buffer erBuffer = Util.buildBuffer(fixER, vertxTCPDelimiter);
             socket.write(erBuffer);
 
@@ -171,7 +177,7 @@ public class MatchingEngineVertxWrapper {
         for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : fixERs){
 
             String clientEntityID = fixER_ord._2._clientEntityID;
-            NetSocket socket = this._triedLogonClientCompIDs.get(clientEntityID);
+            NetSocket socket = this._liveClientCompIDs.get(clientEntityID);
             if(socket == null){
                 log.debug("cannot find the live vertx socket for result client:{}, on clientOrdID:{}",clientEntityID,fixER_ord._2._clientOrdID);
                 continue;

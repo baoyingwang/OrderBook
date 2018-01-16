@@ -4,20 +4,22 @@ import baoying.orderbook.app.MatchingEngineApp;
 import baoying.orderbook.app.MatchingEngineFIXWrapper;
 import baoying.orderbook.app.UniqIDGenerator;
 import baoying.orderbook.testtool.FIXMessageUtil;
-import baoying.orderbook.testtool.ScheduleSender;
+import baoying.orderbook.testtool.ScheduleBatchConfig;
 import baoying.orderbook.testtool.TestToolArgs;
+import baoying.orderbook.testtool.TestToolUtil;
 import com.beust.jcommander.JCommander;
 import com.google.common.base.Charsets;
 import com.google.common.io.CharStreams;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -26,6 +28,27 @@ import java.util.stream.IntStream;
 public class FirstQFJClientBatch {
 
     private final static Logger log = LoggerFactory.getLogger(FirstQFJClientBatch.class);
+
+    private final Vertx _vertx = Vertx.vertx();
+
+    private Instant start = null;
+    private final AtomicInteger totalSent = new AtomicInteger(0);
+    private final AtomicInteger totalRecv = new AtomicInteger(0);
+
+
+    private final ExecutorService _fixERResult = Executors.newFixedThreadPool(4,new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r, "Thread - testtool processes ER result");
+        }
+    });
+
+
+    final TestToolArgs _testToolArgs;
+    private String _latencyDataFile ;
+    private final int bufferSize = 10*1024*1024;
+    private final BufferedOutputStream output;
+
 
     String  getQFJConfigContent(List<String> clientCompIDs)throws Exception{
 
@@ -43,81 +66,172 @@ public class FirstQFJClientBatch {
         return qfjConfigBaseContent+clientSessions;
     }
 
-    public void execute( String symbol,
-                            String price,
-                            String qty ,
-                            String ordType,
-                            String side,
+    FirstQFJClientBatch(TestToolArgs testToolArgs) throws Exception{
 
-                            String clientCompIDPrefix,
-                            int fixClientNum,
-                            int ratePerMinute  ) throws  Exception{
+        _testToolArgs = testToolArgs;
+        _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
+        output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
 
+    }
+
+
+
+    public void execute() throws  Exception{
+
+        start = Instant.now();
 
         List<String> clientIDs = new ArrayList<>();
+        List<SessionID> clientSessionIDs = new ArrayList<>();
         {
-            IntStream.range(0, fixClientNum).forEach(it -> clientIDs.add(clientCompIDPrefix + String.valueOf(it)));
+            IntStream.range(0, _testToolArgs.numOfClients).forEach(
+                    it -> {
+                        //you cannot use prefix+index, because it will conflict  while multi clients up with same prefix
+                        String clientEntityID = _testToolArgs.clientCompIDPrefix +"_"+UniqIDGenerator.next();
+                        clientIDs.add(clientEntityID);
+
+                        SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
+                        clientSessionIDs.add(sessionID);
+
+                    }
+            );
         }
-        String qfjConfigContent = getQFJConfigContent(clientIDs);
-        final Application application;
-        {
-            if(clientCompIDPrefix.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
-                application= new LatencyMessageCallback();
-            }else{
-                application= new FirstMessageCallback();
+
+        AtomicInteger completedInCurrentPeriodCounter = new AtomicInteger(0);
+
+        final AtomicInteger connectedClients = new AtomicInteger(0);
+
+        ScheduleBatchConfig sender = new ScheduleBatchConfig();
+        ScheduleBatchConfig.Config batchConfig = sender.getBatchConfig(_testToolArgs.ratePerMinute);
+        log.info("testtool - {} - schedule config:{}",_testToolArgs.clientCompIDPrefix, batchConfig);
+        Application application = new FirstMessageCallback(){
+            @Override
+            public void fromApp(Message msg, SessionID sessionID) {
+                try {
+                    if(!msg.getHeader().getString(35).equals("8")){
+                        return;
+                    }
+
+                    totalRecv.incrementAndGet();
+
+
+                    int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
+                    long erTimeNano = System.nanoTime();
+
+                    //TODO add SOH in the index
+                    if(msg.getHeader().getString(56).indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX) ==0){
+                        _fixERResult.submit(()->{
+                            try {
+                                TestToolUtil.writeLatencyData(msg, erTimeNano, output);
+                            } catch (Exception e) {
+                                log.error("",e);
+                            }
+                        });
+                    }
+
+                    if(completedInCurrentPeriod < batchConfig._msgNumPerPeriod) {
+                        int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
+                        String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
+                        SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
+
+                        Message order = buildOrder(nextClientCompID);
+                        Session.sendToTarget(order, nextClientSessionID);
+
+                        totalSent.incrementAndGet();
+                    }else{
+                        completedInCurrentPeriodCounter.set(0);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
             }
 
-        }
+            @Override
+            public void onLogon(SessionID paramSessionID) {
+                log.info("{} - onLogon session : {} ", _testToolArgs.clientCompIDPrefix, paramSessionID);
+                connectedClients.incrementAndGet();
+                log.info("{} - ready session number : {} ", _testToolArgs.clientCompIDPrefix, connectedClients.get());
+
+            }
+        };
+
+        String qfjConfigContent = getQFJConfigContent(clientIDs);
         SessionSettings settings = new SessionSettings(new ByteArrayInputStream(qfjConfigContent.getBytes())) ;
         MessageStoreFactory storeFactory = new FileStoreFactory(settings);
         LogFactory logFactory = new SLF4JLogFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
 
-        //multi-thread is used, for better performance to consume messages on high load, e.g. 500 order/second
-        ThreadedSocketInitiator initiator = new ThreadedSocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
-
+        SocketInitiator initiator = new SocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
         initiator.start();
 
-        // after start, you have to wait several seconds before sending
-        // messages.
-        // in production code, you should check the response Logon message.
-        // Refer: DefaultQFJSingSessionInitiator.java
+        while(true){
+            if(connectedClients.get() < clientIDs.size()){
+                log.info("testtool - {} - wait all connections ready, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, clientIDs.size(), connectedClients.get());
+                TimeUnit.SECONDS.sleep(3);
+            }else{
+                break;
+            }
+        }
         TimeUnit.SECONDS.sleep(3);
+        log.info("{} all connections ready", _testToolArgs.clientCompIDPrefix);
 
-        AtomicInteger totalSent = new AtomicInteger(0);
-        ScheduleSender s = new ScheduleSender();
-        s.execut(ratePerMinute, ()-> {
-                int nextClientCompIDIndex = totalSent.get() % fixClientNum;
-                String clientCompID = clientIDs.get(nextClientCompIDIndex);
+        //the schedule is to trigger the first order of each period
+        Runnable command = ()-> {
+            try {
+                int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
+                String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
+                SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
 
-                SessionID sessionID = new SessionID("FIXT.1.1", clientCompID, MatchingEngineFIXWrapper.serverCompID, "");
-                if (!Session.doesSessionExist(sessionID)) {
-                    log.warn("ignore the realtime ER to client, since he:{} is not online now", clientCompID);
-                    return;
-                }
+                Message order = buildOrder(nextClientCompID);
+                Session.sendToTarget(order, nextClientSessionID);
 
-                String clientOrdID = clientCompID+ UniqIDGenerator.next();
-                try {
-                    Message order = FIXMessageUtil.buildNewOrderSingle(clientCompID,
-                            clientOrdID,
-                            symbol,
-                            price,
-                            qty,
-                            ordType,
-                            side);
-                    Session.sendToTarget(order, sessionID);
-                } catch (Exception e) {
-                    log.error("exception while sending",e);
-                }
+                totalSent.incrementAndGet();
+            } catch (Exception e) {
+                log.error("exception while sending",e);
+            }
+        };
+        long initialDelay = 0;
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate( command,  initialDelay, batchConfig._period,  batchConfig._unit);
 
-                int sent = totalSent.incrementAndGet();
-                if (sent >= Integer.MAX_VALUE / 2) {
-                    totalSent.getAndSet(0);
-                }
+
+        start = Instant.now();
+        _vertx.setPeriodic(30 * 1000, (v)->{
+            double sendRateInSecond = TestToolUtil.getCurrentRateInSecond(start, totalSent);
+            log.warn("{} - totalSent:{}, rotalRecv:{}, sendRateInSecond:{}", _testToolArgs.clientCompIDPrefix, totalSent, totalRecv, String.format("%.2f", sendRateInSecond));
         });
 
+    }
 
+    Message buildOrder(String clientCompID) throws Exception{
 
+        String clientOrdID = clientCompID+ UniqIDGenerator.next();
+
+        Message order;
+        if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
+            order = FIXMessageUtil.buildNewOrderSingleWithLatencyTimestamp(clientCompID,
+                    clientOrdID,
+                    _testToolArgs.symbol,
+                    _testToolArgs.px,
+                    _testToolArgs.qty,
+                    _testToolArgs.orderType,
+                    _testToolArgs.side);
+        }else{
+            order = FIXMessageUtil.buildNewOrderSingle(clientCompID,
+                    clientOrdID,
+                    _testToolArgs.symbol,
+                    _testToolArgs.px,
+                    _testToolArgs.qty,
+                    _testToolArgs.orderType,
+                    _testToolArgs.side);
+        }
+
+        return order;
+    }
+
+    void stop() throws Exception{
+        output.flush();
+        output.close();
     }
 
 
@@ -128,22 +242,16 @@ public class FirstQFJClientBatch {
                 .addObject(testToolArgsO)
                 .build()
                 .parse(args);
-        String symbol = testToolArgsO.symbol;
-        String price = testToolArgsO.px;
-        String qty = testToolArgsO.qty;
-        String ordType = testToolArgsO.orderType; //Market or Limit
-        String side = testToolArgsO.side;//Bid or Offer
 
-        String clientCompIDPrefix = testToolArgsO.clientCompIDPrefix + System.currentTimeMillis() + "_";
-        int clientNum = testToolArgsO.numOfClients;
-        int ratePerMinute = testToolArgsO.ratePerMinute;
+        FirstQFJClientBatch firstQFJClientBatch = new FirstQFJClientBatch(testToolArgsO);
 
-        FirstQFJClientBatch firstQFJClientBatch = new FirstQFJClientBatch();
-
-        firstQFJClientBatch.execute( symbol,price,qty ,ordType, side   ,clientCompIDPrefix  ,clientNum,ratePerMinute);
+        firstQFJClientBatch.execute();
 
         TimeUnit.SECONDS.sleep(testToolArgsO.durationInSecond);
-        log.info("exiting, since time out:"+ testToolArgsO.durationInSecond+" seconds");
+
+        firstQFJClientBatch.stop();
+        log.info("exiting, since reached duration limit:"+ testToolArgsO.durationInSecond+" seconds");
+
         System.exit(0);
     }
 }

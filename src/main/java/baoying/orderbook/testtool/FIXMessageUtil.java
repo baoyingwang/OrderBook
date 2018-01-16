@@ -1,11 +1,16 @@
 package baoying.orderbook.testtool;
 
 
+import baoying.orderbook.app.MatchingEngineApp;
+import baoying.orderbook.app.MatchingEngineVertxWrapper;
 import baoying.orderbook.app.UniqIDGenerator;
 import baoying.orderbook.app.Util;
+import io.vertx.core.buffer.Buffer;
+import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -63,6 +68,72 @@ public class FIXMessageUtil {
 
     }
 
+    public static Message buildNewOrderSingleWithLatencyTimestamp(
+            String clientCompID,
+            String clientOrdID,
+            String symbol,
+            String price,
+            String qty,
+            String ordType,
+            String side){
+
+        Message order = FIXMessageUtil.buildNewOrderSingle(
+                 clientCompID,
+                 clientOrdID,
+                 symbol,
+                 price,
+                 qty,
+                 ordType,
+                 side);
+
+        FIXMessageUtil.addLatencyText(order);
+
+        return order;
+    }
+
+    public static Buffer buildNewOrderSingleBuffer(
+            String clientCompID,
+            String clientOrdID,
+            String symbol,
+            String price,
+            String qty,
+            String ordType,
+            String side){
+
+        Message order = FIXMessageUtil.buildNewOrderSingle(
+                clientCompID,
+                clientOrdID,
+                symbol,
+                price,
+                qty,
+                ordType,
+                side);
+
+        Buffer orderAsBuffer = Util.buildBuffer(order, MatchingEngineVertxWrapper.vertxTCPDelimiter);
+        return orderAsBuffer;
+    }
+
+    public  static Buffer buildNewOrderSingleBufferWithLatencyStamp(
+            String clientCompID,
+            String clientOrdID,
+            String symbol,
+            String price,
+            String qty,
+            String ordType,
+            String side){
+
+        Message order = FIXMessageUtil.buildNewOrderSingleWithLatencyTimestamp(
+                clientCompID,
+                clientOrdID,
+                symbol,
+                price,
+                qty,
+                ordType,
+                side);
+
+        Buffer orderAsBuffer = Util.buildBuffer(order, MatchingEngineVertxWrapper.vertxTCPDelimiter);
+        return orderAsBuffer;
+    }
     static Message buildHarcodedNewOrderSingleForTest() {
         /**
          * <message name="NewOrderSingle" msgtype="D" msgcat="app">
@@ -94,7 +165,7 @@ public class FIXMessageUtil {
     }
 
     //only required for Vert.x
-    public static Message buildLogon(String clientCompID){
+    public static Message buildLogon(String senderCompID, String targetCompID){
 
         Message logon = new Message();
         // It is not required to set 8,49,56 if you know SessionID. See
@@ -103,7 +174,8 @@ public class FIXMessageUtil {
 
         //because FIX message is also used by vertx(for now at least)
         //client entity id is always assigned when building any FIX message.
-        logon.getHeader().setString(49, clientCompID);
+        logon.getHeader().setString(49, senderCompID);
+        logon.getHeader().setString(56, targetCompID);
 
         logon.getHeader().setString(35, "A");
 
@@ -132,12 +204,21 @@ public class FIXMessageUtil {
         Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
     }
 
-    public synchronized static void recordLetencyTimeStamps(Message er, long erTimeNano, BufferedOutputStream outputStream) throws Exception{
+    public synchronized static void recordLetencyTimeStamps(Message er, long erTimeNano, OutputStream outputStream) throws Exception{
 
         String clientOrdID = er.getString(11);
 
         String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
         outputStream.write((serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes());
         //Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
+    }
+
+    static Message toMessage(String msg, String dictionary) throws Exception{
+        DataDictionary dd  = new DataDictionary(dictionary); //"FIX50SP1.xml"
+        boolean doValidation = false;
+        Message er = new Message();
+        er.fromString(msg,dd,doValidation);
+
+        return er;
     }
 }

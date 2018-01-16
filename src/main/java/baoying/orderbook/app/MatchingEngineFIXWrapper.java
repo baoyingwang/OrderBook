@@ -3,11 +3,9 @@ package baoying.orderbook.app;
 import baoying.orderbook.CommonMessage;
 import baoying.orderbook.MatchingEngine;
 import baoying.orderbook.OrderBook;
-import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 import baoying.orderbook.TradeMessage;
 import baoying.orderbook.qfj.QFJDynamicSessionAcceptor;
 import baoying.orderbook.testtool.FIXMessageUtil;
-import baoying.orderbook.testtool.qfj.LatencyMessageCallback;
 import com.google.common.eventbus.Subscribe;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
@@ -249,7 +247,7 @@ public class MatchingEngineFIXWrapper {
 
             @Override
             public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
-                log.debug("toApp session:{}, send : {} ", paramSessionID, paramMessage);
+                log.debug("TX session:{}, send : {} ", paramSessionID, paramMessage);
 
             }
 

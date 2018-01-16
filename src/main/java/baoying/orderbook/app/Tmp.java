@@ -1,6 +1,9 @@
 package baoying.orderbook.app;
 
 
+import baoying.orderbook.testtool.vertx.VertxClientRoundBatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.DataDictionary;
 import quickfix.DefaultMessageFactory;
 import quickfix.Message;
@@ -13,32 +16,23 @@ import java.io.FileOutputStream;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 public class Tmp {
-
-    static BufferedOutputStream output;
-
-    static {
-        try {
-            output = new BufferedOutputStream(
-                    new FileOutputStream("log/btrace.csv")
-            );
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-    }
+    private final static Logger log = LoggerFactory.getLogger(Tmp.class);
 
     public static void main(String[] args) throws Exception{
 
+        Map<String, String> x = new HashMap<>();
+        x.put("x","x1");
+        x.put("y","y1");
 
-        output.write((Instant.now()+" hello\n").getBytes());
+        log.error("{}",x);
 
-        output.write((Instant.now()+" hello\n").getBytes());
-
-        output.close();
- }
+    }
 }

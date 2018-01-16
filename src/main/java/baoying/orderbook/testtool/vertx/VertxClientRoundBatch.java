@@ -1,11 +1,7 @@
 package baoying.orderbook.testtool.vertx;
 
-import baoying.orderbook.app.MatchingEngineApp;
-import baoying.orderbook.app.MatchingEngineVertxWrapper;
-import baoying.orderbook.app.Util;
-import baoying.orderbook.testtool.FIXMessageUtil;
-import baoying.orderbook.testtool.ScheduleSender;
-import baoying.orderbook.testtool.TestToolArgs;
+import baoying.orderbook.app.*;
+import baoying.orderbook.testtool.*;
 import com.beust.jcommander.JCommander;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -15,15 +11,9 @@ import io.vertx.core.net.NetSocket;
 import io.vertx.core.parsetools.RecordParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,9 +23,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
-import static java.nio.file.StandardOpenOption.APPEND;
-import static java.nio.file.StandardOpenOption.CREATE;
-
 //This is a simplified version.   
 //For production code, please read common.DefaultQFJSingleSessionInitiator.
 public class VertxClientRoundBatch {
@@ -44,226 +31,231 @@ public class VertxClientRoundBatch {
 
     private final Vertx _vertx = Vertx.vertx();
 
-    private final Map<String, NetSocket> sockets = new HashMap<>();
-    private final AtomicInteger totalSent = new AtomicInteger(0);
-    private Instant start = null;
-    private final String _clientCompIDPrefix;
-    private String _latencyDataFile ;
+    final TestToolArgs _testToolArgs;
 
-    private final ExecutorService _fixERResult = Executors.newFixedThreadPool(4,new ThreadFactory() {
+    private final AtomicInteger totalSent = new AtomicInteger(0);
+    private final AtomicInteger totalRecv = new AtomicInteger(0);
+
+    private Instant start = null;
+
+    private final ExecutorService _LatencyERResultExecutor = Executors.newFixedThreadPool(4,new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
-            return new Thread(r, "Thread - testtool processes ER result");
+            return new Thread(r, "Thread - testtool processes Latency ER result");
         }
     });
 
-    static int bufferSize = 10*1024*1024;
-    static BufferedOutputStream output = null;
+    private final String _latencyDataFile ;
+    private final int bufferSize = 10*1024*1024;
+    private final BufferedOutputStream output;
 
-    void printCurrentStatistics(){
 
-        int totalSentNow = totalSent.get();
 
-        Instant now = Instant.now();
-        long durationInSecond = now.getEpochSecond() - start.getEpochSecond();
-        double rateInSecond = totalSentNow*1.0 / durationInSecond;
-        double rateInMinute = rateInSecond * 60;
 
-        log.info("{} - totalSent:{}, rateInSecond:{}", _clientCompIDPrefix, totalSentNow, String.format("%.2f", rateInSecond));
+    VertxClientRoundBatch(TestToolArgs testToolArgs) throws Exception{
+
+        _testToolArgs = testToolArgs;
+        _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
+        output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
+
     }
 
-    private  final int _vertx_tcp_port;
-    VertxClientRoundBatch(String clientCompIDPrefix, int vertx_tcp_port){
-        _clientCompIDPrefix = clientCompIDPrefix;
-        _vertx_tcp_port = vertx_tcp_port;
-    }
-
-    public void execute( String symbol,
-                            String price,
-                            String qty ,
-                            String ordType,
-                            String side,
-
-                            int fixClientNum,
-                            int ratePerMinute  ) throws  Exception{
-
-        _latencyDataFile = "log/e2e_"+_clientCompIDPrefix+".csv";
-        Path e2eTimeFile = Paths.get(_latencyDataFile);
-        if (!Files.exists(e2eTimeFile)) {
-            Files.write(e2eTimeFile, ("sendTime,clientSendNano,svrRecvOrdNano,svrMatchedNano,clientRecvER,clientOrdID" + "\n").getBytes(), APPEND, CREATE);
-        }
-        try {
-            output = new BufferedOutputStream(
-                    new FileOutputStream(_latencyDataFile, true),
-                    bufferSize
-            );
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
 
 
-        ScheduleSender sender = new ScheduleSender();
-        ScheduleSender.BatchConfig c = sender.getBatchConfig(ratePerMinute);
-        log.info("testool - {} - schedule config:{}",_clientCompIDPrefix, c);
+    public void execute() throws  Exception{
 
-        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        ScheduleBatchConfig sender = new ScheduleBatchConfig();
+        ScheduleBatchConfig.Config c = sender.getBatchConfig(_testToolArgs.ratePerMinute);
+        log.info("testool - {} - schedule config:{}", _testToolArgs.clientCompIDPrefix, c);
 
         List<String> clientIDs = new ArrayList<>();
         {
-            IntStream.range(0, fixClientNum).forEach(it -> clientIDs.add(_clientCompIDPrefix + String.valueOf(it)));
+            IntStream.range(0, _testToolArgs.numOfClients).forEach(it ->{
+                        String clientEntityID = _testToolArgs.clientCompIDPrefix +"_"+UniqIDGenerator.next();
+                        clientIDs.add(clientEntityID);
+                    });
         }
 
-        NetClientOptions options = new NetClientOptions().setConnectTimeout(10000).setTcpNoDelay(true);
+
         AtomicInteger completedInCurrentPeriodCounter = new AtomicInteger(0);
         final AtomicInteger connectedClients = new AtomicInteger(0);
-        for(String clientID: clientIDs){
 
+
+        final Map<String, NetSocket> liveSockets = new HashMap<>();
+        NetClientOptions options = new NetClientOptions().setConnectTimeout(10000).setTcpNoDelay(true);
+        clientIDs.forEach( clientID ->{
             NetClient client = _vertx.createNetClient(options);
-            client.connect(_vertx_tcp_port, "localhost", res -> {
+            client.connect(_testToolArgs.vertx_tcp_port, "localhost", res -> {
                 if (res.succeeded()) {
-                    log.info("{} - vertx client connected on port:{}", _clientCompIDPrefix, _vertx_tcp_port);
+
+                    log.info("{} - vertx client connected on port:{}", _testToolArgs.clientCompIDPrefix, _testToolArgs.vertx_tcp_port);
 
                     NetSocket socket = res.result();
-
-                    sockets.put(clientID, socket);
-
-                    Message logon = FIXMessageUtil.buildLogon(clientID);
-                    Buffer logonAsBuffer = Util.buildBuffer(logon, MatchingEngineVertxWrapper.vertxTCPDelimiter);
-                    socket.write(logonAsBuffer);
-
-                    //http://vertx.io/docs/vertx-core/java/#_record_parser
-                    final RecordParser parser = RecordParser.newDelimited(MatchingEngineVertxWrapper.vertxTCPDelimiter, buffer -> {
-
-                        int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
-                        long erTimeNano = System.nanoTime();
-
-                        int length = buffer.getInt(0);
-                        String erString = buffer.getString(4, length+4);
-                        log.debug("test tool received fix:{}",erString);
-
-                        //TODO add SOH in the index
-                        if(erString.indexOf("56="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
-                            _fixERResult.submit(()->{
-                                writeLatencyData(erString, erTimeNano);
-                            });
-                        }
-
-                        if(completedInCurrentPeriod < c._msgNumPerPeriod) {
-                            int nextClientCompIDIndex = totalSent.get() % fixClientNum;
-                            String clientCompID = clientIDs.get(nextClientCompIDIndex);
-                            Buffer orderAsBuffer = buildOrderBuffer(clientCompID, clientCompID + System.nanoTime(), symbol, price, qty, ordType, side);
-                            socket.write(orderAsBuffer);
-                            totalSent.incrementAndGet();
-                        }else{
-                            completedInCurrentPeriodCounter.set(0);
-                        }
-
-
-                    });
-
-                    socket.handler(buffer -> {
-                        parser.handle(buffer);
-                    });
-
-                    String clientCompID = clientIDs.get(0);
-                    Buffer orderAsBuffer = buildOrderBuffer(clientCompID,
-                            clientCompID+System.nanoTime(),
-                            symbol,
-                            price,
-                            qty,
-                            ordType,
-                            side);
-                    socket.write(orderAsBuffer);
-
+                    liveSockets.put(clientID, socket);
 
                     connectedClients.incrementAndGet();
 
-
                 } else {
-                    log.error("{} - Failed to connect, reason:{} ", _clientCompIDPrefix, res.cause().getMessage());
+                    log.error("{} - Failed to connect, reason:{} ", _testToolArgs.clientCompIDPrefix, res.cause().getMessage());
                     System.exit(-1);
                 }
             });
-        }
+        });
 
         while(true){
             if(connectedClients.get() < clientIDs.size()){
-                System.out.println(_clientCompIDPrefix+ " wait all connections ready");
+                log.info("testtool - {} - wait all connections ready, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, clientIDs.size(), connectedClients.get());
                 TimeUnit.SECONDS.sleep(3);
             }else{
                 break;
             }
-
         }
 
-        log.info("{} all connections ready", _clientCompIDPrefix);
 
+        AtomicInteger logonAcked = new AtomicInteger(0);
+        liveSockets.forEach( (clientID, socket)->{
 
-        Runnable command = ()-> {
-                try {
-                    int nextClientCompIDIndex = totalSent.get() % fixClientNum;
-                    String clientCompID = clientIDs.get(nextClientCompIDIndex);
-                    Buffer orderAsBuffer = buildOrderBuffer(clientCompID,clientCompID+System.nanoTime(),symbol,price,qty,ordType,side);
-                    NetSocket socket = sockets.get(clientCompID);
-                    socket.write(orderAsBuffer);
-                    totalSent.incrementAndGet();
+            //http://vertx.io/docs/vertx-core/java/#_record_parser
+            final RecordParser parser = RecordParser.newDelimited(MatchingEngineVertxWrapper.vertxTCPDelimiter, buffer -> {
 
-                } catch (Exception e) {
-                    log.error("exception while sending",e);
+                long recvTimeNano = System.nanoTime();
+
+                totalRecv.incrementAndGet();
+                int length = buffer.getInt(0);
+                String fixString = buffer.getString(4, length+4);
+                log.debug("test tool received fix:{}",fixString);
+
+                if(fixString.indexOf("\u000135=A\u0001")>0){
+                    logonAcked.incrementAndGet();
+                }else if(fixString.indexOf("\u000135=8\u0001")>0){
+
+                    int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
+
+                    handleER(fixString, recvTimeNano);
+
+                    if(completedInCurrentPeriod < c._msgNumPerPeriod) {
+
+                        int nextClientCompIDIndex = totalSent.get() % clientIDs.size();
+
+                        String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
+                        Buffer orderAsBuffer = buildOrderBuffer(nextClientCompID);
+
+                        NetSocket nextSocket = liveSockets.get(nextClientCompID);
+                        if(nextSocket == null){
+                            log.error("cannot find the live vertx socket for result live socket list, live sockets:{}, nextClientCompID:{}",liveSockets, nextClientCompID);
+                            return;
+                        }
+
+                        nextSocket.write(orderAsBuffer);
+                        totalSent.incrementAndGet();
+
+                    }else{
+                        completedInCurrentPeriodCounter.set(0);
+                    }
                 }
+
+
+            });
+
+            socket.handler(buffer -> {
+                parser.handle(buffer);
+            });
+
+            String clientCompID = clientIDs.get(0);
+            Buffer orderAsBuffer = buildOrderBuffer(clientCompID);
+            socket.write(orderAsBuffer);
+        });
+
+        liveSockets.forEach( (clientID, socket)-> {
+            Message logon = FIXMessageUtil.buildLogon(clientID, MatchingEngineFIXWrapper.serverCompID);
+            Buffer logonAsBuffer = Util.buildBuffer(logon, MatchingEngineVertxWrapper.vertxTCPDelimiter);
+            socket.write(logonAsBuffer);
+        });
+
+        while(true){
+            if(logonAcked.get() < clientIDs.size()){
+                log.info("testtool - {} - wait all connections Logon, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, clientIDs.size(), logonAcked.get());
+                TimeUnit.SECONDS.sleep(3);
+            }else{
+                break;
+            }
+        }
+
+
+        log.info("{} all connections ready", _testToolArgs.clientCompIDPrefix);
+
+
+        //Trigger the first order for each period.
+        //The related callback will control how many orders to be sent in current period
+        Runnable command = ()-> {
+            try {
+                int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
+                String clientCompID = clientIDs.get(nextClientCompIDIndex);
+                Buffer orderAsBuffer = buildOrderBuffer(clientCompID);
+                NetSocket socket = liveSockets.get(clientCompID);
+                socket.write(orderAsBuffer);
+                totalSent.incrementAndGet();
+
+            } catch (Exception e) {
+                log.error("exception while sending",e);
+            }
 
         };
         long initialDelay = 0;
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
         executor.scheduleAtFixedRate( command,  initialDelay, c._period,   c._unit);
 
         start = Instant.now();
         _vertx.setPeriodic(30 * 1000, (v)->{
-            printCurrentStatistics();
+            double sendRateInSecond = TestToolUtil.getCurrentRateInSecond(start, totalSent);
+            log.warn("{} - totalSent:{}, rotalRecv:{}, sendRateInSecond:{}", _testToolArgs.clientCompIDPrefix, totalSent, totalRecv, String.format("%.2f", sendRateInSecond));
         });
 
     }
 
-    Buffer buildOrderBuffer(String clientCompID,
-                            String clientOrdID,
-                            String symbol,
-                            String price,
-                            String qty,
-                            String ordType,
-                            String side){
-        Message order = FIXMessageUtil.buildNewOrderSingle(clientCompID,clientOrdID,symbol,price,qty,ordType,side);
+    Buffer buildOrderBuffer(String clientCompID){
 
+        String clientOrdID = clientCompID+ UniqIDGenerator.next();
+
+        Buffer orderAsBuffer;
         if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
-            FIXMessageUtil.addLatencyText(order);
+            orderAsBuffer = FIXMessageUtil.buildNewOrderSingleBufferWithLatencyStamp(clientCompID,
+                    clientOrdID,
+                    _testToolArgs.symbol,
+                    _testToolArgs.px,
+                    _testToolArgs.qty,
+                    _testToolArgs.orderType,
+                    _testToolArgs.side);
+        }else{
+            orderAsBuffer = FIXMessageUtil.buildNewOrderSingleBuffer(clientCompID,
+                    clientOrdID,
+                    _testToolArgs.symbol,
+                    _testToolArgs.px,
+                    _testToolArgs.qty,
+                    _testToolArgs.orderType,
+                    _testToolArgs.side);
         }
 
-        Buffer orderAsBuffer = Util.buildBuffer(order, MatchingEngineVertxWrapper.vertxTCPDelimiter);
         return orderAsBuffer;
     }
 
-    void writeLatencyData(String erString, long erTimeNano){
-
-        try {
-
-            DataDictionary dd = null;
-
-            dd = new DataDictionary("FIX50SP1.xml");
-
-            boolean doValidation = false;
-            Message er = new Message();
-            er.fromString(erString,dd,doValidation);
-
-            String clientCompID = er.getHeader().getString(56);
-            if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
-                FIXMessageUtil.recordLetencyTimeStamps(er, erTimeNano, output);
-            }
-
-
-        } catch (Exception e) {
-            log.error("", e);
+    void handleER(String fixER, long recvTimeNano){
+        //TODO add SOH in the index
+        if(fixER.indexOf("56="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
+            _LatencyERResultExecutor.submit(()->{
+                try {
+                    TestToolUtil.writeLatencyData(fixER, recvTimeNano, output);
+                } catch (Exception e) {
+                    log.error("",e);
+                }
+            });
         }
-
     }
 
+    void stop()throws Exception{
+        output.flush();
+        output.close();
+    }
 
     public static void main(String[] args) throws Exception {
 
@@ -278,24 +270,18 @@ public class VertxClientRoundBatch {
         String ordType = testToolArgsO.orderType; //Market or Limit
         String side = testToolArgsO.side;//Bid or Offer
 
-        String clientCompIDPrefix = testToolArgsO.clientCompIDPrefix +"_"+System.currentTimeMillis() + "_";
         int clientNum = testToolArgsO.numOfClients;
         int ratePerMinute = testToolArgsO.ratePerMinute;
 
         log.info("testtool -{}, clientNum:{}, ratePerMin:{}, symbol:{}, px:{}, qty:{}, ordType:{},side:{}",
-                clientCompIDPrefix,clientNum,ratePerMinute,symbol, price, qty, ordType, side);
+                testToolArgsO.clientCompIDPrefix,clientNum,ratePerMinute,symbol, price, qty, ordType, side);
 
-        VertxClientRoundBatch vertxClientBatch = new VertxClientRoundBatch(clientCompIDPrefix, testToolArgsO.vertx_tcp_port);
+        VertxClientRoundBatch clientBatch = new VertxClientRoundBatch(testToolArgsO);
 
-        vertxClientBatch.execute( symbol,price,qty ,ordType, side   ,clientNum,ratePerMinute);
-
-
+        clientBatch.execute();
 
         TimeUnit.SECONDS.sleep(testToolArgsO.durationInSecond);
-        output.flush();
-        output.close();
-
-        TimeUnit.SECONDS.sleep(2);
+        clientBatch.stop();
         log.info("exiting, since reached duration limit:"+ testToolArgsO.durationInSecond+" seconds");
         System.exit(0);
     }

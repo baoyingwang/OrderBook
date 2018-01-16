@@ -30,7 +30,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_B -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
         sleep 20
     done
@@ -44,7 +44,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_O -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
 
         sleep 20
@@ -97,8 +97,8 @@ function startLatencyOrder(){
     local tmp_latency_rate_per_min_single_side=$((${tmp_latency_rate_per_min}/2))
     echo "begin sending latency orders - tmp_latency_rate_per_min_single_side:${tmp_latency_rate_per_min_single_side}"
 
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_B' -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix 'LxTxCx_FIX_RT_O' -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix LxTxCx_FIX_RT_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix LxTxCx_FIX_RT_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 function startBTrace(){
@@ -152,9 +152,8 @@ jarfile=$2
 background_rate_per_min=$3
 duration_in_second=$4
 latency_rate_per_min=${5:-60}
+testToolMainClass=${6:-"baoying.orderbook.testtool.vertx.VertxClientRoundBatch"}
 
-#testToolMainClass=baoying.orderbook.testtool.qfj.FirstQFJClientBatch
-testToolMainClass=baoying.orderbook.testtool.vertx.VertxClientRoundBatch
 
 startMachineEngine
 populateOB

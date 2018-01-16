@@ -23,17 +23,17 @@ def getE2E(inputE2EFile):
 
     df.describe()
 
-    df["e2e_match_ms" ] = (df["clientRecvER"  ] - df["clientSendNano" ]            )/1000000
+    df["e2e_match_us" ] = (df["clientRecvER"  ] - df["clientSendNano" ]            )/1000
 
-    df["input_ms"  ] = (df["svrRecvOrdNano"  ] - df["clientSendNano" ]   )/1000000 #client order -->mar-->bytes -->network-->unmar-->svr order
+    df["input_us"  ] = (df["svrRecvOrdNano"  ] - df["clientSendNano" ]   )/1000 #client order -->mar-->bytes -->network-->unmar-->svr order
     df["process_us"] = (df["svrMatchedNano"  ] - df["svrRecvOrdNano"]    )/1000
-    df["output_ms" ] = (df["clientRecvER"    ] - df["svrMatchedNano"]    )/1000000 #server ER -->mar-->bytes -->network-->unmar--> client ER
+    df["output_us" ] = (df["clientRecvER"    ] - df["svrMatchedNano"]    )/1000 #server ER -->mar-->bytes -->network-->unmar--> client ER
 
     df['sendTime_datetime' ] = df['sendTime'].map(lambda x: datetime.strptime(x,"%Y-%m-%dT%H:%M:%S.%fZ"))
 
     result_df = df[['sendTime_datetime',
-                    'e2e_match_ms',
-                    'input_ms', 'process_us', 'output_ms']]
+                    'e2e_match_us',
+                    'input_us', 'process_us', 'output_us']]
 
     return result_df
 
@@ -47,73 +47,45 @@ def genPlotE2E( plt, shape, row_start_index, df_e2e, output_file_prefix):
     plt.text(0, 0 ,describeResult.to_string())
     #plt.title(" e2e summary" ) #remove title because of overlap on diagram
 
-    plt.subplot2grid(shape,(row_start_index,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["e2e_match_ms"] , label="e2e_match_ms" , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"e2e_match_ms")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    #------------------
+    genSimplePlot(plt, shape,df_e2e ,(row_start_index  ,2),'sendTime_datetime',"e2e_match_us"  ,"e2e_match_us" , "us")
 
-    plt.subplot2grid(shape,(row_start_index+1,0))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["input_ms"]   , label="input_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"#1 client ord obj->network bytes-> svr ord obj")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+1,1))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["process_us"]   , label="process_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"us")
-    plt.title(u"#2 svr process java obj")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
-
-    plt.subplot2grid(shape,(row_start_index+1,2))
-    plt.plot(df_e2e["sendTime_datetime"], df_e2e["output_ms"]   , label="output_ms"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.ylabel(u"ms")
-    plt.title(u"#3 svr ER obj->network bytes-> client ER obj")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+    genSimplePlot(plt, shape,df_e2e ,(row_start_index+1,0),'sendTime_datetime',"input_us"  ,"#1 clnt ord obj->net bytes->svr ord obj" , "us")
+    genSimplePlot(plt, shape,df_e2e ,(row_start_index+1,1),'sendTime_datetime',"process_us","#2 svr proc obj" , "us")
+    genSimplePlot(plt, shape,df_e2e ,(row_start_index+1,2),'sendTime_datetime',"output_us" ,"#3 svr ER obj->net bytes->clnt ER obj" , "us")
 
 
     return (row_start_index + 1) + 1
 
-def genPlotBTrace( plt, shape, row_start_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us):
+def genSimplePlot( plt, shape, df, loc, x_col, y_col, title, y_label):
+    plt.subplot2grid(shape,loc)
+    plt.plot(df[x_col], df[y_col]   , label=y_col   , marker='h' )
+    #https://plot.ly/matplotlib/axes/
+    plt.title(title)
+    plt.ylabel(y_label)
+    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
+
+
+def genPlotBTrace( plt, shape, row_start_index, df_match_us):
 
     plt.subplot2grid(shape,(row_start_index,0))
-    plt.plot(df_match_us['manual_index'], df_match_us["match_us"]   , label="match_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"match_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+    plt.text(0, 0 ,df_match_us["match_us"].describe(percentiles=[.25,.75,.95, .99 ]).to_string())
+    plt.ylabel("match_us")
 
-    df_publish2bus_us['index']=range(df_publish2bus_us["publish2bus_us"].size)
-    plt.subplot2grid(shape,(row_start_index,1))
-    plt.plot(df_publish2bus_us["index"],df_publish2bus_us["publish2bus_us"]/1000   , label="publish2bus_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"publish2bus_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+    genSimplePlot(plt, shape,df_match_us            ,(row_start_index,1),'manual_index',"match_us"           ,"match_us"             , "us")
+    #genSimplePlot(plt, shape,df_publish2bus_us      ,(row_start_index,1),'manual_index',"publish2bus_us"      ,"publish2bus_us"      , "us")
+    #genSimplePlot(plt, shape,df_match_publish2bus_us,(row_start_index,2),'manual_index',"match_publish2bus_us","match_publish2bus_us", "us")
 
-    df_match_publish2bus_us['index']=range(df_match_publish2bus_us["match_publish2bus_us"].size)
-    plt.subplot2grid(shape,(row_start_index,2))
-    plt.plot(df_match_publish2bus_us["index"],df_match_publish2bus_us["match_publish2bus_us"]/1000 , label="match_publish2bus_us"   , marker='h' )
-    #https://plot.ly/matplotlib/axes/
-    plt.title(u"match_publish2bus_us")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    min_size=min([df_match_us["match_us"].size,
-                  df_publish2bus_us["publish2bus_us"].size,
-                  df_match_publish2bus_us["match_publish2bus_us"].size])
+    #min_size=min([df_match_us["match_us"].size,
+    #              df_publish2bus_us["publish2bus_us"].size,
+    #              df_match_publish2bus_us["match_publish2bus_us"].size])
+    ##https://stackoverflow.com/questions/23668427/pandas-joining-multiple-dataframes-on-columns
+    #agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index')
+    #agg_df    =agg_df_tmp[['match_us','publish2bus_us','match_publish2bus_us']]
 
-    #https://stackoverflow.com/questions/23668427/pandas-joining-multiple-dataframes-on-columns
-    agg_df_tmp=df_match_us[:min_size].merge(df_publish2bus_us[:min_size],on='manual_index').merge(df_match_publish2bus_us[0:min_size],on='manual_index')
-    agg_df    =agg_df_tmp[['match_us','publish2bus_us','match_publish2bus_us']]
-
-    plt.subplot2grid(shape,(row_start_index+1,1), colspan=2)
-    plt.text(0, 0 ,agg_df.describe(percentiles=[.25,.5,.75,.9, .95, .99 ]).to_string())
-    return (row_start_index + 1) + 1
+    return row_start_index + 1
 
 
 #time_datetime
@@ -165,19 +137,20 @@ def getVmstat(inputVmstatFile):
 def getBTrace(btraceFilePrefix):
 
     df_match                   =pd.read_csv(btraceFilePrefix+".match_ns.txt")
-    df_publish2bus             =pd.read_csv(btraceFilePrefix+".publish2bus_ns.txt")
-    df_match_publish2bus       =pd.read_csv(btraceFilePrefix+".match_publish2bus_ns.txt")
+    #df_publish2bus             =pd.read_csv(btraceFilePrefix+".publish2bus_ns.txt")
+    #df_match_publish2bus       =pd.read_csv(btraceFilePrefix+".match_publish2bus_ns.txt")
 
     df_match['match_us']     =       df_match["match_ns"]/1000
     df_match['manual_index'] = range(df_match.index.size) #Not df.size, because it is m*n.
 
-    df_publish2bus['publish2bus_us']     =       df_publish2bus["publish2bus_ns"]/1000
-    df_publish2bus['manual_index']       = range(df_publish2bus.index.size) #Not df.size, because it is m*n.
+    #df_publish2bus['publish2bus_us']     =       df_publish2bus["publish2bus_ns"]/1000
+    #df_publish2bus['manual_index']       = range(df_publish2bus.index.size) #Not df.size, because it is m*n.
 
-    df_match_publish2bus['match_publish2bus_us']  =       df_match_publish2bus["match_publish2bus_ns"]/1000
-    df_match_publish2bus['manual_index']          = range(df_match_publish2bus.index.size) #Not df.size, because it is m*n.
+    #df_match_publish2bus['match_publish2bus_us']  =       df_match_publish2bus["match_publish2bus_ns"]/1000
+    #df_match_publish2bus['manual_index']          = range(df_match_publish2bus.index.size) #Not df.size, because it is m*n.
 
-    return df_match[['manual_index','match_us']], df_publish2bus[['manual_index','publish2bus_us']],df_match_publish2bus[['manual_index','match_publish2bus_us']]
+    #return df_match[['manual_index','match_us']], df_publish2bus[['manual_index','publish2bus_us']],df_match_publish2bus[['manual_index','match_publish2bus_us']]
+    return df_match[['manual_index','match_us']]
 
 
 def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):
@@ -238,53 +211,43 @@ def genPlotVMStat(plt, shape, vmstat_row_start_index, df_vmstat):
     next_row_index_for_plot=vmstat_row_start_index + 1 +1
     return next_row_index_for_plot
 
-def genPlotSysUsage(plt, shape, sys_usage_row_start_index, df_sysUsage):
+def genPlotSysUsage(plt, shape, row_start_index, df_sysUsage):
 
-    plt.subplot2grid(shape, (sys_usage_row_start_index, 0))
-    plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_ProcessCpuLoad"]  , label="cpu_ProcessCpuLoad" ,  marker='h' )
-    plt.ylabel(u"%")
-    plt.title(u"cpu_ProcessCpuLoad")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape, (sys_usage_row_start_index, 1))
-    plt.plot(df_sysUsage["time_datetime"], df_sysUsage["cpu_SystemLoadAverage"]  , label="cpu_SystemLoadAverage" ,  marker='h' )
-    plt.title(u"cpu_SystemLoadAverage")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
+    genSimplePlot(plt, shape,df_sysUsage ,(row_start_index  ,0),'time_datetime',"cpu_ProcessCpuLoad"     ,"cpu_ProcessCpuLoad"    ,"%")
+    genSimplePlot(plt, shape,df_sysUsage ,(row_start_index  ,1),'time_datetime',"cpu_SystemLoadAverage"  ,"cpu_SystemLoadAverage" , "")
+    genSimplePlot(plt, shape,df_sysUsage ,(row_start_index  ,2),'time_datetime',"thread_ThreadCount"     ,"thread_ThreadCount" , "")
 
-    plt.subplot2grid(shape, (sys_usage_row_start_index, 2))
-    plt.plot(df_sysUsage["time_datetime"], df_sysUsage["thread_ThreadCount"]  , label="thread_ThreadCount" ,  marker='h' )
-    plt.title(u"thread_ThreadCount")
-    plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape, (sys_usage_row_start_index + 1,0))
+    plt.subplot2grid(shape, (row_start_index + 1,0))
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Used"]/(1024*1024)        , label="heapMemory_Used" ,  marker='h' )
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["heapMemory_Committed"]/(1024*1024)   , label="heapMemory_Committed" ,  marker='h' )
     plt.title(u"heapMemory (MB)")
     plt.legend((u'Used', u'Committed'),loc='best')
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(sys_usage_row_start_index + 2,0))
+    plt.subplot2grid(shape,(row_start_index + 2,0))
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Used"]/(1024*1024)       , label="non-heapMemory_Used" ,  marker='h' )
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["non-heapMemory_Committed"]/(1024*1024)  , label="non-heapMemory_Committed" ,  marker='h' )
     plt.title(u"non-heapMemory (MB)")
     plt.legend((u'Used', u'Committed'),loc='best')
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(sys_usage_row_start_index + 1,1))
+    plt.subplot2grid(shape,(row_start_index + 1,1))
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionCount"] , label="gc_ConcurrentMarkSweep_CollectionCount",  marker='h')
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionCount"]              , label="gc_ParNew_CollectionCount"             ,  marker='h')
     plt.title(u"GC Collection Count")
     plt.legend((u'ConcurrentMarkSweep', u'ParNew'),loc='best')
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    plt.subplot2grid(shape,(sys_usage_row_start_index + 2,1))
+    plt.subplot2grid(shape,(row_start_index + 2,1))
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ConcurrentMarkSweep_CollectionTime"] , label="gc_ConcurrentMarkSweep_CollectionTime",  marker='h')
     plt.plot(df_sysUsage["time_datetime"], df_sysUsage["gc_ParNew_CollectionTime"]              , label="gc_ParNew_CollectionTime"             ,  marker='h')
-    plt.title(u"GC Collection Accumulated Time-MS? to be confirmed")
+    plt.title(u"GC Collection Accumulated Time-MS?")
     plt.legend((u'ConcurrentMarkSweep', u'ParNew'),loc='best')
     plt.xticks(rotation=90)#fig.autofmt_xdate() does not work for me. why? https://stackoverflow.com/questions/10998621/rotate-axis-text-in-python-matplotlib
 
-    next_row_index_for_plot=sys_usage_row_start_index + 2 +1
+    next_row_index_for_plot=row_start_index + 2 +1
     return next_row_index_for_plot
 
 
@@ -295,33 +258,36 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     #https://stackoverflow.com/questions/16522111/python-syntax-for-if-a-or-b-or-c-but-not-all-of-them
     osLineList      = [x for x in sysInfoContentList if x.startswith("os ")]
     gcLineList      = [x for x in sysInfoContentList if x.startswith("gc ")]
-    os_gc_text = "".join(osLineList) + "".join(gcLineList)
-    plt.subplot2grid(shape,(row_start_index,0))
-    plt.text(0, 0 , os_gc_text[ :-1])#string[:-1] remove the last carriage return character
+    runtimeSpecLineList    = [x for x in sysInfoContentList if x.startswith("runtime Spec")]
+    runtimeVMLineList      = [x for x in sysInfoContentList if x.startswith("runtime Vm")]
 
+    overall_text = "".join(osLineList) + "".join(gcLineList) + "".join(runtimeSpecLineList) + "".join(runtimeVMLineList)
+    plt.subplot2grid(shape,(row_start_index,0), rowspan=2)
+    plt.text(0, 0 , overall_text[ :-1])#string[:-1] remove the last carriage return character
+    plt.title(u"OS and GC information")
 
-    runtime_prefix_list = ["runtime ClassPath",
-                           "runtime InputArguments" ,
-                           #"runtime Name"           ,
-                           "runtime VmName"         ,
-                           #"runtime VmVendor",
-                           "runtime VmVersion"  ]
+    runtime_prefix_list = [
+        "runtime Name"           ,
+        "runtime ClassPath"      ,
+        "runtime InputArguments" ,
+        "runtime BootClassPath"]
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
-    runtimeLineList = ['\n          '.join(x[i:i+100] for i in range(0, len(x), 100)) for x in sysInfoContentList if x.startswith("runtime ") and x.split(":")[0] in runtime_prefix_list]
+    runtimeLineList = ['\n          '.join(x[i:i+80] for i in range(0, len(x), 80)) for x in sysInfoContentList if x.startswith("runtime ") and x.split(":")[0] in runtime_prefix_list]
 
     #https://stackoverflow.com/questions/30919275/inserting-period-after-every-3-chars-in-a-string
     #the ? is for non-greedy - https://docs.python.org/3/library/re.html
     java_command = [re.findall('sun.java.command=.+?,', x)[0] for x in sysInfoContentList if x.startswith("runtime SystemProperties")]
-    java_command_string = '\n          '.join(java_command[0][i:i+100] for i in range(0, len(java_command[0]), 100))
+    java_command_string = '\n          '.join(java_command[0][i:i+80] for i in range(0, len(java_command[0]), 80))
 
     text = java_command_string + '\n' + ( "".join(runtimeLineList))
-    plt.subplot2grid(shape,(row_start_index,1), colspan=2)
+    plt.subplot2grid(shape,(row_start_index,1), colspan=2, rowspan=2)
     plt.text(0, 0 ,  text[:-1] ) #text[:-1] remove the last carriage return character
+    plt.title(u"Runtime Arguments")
 
-    return row_start_index+1
+    return row_start_index+2
 
 
-def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, df_publish2bus_us,df_match_publish2bus_us, output_file_prefix):
+def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -340,7 +306,7 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_matc
     next_row_index = 0
     next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
-    next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us, df_publish2bus_us,df_match_publish2bus_us)
+    next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
     next_row_index = genPlotVMStat(     plt, shape, next_row_index, df_vmstat  )
 
@@ -375,7 +341,7 @@ else:
     df_vmstat = pd.DataFrame()
 
 
-df_match_us, df_publish2bus_us,df_match_publish2bus_us=getBTrace(inputBTraceFilePrefix)
+df_match_us=getBTrace(inputBTraceFilePrefix)
 
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
 with open(inputSysInfoFile) as f:
@@ -385,6 +351,6 @@ with open(inputSysInfoFile) as f:
 
 plotTitle=output_file_prefix
 #df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
-genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us, df_publish2bus_us,df_match_publish2bus_us,output_file_prefix)
+genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us[30:],output_file_prefix)
 
 

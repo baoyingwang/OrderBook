@@ -10,12 +10,24 @@
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
         <RollingFile name="RollingFile" fileName="log/${app_name}.log" filePattern="logarchive/${app_name}-%d{MM-dd-yyyy}.log.gz"
-                     ignoreExceptions="false" bufferSize="819200">
+                     ignoreExceptions="false" bufferSize="8192000">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
             </PatternLayout>
             <TimeBasedTriggeringPolicy />
         </RollingFile>
+
+        <!-- https://logging.apache.org/log4j/2.x/manual/async.html -->
+        <RandomAccessFile name="RandomAccessFile" fileName="log/${app_name}_async.log" immediateFlush="false" append="false">
+            <PatternLayout>
+                <Pattern>%d %p %c{1.} [%t] %m %ex%n</Pattern>
+            </PatternLayout>
+        </RandomAccessFile>
+
+        <Async name="Async" bufferSize="8192000">
+            <AppenderRef ref="RollingFile"/>
+            <LinkedTransferQueue/>
+        </Async>
 
     </Appenders>
 
