@@ -36,13 +36,19 @@ public class FirstQFJClientBatch {
     private final AtomicInteger totalRecv = new AtomicInteger(0);
 
 
-    private final ExecutorService _fixERResult = Executors.newFixedThreadPool(4,new ThreadFactory() {
+    private final ExecutorService _fixLatencyERResult = Executors.newFixedThreadPool(2,new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
-            return new Thread(r, "Thread - testtool processes ER result");
+            return new Thread(r, "Thread - testtool processes Latency ER result");
         }
     });
 
+    private final ExecutorService _fixSendingBatchOrder = Executors.newFixedThreadPool(16,new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            return new Thread(r, "Thread - testtool sending batch Order");
+        }
+    });
 
     final TestToolArgs _testToolArgs;
     private String _latencyDataFile ;
@@ -110,16 +116,14 @@ public class FirstQFJClientBatch {
                     if(!msg.getHeader().getString(35).equals("8")){
                         return;
                     }
+                    long erTimeNano = System.nanoTime();
 
                     totalRecv.incrementAndGet();
-
-
                     int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
-                    long erTimeNano = System.nanoTime();
 
                     //TODO add SOH in the index
                     if(msg.getHeader().getString(56).indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX) ==0){
-                        _fixERResult.submit(()->{
+                        _fixLatencyERResult.submit(()->{
                             try {
                                 TestToolUtil.writeLatencyData(msg, erTimeNano, output);
                             } catch (Exception e) {
@@ -134,7 +138,14 @@ public class FirstQFJClientBatch {
                         SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
 
                         Message order = buildOrder(nextClientCompID);
-                        Session.sendToTarget(order, nextClientSessionID);
+                        _fixSendingBatchOrder.submit(()->{
+                            try {
+                                Session.sendToTarget(order, nextClientSessionID);
+                            }catch (Exception e){
+                                log.error("fail to send order to target:"+nextClientSessionID.toString(), e);
+                            }
+                        });
+
 
                         totalSent.incrementAndGet();
                     }else{
@@ -161,7 +172,7 @@ public class FirstQFJClientBatch {
         LogFactory logFactory = new SLF4JLogFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
 
-        SocketInitiator initiator = new SocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
+        ThreadedSocketInitiator initiator = new ThreadedSocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
         initiator.start();
 
         while(true){
@@ -191,8 +202,8 @@ public class FirstQFJClientBatch {
             }
         };
         long initialDelay = 0;
-        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-        executor.scheduleAtFixedRate( command,  initialDelay, batchConfig._period,  batchConfig._unit);
+        ScheduledExecutorService executorFor1stOrderOfEachPeriod = Executors.newSingleThreadScheduledExecutor();
+        executorFor1stOrderOfEachPeriod.scheduleAtFixedRate( command,  initialDelay, batchConfig._period,  batchConfig._unit);
 
 
         start = Instant.now();

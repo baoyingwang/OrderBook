@@ -44,58 +44,175 @@
 
 
 
-    <div ng-controller = "order_book_table_USDJPY">
+    <div ng-controller = "test_summary_div">
 
-        <table>
-            <!--
-                ////https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
-            -->
-            <tr ng-repeat = "(item, value) in filterOutLatencyDataFromMap(test_summary)  ">
-                <!--
-                https://docs.angularjs.org/api/ng/filter/number
-                https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
-                -->
-                <td align="right">{{ item }}</td>
-                <td>{{ value }}</td>
-
-            </tr>
-        </table>
-
-        <h3>Latency Chart</h3>
-        <div id="latency_chart"></div>
-        Show Latency Detail Data: <input type="checkbox" checked="true"  ng-model="latencyDataChecked" aria-label="Toggle ngShow"><br />
-        <div ng-show="latencyDataChecked">
+        <div>
             <table>
-
-                <tr>
-                    <td>recvTime</td>
-                    <td>put2InputQ</td>
-                    <td>pickFromInputQ</td>
-                    <td>match</td>
-                    <td>pickFromOutputQ</td>
-                </tr>
-                <tr ng-repeat = "one_record in test_summary.latency_data ">
+                <!--
+                    ////https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
+                -->
+                <tr ng-repeat = "(item, value) in test_summary  ">
                     <!--
                     https://docs.angularjs.org/api/ng/filter/number
                     https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
                     -->
-                    <td align="right">{{ one_record[0] }}</td>
-                    <td align="right">{{ one_record[1] | number : 0}}</td>
-                    <td align="right">{{ one_record[2] | number : 0}}</td>
-                    <td align="right">{{ one_record[3] | number : 0}}</td>
-                    <td align="right">{{ one_record[4] | number : 0}}</td>
+                    <td align="right">{{ item }}</td>
+                    <td>{{ value }}</td>
+
+                </tr>
+            </table>
+
+        </div>
+
+
+        <h3>Detail of each period</h3>
+        <div id="msg_count_chart"></div>
+        <div id="msg_rate_chart"></div>
+        Show Detail of each period: <input type="checkbox" checked="true"  ng-model="periodsDetailChecked" aria-label="Toggle ngShow"><br />
+
+        <div ng-show="periodsDetailChecked">
+            <table>
+
+                <tr>
+                    <td align="right">start_time                   </td>
+                    <td align="right">end_time                     </td>
+                    <td align="right">duration_in_second           </td>
+                    <td align="right">order_count                  </td>
+                    <td align="right">er_count                     </td>
+                    <td align="right">md_count                     </td>
+                    <td align="right">ord_rate_per_second          </td>
+                    <td align="right">er_rate_per_second           </td>
+                    <td align="right">md_rate_per_second           </td>
+                </tr>
+                <tr ng-repeat = "one_record in periods_list ">
+                    <!--
+                    https://docs.angularjs.org/api/ng/filter/number
+                    https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                    -->
+                    <td align="right">{{ one_record.start_time             }}      </td>
+                    <td align="right">{{ one_record.end_time               }}      </td>
+                    <td align="right">{{ one_record.duration_in_second     }}      </td>
+                    <td align="right">{{ one_record.order_count            }}      </td>
+                    <td align="right">{{ one_record.er_count               }}      </td>
+                    <td align="right">{{ one_record.md_count               }}      </td>
+                    <td align="right">{{ one_record.ord_rate_per_second    }}      </td>
+                    <td align="right">{{ one_record.er_rate_per_second     }}      </td>
+                    <td align="right">{{ one_record.md_rate_per_second     }}      </td>
 
                 </tr>
             </table>
         </div>
 
+
+    </div>
+
     <p id="console_container"></p>
 
-        <script>
+    <script>
 
-            //http://c3js.org/samples/data_stringx.html
+            //-------------- Chart prepare -----------
+            msg_count_chart = prepare_empty_c3_chart('#msg_count_chart')
+            msg_rate_chart = prepare_empty_c3_chart('#msg_rate_chart')
+
+			//-----------------------------------
+
+            var mainApp = angular.module("mainApp", []);
+
+            mainApp.controller('test_summary_div', function($scope, $http) {
+                $http.get('/matching/get_test_summary').
+                    then(function(response) {
+                        $scope.test_summary = response.data.overall;
+                        $scope.periods_list = response.data.periods;
+
+                        msg_count_chart.load({
+                            columns: summary_count_list_for_chart(response.data.periods)
+                        });
+
+                        msg_rate_chart.load({
+                            columns: summary_rate_list_for_chart(response.data.periods)
+                        });
+
+
+
+                    });
+            });
+
+
+
+
+
+    function addParagraph(containerName, text){
+
+	 	var container = document.getElementById(containerName);
+	 	var p = document.createElement('p');
+	 	p.innerHTML = text;
+	 	container.appendChild(p);
+
+    }
+
+    function summary_count_list_for_chart(periods){
+
+        var start_time_array = []
+        var order_count_array = []
+        var er_count_array = []
+        var md_count_array = []
+
+        for(var i = 0; i < periods.length; i++){
+            start_time_array.push(periods[i].start_time);
+
+            order_count_array.push(periods[i].order_count);
+            er_count_array.push(periods[i].er_count);
+            md_count_array.push(periods[i].md_count);
+        }
+        start_time_array.unshift('x'); //categary
+        order_count_array.unshift('order');
+        er_count_array.unshift('execution_report');
+        md_count_array.unshift('market data delta');
+
+        var result = []
+        result.push(start_time_array);
+        result.push(order_count_array);
+        result.push(er_count_array);
+        result.push(md_count_array);
+
+        return result
+
+    }
+
+    function summary_rate_list_for_chart(periods){
+
+        var start_time_array = []
+        var order_rate_array = []
+        var er_rate_array = []
+        var md_rate_array = []
+
+        for(var i = 0; i < periods.length; i++){
+            start_time_array.push(periods[i].start_time);
+
+            order_rate_array.push(periods[i].ord_rate_per_second);
+            er_rate_array.push(periods[i].er_rate_per_second);
+            md_rate_array.push(periods[i].md_rate_per_second);
+        }
+        start_time_array.unshift('x'); //categary
+        order_rate_array.unshift('order_per_second');
+        er_rate_array.unshift('execution_report_per_second');
+        md_rate_array.unshift('market data delta_per_second');
+
+        var result = []
+        result.push(start_time_array);
+        result.push(order_rate_array);
+        result.push(er_rate_array);
+        result.push(md_rate_array);
+
+        return result
+
+    }
+
+    function prepare_empty_c3_chart(chart_div_id){
+
+               //http://c3js.org/samples/data_stringx.html
             var latency_chart = c3.generate({
-                bindto: '#latency_chart',
+                bindto: chart_div_id,
                 data: {
                     x : 'x',
                     columns:  [
@@ -113,61 +230,10 @@
 				ids: ['data1']
 			});
 
-
-            var mainApp = angular.module("mainApp", []);
-
-            mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
-                $http.get('/matching/get_test_summary').
-                    then(function(response) {
-                        $scope.test_summary = response.data;
-
-                        var latency_data_copy = new Array(response.data['latency_data'].length);
-                        for(var i = 0; i < response.data['latency_data'].length; i++){	latency_data_copy[i] = response.data['latency_data'][i].slice(0);}
-                        var columnLatencyData = latency_data_copy[0].map((col, i) => latency_data_copy.map(row => row[i]));
-                        columnLatencyData[0].unshift('x'); //categary - recvTime
-                        columnLatencyData[1].unshift('put2InputQ_ns');
-                        columnLatencyData[2].unshift('pickFromInputQ_ns');
-                        columnLatencyData[3].unshift('match_ns');
-                        columnLatencyData[4].unshift('pickFromOutputQ_ns');
-                        //addParagraph('console_container',latency_data_copy.length);
-                        //addParagraph('console_container',latency_data_copy[0].length);
-                        latency_chart.load({
-                            columns: [
-                                columnLatencyData[0],
-                                columnLatencyData[1],
-                                columnLatencyData[2],
-                                columnLatencyData[3],
-                                columnLatencyData[4]
-                            ]
-                        });
-
-
-                    });
-
-                //remove un-expected values(latency_data', 'gc_took') from the summary table. Too many data there.
-                //https://stackoverflow.com/questions/14788652/how-to-filter-key-value-with-ng-repeat-in-angularjs
-                //it is not easy to filter map(but easy to filter a plain value - http://docs.angularjs.org/api/ng.filter:filter)
-                $scope.filterOutLatencyDataFromMap = function(items) {
-                    var result = {};
-                    angular.forEach(items, function(value, key) {
-                        if (key !== 'latency_data' && key !== 'gc_took' ) {
-                            result[key] = value;
-                        }
-                    });
-                    return result;
-                }
-
-            });
-
-    function addParagraph(containerName, text){
-
-	 	var container = document.getElementById(containerName);
-	 	var p = document.createElement('p');
-	 	p.innerHTML = text;
-	 	container.appendChild(p);
-
+			return latency_chart
     }
-        </script>
+
+    </script>
       
     </body>
 </html>

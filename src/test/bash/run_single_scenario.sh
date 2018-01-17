@@ -30,7 +30,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_B -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_B_$px -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
         sleep 20
     done
@@ -44,7 +44,7 @@ function populateOB(){
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_O -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_O_$px -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
 
         sleep 20

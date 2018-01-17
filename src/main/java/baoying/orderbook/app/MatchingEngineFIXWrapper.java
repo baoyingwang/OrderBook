@@ -37,7 +37,7 @@ public class MatchingEngineFIXWrapper {
     private final Set<String> _triedLogonClientCompIDs = new HashSet<>();
 
 
-    private final ExecutorService _fixProcessMatchResult = Executors.newSingleThreadExecutor(new ThreadFactory() {
+    private final ExecutorService _fixProcessMatchResultExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
             return new Thread(r, "Thread - FIXInterface processes match result");
@@ -73,7 +73,7 @@ public class MatchingEngineFIXWrapper {
             return;
         }
 
-        _fixProcessMatchResult.submit(()->{
+        _fixProcessMatchResultExecutor.submit(()->{
 
             Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
             try {
@@ -89,32 +89,35 @@ public class MatchingEngineFIXWrapper {
     @Subscribe
     public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport){
 
+        List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
+                = MatchingEngineFIXHelper.translateMatchedER(
+                CommonMessage.ExternalSource.FIX,
+                matchedExecutionReport);
 
-        _fixProcessMatchResult.submit(()->{
+        for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : fixERs){
 
-            List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
-                    = MatchingEngineFIXHelper.translateMatchedER(
-                            CommonMessage.ExternalSource.FIX,
-                            matchedExecutionReport);
+            if(fixER_ord._2._isLatencyTestOrder){
+                long order_process_done_sysNano_test = System.nanoTime();
+                String latencyTimes = fixER_ord._2._latencyTimesFromClient
+                        +","+fixER_ord._2._recvFromClient_sysNano_test
+                        +","+ order_process_done_sysNano_test ;
+                fixER_ord._1.setString(FIXMessageUtil.latencyTimesField, latencyTimes);
+            }
 
-            for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : fixERs){
-
-                if(fixER_ord._2._isLatencyTestOrder){
-                    long order_process_done_sysNano_test = System.nanoTime();
-                    String latencyTimes = fixER_ord._2._latencyTimesFromClient
-                            +","+fixER_ord._2._recvFromClient_sysNano_test
-                            +","+ order_process_done_sysNano_test ;
-                    fixER_ord._1.setString(FIXMessageUtil.latencyTimesField, latencyTimes);
-                }
+            _fixProcessMatchResultExecutor.submit(()->{
 
                 try {
                     sendER(fixER_ord._1, fixER_ord._2._clientEntityID);
                 } catch (Exception e) {
                     log.error("problem while processing:"+fixER_ord._1.toString(),e);
-               }
-            }
+                }
 
-        });
+
+            });
+        }
+
+
+
     }
 
 
@@ -178,19 +181,7 @@ public class MatchingEngineFIXWrapper {
             return;
         }
 
-        sendER(er, sessionID);
-
-    }
-
-    private void sendER(Message er, SessionID sessionID) throws Exception{
-
-        if(! Session.doesSessionExist(sessionID)){
-            log.warn("ignore the realtime ER to client, since the session:{} is not online now", sessionID.toString());
-            return;
-        }
-
         Session.sendToTarget(er, sessionID);
-
     }
 
     class InternalQFJApplicationCallback implements Application {
@@ -202,7 +193,7 @@ public class MatchingEngineFIXWrapper {
 
             @Override
             public void fromApp(final Message paramMessage, final SessionID paramSessionID)  {
-                log.debug("fromApp session:{}, received : {} ", paramSessionID, paramMessage);
+                log.debug("fromApp session:{}, received:{} ", paramSessionID, paramMessage);
 
                 try {
 
@@ -256,17 +247,21 @@ public class MatchingEngineFIXWrapper {
     private void processIncomingOrder(final Message paramMessage, final SessionID paramSessionID) throws Exception{
 
         String orderID = UniqIDGenerator.next();
+        _vertx.runOnContext((v)->{
 
-        final TradeMessage.OriginalOrder originalOrder
-                = MatchingEngineFIXHelper.buildOriginalOrder(
+            try {
+
+                final TradeMessage.OriginalOrder originalOrder
+                        = MatchingEngineFIXHelper.buildOriginalOrder(
                         CommonMessage.ExternalSource.FIX,
                         paramMessage,
                         orderID);
+                final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
+                //NOT process the match result here for FIX, because maybe the counterparty is on other interfaces(e.g. vertx).
 
-        _vertx.runOnContext((v)->{
-
-            final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
-            //NOT process the match result here for FIX, because maybe the counterparty is on other interfaces(e.g. vertx).
+            }catch (Exception e){
+                log.error("fail to process FIX order:"+paramMessage.toString(), e);
+            }
         });
     }
 

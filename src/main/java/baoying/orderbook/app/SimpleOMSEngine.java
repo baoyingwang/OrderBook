@@ -21,70 +21,6 @@ public class SimpleOMSEngine {
         }
     });
 
-    PerfTestDataForWeb perfTestDataForWeb = new PerfTestDataForWeb();
-    class PerfTestDataForWeb {
-
-        AtomicLong _placedOrderCounter = new AtomicLong(0);
-        AtomicLong _latencyOrderCounter = new AtomicLong(0);
-        TradeMessage.OriginalOrder _firstOriginalOrderSinceTest = null;
-        TradeMessage.OriginalOrder _lastOriginalOrderSinceTest = null;
-
-        private BlockingQueue<long[]> _testTimeDataQueue = new LinkedBlockingQueue<long[]>();
-        int maxQueueSize = 80;
-        int popSizeAfterFull = 30;
-
-        void resetBeforeTest(){
-            _placedOrderCounter.set(0);
-            _firstOriginalOrderSinceTest = null;
-            _lastOriginalOrderSinceTest = null;
-
-            _testTimeDataQueue.clear();
-        }
-
-        //TODO will thread issue? since maybe multi threads call this method.
-        void recordNewOrder(TradeMessage.OriginalOrder originalOrder){
-            long nthOrderSinceTest = _placedOrderCounter.incrementAndGet();
-
-            if(originalOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
-                _latencyOrderCounter.incrementAndGet();
-            }
-
-            if(_testTimeDataQueue.size() >= maxQueueSize){ //not the nthOrderSinceTest, since the nthOrderSinceTest can be drained.
-                for(int i=0; i<popSizeAfterFull; i++ ){
-                    _testTimeDataQueue.poll();
-                }
-            }
-
-            if(nthOrderSinceTest == 1) { _firstOriginalOrderSinceTest = originalOrder; }
-            else{_lastOriginalOrderSinceTest = originalOrder;}
-        }
-
-        long count(){
-            return _placedOrderCounter.get();
-        }
-
-        long latencyOrdCount(){
-            return _latencyOrderCounter.get();
-        }
-        long startInEpochMS(){
-            if(_firstOriginalOrderSinceTest == null){
-                throw new RuntimeException("fail to get start in MS");
-            }
-            return _firstOriginalOrderSinceTest._recvFromClientEpochMS;
-        }
-
-        long lastInEpochMS(){
-            if(_lastOriginalOrderSinceTest == null){
-                throw new RuntimeException("fail to get end in MS");
-            }
-            return _lastOriginalOrderSinceTest._recvFromClientEpochMS;
-        }
-
-        List<long[]> getListCopy(){
-             return new ArrayList<>(_testTimeDataQueue);
-        }
-    }
-
     //value: list of execution report(as Map<String, String)
     private final Map<String, List<Map<String, String>>> executionReportsByOrderID;
 
@@ -108,15 +44,22 @@ public class SimpleOMSEngine {
 
     public void internalProcess(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        if(singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)) {
-            List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
-            List<Map<String, String>> originalReportsNew = new ArrayList<>();
-            if (originalReports != null) {
-                originalReportsNew.addAll(originalReports);
-            }
-            originalReportsNew.add(buildExternalERfromInternalER(singleSideExecutionReport));
-            executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
+        if( singleSideExecutionReport._originOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)){
+            return;
         }
+
+        if( singleSideExecutionReport._originOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
+            return;
+        }
+
+        List<Map<String, String>> originalReports = executionReportsByOrderID.get(singleSideExecutionReport._originOrder._orderID);
+
+        List<Map<String, String>> originalReportsNew = new ArrayList<>();
+        if (originalReports != null) {
+            originalReportsNew.addAll(originalReports);
+        }
+        originalReportsNew.add(buildExternalERfromInternalER(singleSideExecutionReport));
+        executionReportsByOrderID.put(singleSideExecutionReport._originOrder._orderID, originalReportsNew);
 
     }
 
@@ -129,29 +72,24 @@ public class SimpleOMSEngine {
 
     public void internalProcess(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
 
-        //ignore maker side, because maker orders always sit in book during test
-        if(matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)) {
-            long outputConsumingNanoTime = System.nanoTime();
-            perfTestDataForWeb._testTimeDataQueue.add(new long[]{
-                    matchedExecutionReport._takerOriginOrder._recvFromClientEpochMS,
-                    outputConsumingNanoTime - matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test});
-        }
-
         if(! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)
-                && matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)) {
+                && ! matchedExecutionReport._makerOriginOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)) {
+
             addERStore(matchedExecutionReport, MAKER_TAKER.MAKER, matchedExecutionReport._makerOriginOrder);
+
         }
 
         if(! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(IGNORE_ENTITY_PREFIX)
                 && ! matchedExecutionReport._takerOriginOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)) {
+
             addERStore(matchedExecutionReport, MAKER_TAKER.TAKER, matchedExecutionReport._takerOriginOrder);
+
         }
 
     }
 
     private void addERStore(TradeMessage.MatchedExecutionReport matchedExecutionReport, MAKER_TAKER maker_taker, TradeMessage.OriginalOrder originalOrder){
 
-        long outputConsumingNanoTime = System.nanoTime();
         List<Map<String, String>> reportsBeforeUpdate = executionReportsByOrderID.get(originalOrder._orderID);
         List<Map<String, String>> reportsNew = reportsBeforeUpdate==null?new ArrayList<>():new ArrayList<>(reportsBeforeUpdate);
         reportsNew.add(buildExternalERfromInternalER(matchedExecutionReport, maker_taker));

@@ -103,18 +103,18 @@ public class MatchingEngineApp {
                 }
             });
 
-            _executionReportsBus = new AsyncEventBus("async evt ER bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
-                                                                                                                                 @Override
-                                                                                                                                 public Thread newThread(Runnable r) {
-                                                                                                                                     return new Thread(r, "Thread - async evt ER bus - for all engines");
-                                                                                                                                 }
-                                                                                                                             }
+            _executionReportsBus = new AsyncEventBus("async ER bus", Executors.newSingleThreadExecutor(new ThreadFactory() {
+                                                                                     @Override
+                                                                                     public Thread newThread(Runnable r) {
+                                                                                         return new Thread(r, "Thread - async ER Bus");
+                                                                                     }
+}
             )
             );
-            _marketDataBus = new AsyncEventBus("async evt MD bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
+            _marketDataBus = new AsyncEventBus("async MD bus", Executors.newSingleThreadExecutor(new ThreadFactory() {
                                                                                                                            @Override
                                                                                                                            public Thread newThread(Runnable r) {
-                                                                                                                               return new Thread(r, "Thread - async evt MD bus - for all engines");
+                                                                                                                               return new Thread(r, "Thread - async MD bus");
                                                                                                                            }
                                                                                                                        }
             )

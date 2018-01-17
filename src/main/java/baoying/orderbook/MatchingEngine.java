@@ -18,6 +18,8 @@ public class MatchingEngine {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngine.class);
 
+    public final MatchingDataStatistics statistics = new MatchingDataStatistics();
+
     public final List<String> _symbols;
 	private final Map<String, OrderBook> _orderBooks;
 
@@ -42,6 +44,8 @@ public class MatchingEngine {
 
 	public List<MEExecutionReportMessageFlag> matchOrder(OriginalOrder order) {
 
+		statistics.increaseRecvOrder();
+
 		OrderBook orderBook = orderBook(order._symbol);
 		OrderBook.ExecutingOrder executingOrder = new OrderBook.ExecutingOrder(order);
 
@@ -57,10 +61,12 @@ public class MatchingEngine {
 
 		matchResult._1.forEach( execRpt ->{
 			_outputExecutionReportsBus.post(execRpt);
+			statistics.increaseER();
 		} );
 
 		matchResult._2.forEach( ordBookDelta ->{
 			_outputMarketDataBus.post(ordBookDelta);
+			statistics.increaseMD();
 		} );
 
 	}
