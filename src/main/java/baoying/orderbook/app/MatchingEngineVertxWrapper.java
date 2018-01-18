@@ -83,31 +83,41 @@ public class MatchingEngineVertxWrapper {
 
     private void handleMessage(Buffer buffer, NetSocket socket) {
 
-        final int     msgSize = buffer.getInt(0);
-        final String  msg     = buffer.getString(4, msgSize+4);
-        log.debug("vertx received:{}", msg);
+        long zeroOLatencyOrdRrecvTimeNano = 0;
+        final int     msgSize   = buffer.getInt(0);
+        final String  msgString = buffer.getString(4, msgSize+4);
+        log.debug("vertx received:{}", msgString);
+
+
+        boolean isLatencyClient;
+        if(msgString.indexOf("\u000149="+MatchingEngineApp.LATENCY_ENTITY_PREFIX)>0){
+            isLatencyClient=true;
+            zeroOLatencyOrdRrecvTimeNano = System.nanoTime();
+        }else{
+            isLatencyClient=false;
+        }
 
         try {
 
-            Message x = new Message();
-            x.fromString(msg, dd50sp1, fixMsgDoValidation);
+            Message msg = new Message();
+            msg.fromString(msgString, dd50sp1, fixMsgDoValidation);
 
-            String msgType = x.getHeader().getString(35);
-
-            if (msgType.equals("A")) {
-                log.info("vertx - received logon:{}", msg);
-                processIncomingLogon(x, socket);
-
-            }else if (msgType.equals("D")) {
-
-                processIncomingOrder(x);
-
-            } else {
-                log.error("unknown message type:{}", msgType);
+            String msgType = msg.getHeader().getString(35);
+            switch (msgType){
+                case "D" :
+                    processIncomingOrder(msg, zeroOLatencyOrdRrecvTimeNano);
+                    break;
+                case "A" :
+                    log.info("vertx - received logon:{}", msg);
+                    processIncomingLogon(msg, socket);
+                    break;
+                default :
+                    log.error("unknown message type:{}", msgType);
             }
+
         }
         catch(Exception e){
-            log.error("problem while processing vertx:"+ msg , e);
+            log.error("problem while processing vertx:"+ msgString , e);
         }
 
     }
@@ -121,7 +131,7 @@ public class MatchingEngineVertxWrapper {
         socket.write(buffer);
     }
 
-    private void processIncomingOrder(final Message newSingleOrder) throws Exception{
+    private void processIncomingOrder(final Message newSingleOrder, final long zeroOLatencyOrdRrecvTimeNano) throws Exception{
 
         String orderID = UniqIDGenerator.next();
 
@@ -129,7 +139,8 @@ public class MatchingEngineVertxWrapper {
                 = MatchingEngineFIXHelper.buildOriginalOrder(
                     CommonMessage.ExternalSource.VertxTCP,
                     newSingleOrder,
-                    orderID);
+                    orderID,
+                    zeroOLatencyOrdRrecvTimeNano);
 
         _vertx.runOnContext((v)->{
 

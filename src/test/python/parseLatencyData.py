@@ -2,7 +2,9 @@ import sys
 from by_common_import import *
 import os
 import re #regex
+import json
 from datetime import datetime
+
 
 
 #===input===
@@ -252,7 +254,7 @@ def genPlotSysUsage(plt, shape, row_start_index, df_sysUsage):
 
 
 
-def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
+def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList, meStatsJsonOverall):
 
     #https://stackoverflow.com/questions/3013449/list-filtering-list-comprehension-vs-lambda-filter
     #https://stackoverflow.com/questions/16522111/python-syntax-for-if-a-or-b-or-c-but-not-all-of-them
@@ -261,10 +263,20 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     runtimeSpecLineList    = [x for x in sysInfoContentList if x.startswith("runtime Spec")]
     runtimeVMLineList      = [x for x in sysInfoContentList if x.startswith("runtime Vm")]
 
-    overall_text = "".join(osLineList) + "".join(gcLineList) + "".join(runtimeSpecLineList) + "".join(runtimeVMLineList)
+    stats = "ord_rate_per_second:"+meStatsJsonOverall["ord_rate_per_second"]+"\n" \
+          + "duration_in_second:" +meStatsJsonOverall["duration_in_second" ]+"\n" \
+          + "order_count:"        +meStatsJsonOverall["order_count"]+"\n"         \
+          + "start_time:"         +meStatsJsonOverall["start_time"]+"\n"          \
+          + "end_time:"           +meStatsJsonOverall["end_time"]+"\n\n"
+
+    overall_text = stats \
+                   + "".join(osLineList) \
+                   + "".join(gcLineList) \
+                   + "".join(runtimeSpecLineList) \
+                   + "".join(runtimeVMLineList)
     plt.subplot2grid(shape,(row_start_index,0), rowspan=2)
     plt.text(0, 0 , overall_text[ :-1])#string[:-1] remove the last carriage return character
-    plt.title(u"OS and GC information")
+    plt.title(u"Overall Information")
 
     runtime_prefix_list = [
         "runtime Name"           ,
@@ -287,7 +299,7 @@ def genPlotSysInfo(plt, shape, row_start_index, sysInfoContentList):
     return row_start_index+2
 
 
-def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, output_file_prefix):
+def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_match_us, meStatsJson, output_file_prefix):
 
     #https://matplotlib.org/api/pyplot_api.html
     #http://blog.csdn.net/han_xiaoyang/article/details/49797143
@@ -304,7 +316,7 @@ def genPlot(plotTitle,df_e2e,df_sysUsage, df_vmstat, sysInfoContentList, df_matc
     #================================df_latency==============================
     shape=(10,4)
     next_row_index = 0
-    next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList)
+    next_row_index = genPlotSysInfo(    plt, shape, next_row_index, sysInfoContentList, meStatsJson["overall"])
     next_row_index = genPlotE2E(        plt, shape, next_row_index, df_e2e, output_file_prefix)
     next_row_index = genPlotBTrace(     plt, shape, next_row_index, df_match_us)
     next_row_index = genPlotSysUsage(   plt, shape, next_row_index, df_sysUsage)
@@ -328,7 +340,8 @@ inputSysUsageFile    = sys.argv[2]
 inputSysInfoFile     = sys.argv[3]
 inputVmstatFile      = sys.argv[4]
 inputBTraceFilePrefix= sys.argv[5]
-output_file_prefix   = sys.argv[6]
+inputMEStatsJsonFile = sys.argv[6]
+output_file_prefix   = sys.argv[7]
 
 df_sysUsage = getSysUsage(inputSysUsageFile)
 df_e2e      = getE2E(inputE2EFile)
@@ -340,7 +353,6 @@ if os.path.isfile(inputVmstatFile):
 else:
     df_vmstat = pd.DataFrame()
 
-
 df_match_us=getBTrace(inputBTraceFilePrefix)
 
 #https://stackoverflow.com/questions/3277503/how-do-i-read-a-file-line-by-line-into-a-list
@@ -349,8 +361,13 @@ with open(inputSysInfoFile) as f:
 # you may also want to remove whitespace characters like `\n` at the end of each line
 #sysInfoContentList = [x.strip() for x in sysInfoContentList]
 
+
+with open(inputMEStatsJsonFile) as json_data:
+    meStatsJson = json.load(json_data)
+
+
 plotTitle=output_file_prefix
 #df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
-genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us[30:],output_file_prefix)
+genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us[30:],meStatsJson, output_file_prefix)
 
 

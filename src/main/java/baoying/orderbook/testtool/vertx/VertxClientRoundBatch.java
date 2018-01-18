@@ -138,14 +138,19 @@ public class VertxClientRoundBatch {
                         int nextClientCompIDIndex = totalSent.get() % clientIDs.size();
 
                         String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
-                        Buffer orderAsBuffer = buildOrderBuffer(nextClientCompID);
-
                         NetSocket nextSocket = liveSockets.get(nextClientCompID);
                         if(nextSocket == null){
                             log.error("cannot find the live vertx socket for result live socket list, live sockets:{}, nextClientCompID:{}",liveSockets, nextClientCompID);
                             return;
                         }
 
+                        String clientOrdID = nextClientCompID+ UniqIDGenerator.next();
+                        Message newOrder   = FIXMessageUtil.buildNewOrderSingle(nextClientCompID,clientOrdID,_testToolArgs.symbol,_testToolArgs.px,_testToolArgs.qty,_testToolArgs.orderType,_testToolArgs.side);
+                        if(nextClientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
+                            FIXMessageUtil.addLatencyText(newOrder);
+                        }
+
+                        Buffer orderAsBuffer = Util.buildBuffer(newOrder, MatchingEngineVertxWrapper.vertxTCPDelimiter);
                         nextSocket.write(orderAsBuffer);
                         totalSent.incrementAndGet();
 
@@ -161,9 +166,6 @@ public class VertxClientRoundBatch {
                 parser.handle(buffer);
             });
 
-            String clientCompID = clientIDs.get(0);
-            Buffer orderAsBuffer = buildOrderBuffer(clientCompID);
-            socket.write(orderAsBuffer);
         });
 
         liveSockets.forEach( (clientID, socket)-> {
@@ -191,8 +193,15 @@ public class VertxClientRoundBatch {
             try {
                 int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
                 String clientCompID = clientIDs.get(nextClientCompIDIndex);
-                Buffer orderAsBuffer = buildOrderBuffer(clientCompID);
                 NetSocket socket = liveSockets.get(clientCompID);
+
+                String clientOrdID = clientCompID+ UniqIDGenerator.next();
+                Message newOrder   = FIXMessageUtil.buildNewOrderSingle(clientCompID,clientOrdID,_testToolArgs.symbol,_testToolArgs.px,_testToolArgs.qty,_testToolArgs.orderType,_testToolArgs.side);
+                if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
+                    FIXMessageUtil.addLatencyText(newOrder);
+                }
+
+                Buffer orderAsBuffer = Util.buildBuffer(newOrder, MatchingEngineVertxWrapper.vertxTCPDelimiter);
                 socket.write(orderAsBuffer);
                 totalSent.incrementAndGet();
 
@@ -211,32 +220,6 @@ public class VertxClientRoundBatch {
             log.warn("{} - totalSent:{}, rotalRecv:{}, sendRateInSecond:{}", _testToolArgs.clientCompIDPrefix, totalSent, totalRecv, String.format("%.2f", sendRateInSecond));
         });
 
-    }
-
-    Buffer buildOrderBuffer(String clientCompID){
-
-        String clientOrdID = clientCompID+ UniqIDGenerator.next();
-
-        Buffer orderAsBuffer;
-        if(clientCompID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
-            orderAsBuffer = FIXMessageUtil.buildNewOrderSingleBufferWithLatencyStamp(clientCompID,
-                    clientOrdID,
-                    _testToolArgs.symbol,
-                    _testToolArgs.px,
-                    _testToolArgs.qty,
-                    _testToolArgs.orderType,
-                    _testToolArgs.side);
-        }else{
-            orderAsBuffer = FIXMessageUtil.buildNewOrderSingleBuffer(clientCompID,
-                    clientOrdID,
-                    _testToolArgs.symbol,
-                    _testToolArgs.px,
-                    _testToolArgs.qty,
-                    _testToolArgs.orderType,
-                    _testToolArgs.side);
-        }
-
-        return orderAsBuffer;
     }
 
     void handleER(String fixER, long recvTimeNano){

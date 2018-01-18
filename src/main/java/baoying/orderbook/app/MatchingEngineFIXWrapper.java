@@ -115,9 +115,6 @@ public class MatchingEngineFIXWrapper {
 
             });
         }
-
-
-
     }
 
 
@@ -203,7 +200,12 @@ public class MatchingEngineFIXWrapper {
                         return;
                     }
 
-                    processIncomingOrder(paramMessage,paramSessionID );
+                    long zeroOLatencyOrdRrecvTimeNano = 0;
+                    boolean isLatencyClient;
+                    if(paramSessionID.getSenderCompID().indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX)>0){
+                        zeroOLatencyOrdRrecvTimeNano = System.nanoTime();
+                    }
+                    processIncomingOrder(paramMessage,paramSessionID ,zeroOLatencyOrdRrecvTimeNano);
 
 
                 }catch (Exception e){
@@ -244,7 +246,7 @@ public class MatchingEngineFIXWrapper {
 
     }
 
-    private void processIncomingOrder(final Message paramMessage, final SessionID paramSessionID) throws Exception{
+    private void processIncomingOrder(final Message paramMessage, final SessionID paramSessionID, long zeroOLatencyOrdRrecvTimeNano) throws Exception{
 
         String orderID = UniqIDGenerator.next();
         _vertx.runOnContext((v)->{
@@ -255,7 +257,8 @@ public class MatchingEngineFIXWrapper {
                         = MatchingEngineFIXHelper.buildOriginalOrder(
                         CommonMessage.ExternalSource.FIX,
                         paramMessage,
-                        orderID);
+                        orderID,
+                        zeroOLatencyOrdRrecvTimeNano);
                 final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
                 //NOT process the match result here for FIX, because maybe the counterparty is on other interfaces(e.g. vertx).
 

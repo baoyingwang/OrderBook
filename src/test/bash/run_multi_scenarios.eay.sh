@@ -13,8 +13,8 @@ fi
 interfaceType=${2:-TCP}
 
 duration_in_seconds=600
-#for bg_rate_per_second in 50 100 200 500 1000 2000 3000 4000 5000
-for bg_rate_per_second in 50 1000 5000
+for bg_rate_per_second in 50 500 1000 5000 10000 20000 40000 50000 60000
+#for bg_rate_per_second in 50 1000 5000
 do
     #for lt_rate_per_min in 5 10 50 100
     for lt_rate_per_min in 60

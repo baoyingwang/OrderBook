@@ -171,8 +171,8 @@ sleep 5 #wait bind done, TODO: bind while jvm start? why and why not?
 startBackgroundOrder $background_rate_per_min
 startLatencyOrder $latency_rate_per_min
 
-echo "reset test data, after wait 5 seconds(the fix session setup will wait several seconds)"
-sleep 5
+echo "reset test data, after wait 10 seconds(the fix session setup will wait several seconds)"
+sleep 10
 curl http://localhost:8080/matching/reset_test_data | cut -c1-150
 
 for i in {1..10}
@@ -181,6 +181,12 @@ do
 	sleep $(($duration_in_second/10))
 
 done
+
+
+curl http://localhost:8080/matching/get_test_summary > log/engine_statistics.json.txt
+
+#sleep a while to make sure the latency test tool writes the data to disk in time
+sleep 3
 
 
 case $OSTYPE in

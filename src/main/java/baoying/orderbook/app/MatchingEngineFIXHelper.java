@@ -74,7 +74,10 @@ public class MatchingEngineFIXHelper {
     }
 
 
-    static TradeMessage.OriginalOrder buildOriginalOrder(CommonMessage.ExternalSource source, Message paramMessage, String orderID)throws Exception{
+    static TradeMessage.OriginalOrder buildOriginalOrder(CommonMessage.ExternalSource source,
+                                                         Message paramMessage,
+                                                         String orderID,
+                                                         long zeroOLatencyOrdRrecvTimeNano)throws Exception{
 
         String symbol = paramMessage.getString(55);
         String clientEntity = paramMessage.getHeader().getString(49);
@@ -97,7 +100,7 @@ public class MatchingEngineFIXHelper {
 
         if(originalOrder._clientEntityID.startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)){
             originalOrder._isLatencyTestOrder = true;
-            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
+            originalOrder._recvFromClient_sysNano_test = zeroOLatencyOrdRrecvTimeNano;
             if(paramMessage.isSetField(FIXMessageUtil.latencyTimesField)) {
                 originalOrder._latencyTimesFromClient = paramMessage.getString(FIXMessageUtil.latencyTimesField);
             }

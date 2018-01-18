@@ -91,49 +91,7 @@ public class FIXMessageUtil {
         return order;
     }
 
-    public static Buffer buildNewOrderSingleBuffer(
-            String clientCompID,
-            String clientOrdID,
-            String symbol,
-            String price,
-            String qty,
-            String ordType,
-            String side){
 
-        Message order = FIXMessageUtil.buildNewOrderSingle(
-                clientCompID,
-                clientOrdID,
-                symbol,
-                price,
-                qty,
-                ordType,
-                side);
-
-        Buffer orderAsBuffer = Util.buildBuffer(order, MatchingEngineVertxWrapper.vertxTCPDelimiter);
-        return orderAsBuffer;
-    }
-
-    public  static Buffer buildNewOrderSingleBufferWithLatencyStamp(
-            String clientCompID,
-            String clientOrdID,
-            String symbol,
-            String price,
-            String qty,
-            String ordType,
-            String side){
-
-        Message order = FIXMessageUtil.buildNewOrderSingleWithLatencyTimestamp(
-                clientCompID,
-                clientOrdID,
-                symbol,
-                price,
-                qty,
-                ordType,
-                side);
-
-        Buffer orderAsBuffer = Util.buildBuffer(order, MatchingEngineVertxWrapper.vertxTCPDelimiter);
-        return orderAsBuffer;
-    }
     static Message buildHarcodedNewOrderSingleForTest() {
         /**
          * <message name="NewOrderSingle" msgtype="D" msgcat="app">
