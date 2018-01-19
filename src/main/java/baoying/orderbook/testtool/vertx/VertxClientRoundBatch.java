@@ -11,9 +11,12 @@ import io.vertx.core.net.NetSocket;
 import io.vertx.core.parsetools.RecordParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import quickfix.ConfigError;
+import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
+import java.rmi.server.ExportException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,7 +41,8 @@ public class VertxClientRoundBatch {
 
     private Instant start = null;
 
-    private final ExecutorService _LatencyERResultExecutor = Executors.newFixedThreadPool(4,new ThreadFactory() {
+    //single thread, since only single output stream.
+    private final ExecutorService _latencyWritingExecutor = Executors.newFixedThreadPool(1,new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
             return new Thread(r, "Thread - testtool processes Latency ER result");
@@ -46,21 +50,15 @@ public class VertxClientRoundBatch {
     });
 
     private final String _latencyDataFile ;
-    private final int bufferSize = 10*1024*1024;
+    private final int bufferSize = 16*1024*1024;
     private final BufferedOutputStream output;
-
-
-
 
     VertxClientRoundBatch(TestToolArgs testToolArgs) throws Exception{
 
         _testToolArgs = testToolArgs;
         _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
         output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
-
     }
-
-
 
     public void execute() throws  Exception{
 
@@ -222,14 +220,31 @@ public class VertxClientRoundBatch {
 
     }
 
+    static DataDictionary dd50sp1 ;
+    static{
+        try {
+            dd50sp1= new DataDictionary("FIX50SP1.xml");
+        } catch (ConfigError configError) {
+            configError.printStackTrace();
+        }
+    }
+    static boolean fixMsgDoValidation = false;
     void handleER(String fixER, long recvTimeNano){
-        //TODO add SOH in the index
-        if(fixER.indexOf("56="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
-            _LatencyERResultExecutor.submit(()->{
+
+        if(fixER.indexOf("\u000156="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
+
+
+            String latencyRecord= TestToolUtil.getLantecyRecord(fixER,recvTimeNano);
+            if(latencyRecord.length() < 1){
+                log.error("fail to get latency record from:{}", fixER);
+                return;
+            }
+
+            _latencyWritingExecutor.submit(()->{
                 try {
-                    TestToolUtil.writeLatencyData(fixER, recvTimeNano, output);
-                } catch (Exception e) {
-                    log.error("",e);
+                    output.write(latencyRecord.getBytes());
+                }catch (Exception e){
+                    log.error("fail to write", e);
                 }
             });
         }

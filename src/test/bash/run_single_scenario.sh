@@ -21,38 +21,34 @@ function startMachineEngine(){
 }
 
 function populateOB(){
-    echo "$(date '+%Y%m%d_%H%M%S') begin preparing big orders to book, for later test orders"
-    JVMOptions_popOB="-Xmx64M -Dlog4j.configurationFile=log4j2_testtool.xml"
-    for delta in {1..2}
-    do
-        USDJPY_base_px=110
-        USDJPY_px_for_book=$(($USDJPY_base_px-$delta))
-        for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
-        do
-            px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_B_$px -symbol USDJPY -side Bid -qty 1000000000 -ordType Limit -px ${px} -d 3 &
-        done
-        sleep 20
-    done
 
-    echo "$(date '+%Y%m%d_%H%M%S') Bid side book done"
+    local side=${1:-Bid}
+    local symbol=${2:-USDJPY}
+    local base_px=${3:110}
+
+    local price_delta_sign
+    if [[ $side == Bid ]]; then
+        price_delta_sign="-"
+    else
+        price_delta_sign="+"
+    fi
+
+    echo "$(date '+%Y%m%d_%H%M%S') begin preparing big orders to book, for later test orders,side: ${side}, symbol:${symbol}, base_px:${base_px}, px_sign:${price_delta_sign}"
 
     for delta in {1..2}
     do
         USDJPY_base_px=110
-        USDJPY_px_for_book=$(($USDJPY_base_px+$delta))
+        USDJPY_px_for_book=$(($base_px $price_delta_sign $delta))
         for fraction_party in ".0" ".1" ".2" ".3" ".4" ".5" ".6" ".7" ".8" ".9"
         do
             px="$USDJPY_px_for_book$fraction_party"
-            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_O_$px -symbol USDJPY -side Offer -qty 1000000000 -ordType Limit -px ${px} -d 3 &
+            java $JVMOptions_popOB -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute 10 -client_prefix BACKGROUND_FIX_OB_${side}_$px -symbol $symbol -side $side -qty 1000000000 -ordType Limit -px ${px} -d 3 &
         done
-
         sleep 20
     done
-    echo "$(date '+%Y%m%d_%H%M%S') Offer side book done"
-
-
 }
+
+
 
 #latency_rate_per_min is used in this function - to be refactored
 function warmupOrder(){
@@ -67,11 +63,11 @@ function warmupOrder(){
 
     echo "begin sending warmup orders - ${tmp_warmup_duration_in_seconds} seconds - warmup bg rate:$tmp_warmup_rate_per_min per min, warmup latency rate:$latency_rate_per_min per min"
     local warmup_rate_per_min_single_side=$((${tmp_warmup_rate_per_min} / 2))
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_WMUP_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_WMUP_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_WMUP_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${warmup_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_WMUP_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
 
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUP_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUP_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUP_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${latency_rate_per_min} -client_prefix LxTxCx_FIX_WMUP_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${tmp_warmup_duration_in_seconds} &
 
     #addtional 20 seconds to 1) make sure FIX setup and exit 2) make sure all warmup messages are consumed
     sleep $(( ${tmp_warmup_duration_in_seconds} + 20 ))
@@ -87,18 +83,18 @@ function startBackgroundOrder(){
 
     local background_rate_per_min_single_side=$((${tmp_background_rate_per_min} / 2))
     echo "begin sending background orders - each side:${background_rate_per_min_single_side} per minute"
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${background_rate_per_min_single_side} -client_prefix BACKGROUND_FIX_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 function startLatencyOrder(){
 
-    local tmp_latency_rate_per_min=${1:-60}
-    local tmp_latency_rate_per_min_single_side=$((${tmp_latency_rate_per_min}/2))
-    echo "begin sending latency orders - tmp_latency_rate_per_min_single_side:${tmp_latency_rate_per_min_single_side}"
+    local side=${1:-Bid}
+    local symbol=${2:-USDJPY}
+    local rate_per_min=${3:-60}
+    echo "begin sending latency orders - symbol:${symbol}, side:$side, rate per min:${rate_per_min}"
 
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix LxTxCx_FIX_RT_B -symbol USDJPY -side Bid   -qty 2 -ordType Market -d ${duration_in_second} &
-    java ${JVMOptions_sending} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${tmp_latency_rate_per_min_single_side} -client_prefix LxTxCx_FIX_RT_O -symbol USDJPY -side Offer -qty 2 -ordType Market -d ${duration_in_second} &
+    java ${JVMOptionsTestClient} -cp ${jarfile} ${testToolMainClass} -clientNum 1 -ratePerMinute ${rate_per_min} -client_prefix LxTxCx_FIX_RT_${side} -symbol ${symbol} -side $side   -qty 2 -ordType Market -d ${duration_in_second} &
 }
 
 function startBTrace(){
@@ -150,28 +146,35 @@ esac
 test_name=$1
 jarfile=$2
 background_rate_per_min=$3
-duration_in_second=$4
-latency_rate_per_min=${5:-60}
+latency_rate_per_min=${4:-60}
+duration_in_second=$5
 testToolMainClass=${6:-"baoying.orderbook.testtool.vertx.VertxClientRoundBatch"}
 
 
 startMachineEngine
-populateOB
 
-JVMOptions_sending="-Xmx256M -Dlog4j.configurationFile=log4j2_testtool.xml"
+JVMOptions_popOB="-Xmx64M -Dlog4j.configurationFile=log4j2_testtool.xml"
+populateOB Bid   USDJPY 110
+populateOB Offer USDJPY 110
 
-tmp_warmup_rate_per_min=$((60*3000))
-tmp_warmup_duration_in_seconds=20
-warmupOrder $tmp_warmup_rate_per_min $tmp_warmup_duration_in_seconds
+JVMOptionsTestClient="-Xmx256M -Dlog4j.configurationFile=log4j2_testtool.xml"
+warmupOrder $((60*500)) 20 #tmp_warmup_rate_per_min tmp_warmup_duration_in_seconds
 
 
-startBTrace $(( $background_rate_per_min / 600 )) #sample 10 values per second
+if (( $background_rate_per_min > $latency_rate_per_min )); then
+    sampleMeanBaseRatePerMin=$background_rate_per_min
+else
+    sampleMeanBaseRatePerMin=$latency_rate_per_min
+fi
+startBTrace $(( $sampleMeanBaseRatePerMin / 600 )) #sample 10 values per second
 sleep 5 #wait bind done, TODO: bind while jvm start? why and why not?
 
-startBackgroundOrder $background_rate_per_min
-startLatencyOrder $latency_rate_per_min
 
-echo "reset test data, after wait 10 seconds(the fix session setup will wait several seconds)"
+startBackgroundOrder $background_rate_per_min
+startLatencyOrder   Bid  USDJPY $(($latency_rate_per_min/2))
+startLatencyOrder  Offer USDJPY $(($latency_rate_per_min/2))
+
+echo "$(date '+%Y%m%d_%H%M%S') reset test data, after wait 10 seconds - the fix session setup will wait several seconds"
 sleep 10
 curl http://localhost:8080/matching/reset_test_data | cut -c1-150
 
@@ -198,4 +201,5 @@ case $OSTYPE in
 	msys*)
 		cmd "/C TASKKILL /F /IM java.exe /T"
 		;;
-esac	
+esac
+

@@ -4,6 +4,8 @@ import baoying.orderbook.app.MatchingEngineApp;
 import baoying.orderbook.testtool.qfj.FirstQFJClientBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import quickfix.ConfigError;
+import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
@@ -52,20 +54,54 @@ public class TestToolUtil {
 
     }
 
-    public static void writeLatencyData(Message er, long erTimeNano, OutputStream output) throws Exception{
+    public static String getLantecyRecord(Message er, long erTimeNano){
 
-        String clientCompID = er.getHeader().getString(56);
-        FIXMessageUtil.recordLetencyTimeStamps(er, erTimeNano, output);
+        String latencyRecord = "";
+        try {
+            String clientOrdID = er.getString(11);
+            String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
+
+            latencyRecord = serverTimes + "," + erTimeNano + "," + clientOrdID + "\n";
+        }catch (Exception e){
+            log.error("exception on:" + er.toString(), e);
+            return "";
+        }
+
+        return latencyRecord;
 
     }
 
-    public static void writeLatencyData(String erString, long erTimeNano, OutputStream output) throws Exception{
-
-        Message er = FIXMessageUtil.toMessage(erString, "FIX50SP1.xml");
-        if(! (er.getChar(150) == 'F') ){
-            log.error("cannot record lantency for non fill(partial or full fill) execution report");
-            return;
+    static DataDictionary dd50sp1 ;
+    static{
+        try {
+            dd50sp1= new DataDictionary("FIX50SP1.xml");
+        } catch (ConfigError configError) {
+            configError.printStackTrace();
         }
-        writeLatencyData(er, erTimeNano, output);
+    }
+    static boolean fixMsgDoValidation = false;
+
+
+    public static String getLantecyRecord(String fixER, long erTimeNano){
+
+        String latencyRecord = "";
+        try {
+            Message er = FIXMessageUtil.toMessage(fixER, dd50sp1, fixMsgDoValidation);
+            if (!(er.getChar(150) == 'F')) {
+                log.error("cannot record lantency for non fill(partial or full fill) execution report");
+                return "";
+            }
+
+            String clientOrdID = er.getString(11);
+            String serverTimes = er.getString(FIXMessageUtil.latencyTimesField);
+
+            latencyRecord = serverTimes + "," + erTimeNano + "," + clientOrdID + "\n";
+        }catch (Exception e){
+            log.error("exception on:" + fixER, e);
+            return "";
+        }
+
+        return latencyRecord;
+
     }
 }

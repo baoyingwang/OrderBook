@@ -123,9 +123,15 @@ public class FirstQFJClientBatch {
 
                     //TODO add SOH in the index
                     if(msg.getHeader().getString(56).indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX) ==0){
+
+                        String latencyRecord= TestToolUtil.getLantecyRecord(msg,erTimeNano);
+                        if(latencyRecord.length() < 1){
+                            log.error("fail to get latency record from:{}", msg.toString());
+                            return;
+                        }
                         _fixLatencyERResult.submit(()->{
                             try {
-                                TestToolUtil.writeLatencyData(msg, erTimeNano, output);
+                                output.write(latencyRecord.getBytes());
                             } catch (Exception e) {
                                 log.error("",e);
                             }

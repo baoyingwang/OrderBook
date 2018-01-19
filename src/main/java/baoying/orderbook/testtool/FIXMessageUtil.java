@@ -171,12 +171,9 @@ public class FIXMessageUtil {
         //Files.write(e2eTimeFile, (serverTimes+","+erTimeNano+","+clientOrdID+"\n").getBytes(), APPEND, CREATE);
     }
 
-    static Message toMessage(String msg, String dictionary) throws Exception{
-        DataDictionary dd  = new DataDictionary(dictionary); //"FIX50SP1.xml"
-        boolean doValidation = false;
+    static Message toMessage(String msg, DataDictionary dd, boolean doValidation) throws Exception{
         Message er = new Message();
         er.fromString(msg,dd,doValidation);
-
         return er;
     }
 }

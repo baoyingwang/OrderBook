@@ -16,9 +16,16 @@ function parseZipFile(){
 
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
     head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp                 > $name.e2e_LxTxCx_FIX_RT.csv
-    #Sort to avoid possible diagram problem. sendTime(YYY-MM-DD...) is the first column.
-    sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)  >> $name.e2e_LxTxCx_FIX_RT.csv
+    #on git bash, sort silently quit on big file, e.g. 80MB
+    #I expect Python will handle the sequence, since i have convert them to datetime. But looks like python does not handle that well.
+    if (( $(wc -l $name.e2e_LxTxCx_FIX_RT.csv.tmp | cut -d ' ' -f1) < 5000 )); then
+        sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)   >> $name.e2e_LxTxCx_FIX_RT.csv
+    else
+        grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp >> $name.e2e_LxTxCx_FIX_RT.csv
+    fi
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
+
+
 
     echo "match_ns"                    > $name.btrace.match_ns.txt
     grep "^match_ns" $name.btrace.csv | cut -d ',' -f2 >> $name.btrace.match_ns.txt
@@ -53,7 +60,7 @@ function generate_all_cases_summary(){
 	do
 		echo processing $e2e_desc_file
 		local tmp_1st_col_file=tmp.$e2e_desc_file.1st.col.txt
-		echo $e2e_desc_file |cut -d'_' -f1-2       > $tmp_1st_col_file
+		echo $e2e_desc_file |cut -d'_' -f1-3       > $tmp_1st_col_file
 		cut -d, -f2 $e2e_desc_file | sed -n '1!p' >> $tmp_1st_col_file
 
 		local local_tmp_result=tmp_local.txt.tmp
@@ -99,7 +106,7 @@ DIRNAMECMD="/usr/bin/dirname"
 MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
 
 zipfies_dir=${1:-${SCRIPT_START_DIR}}
-vmstat_file=$2
+vmstat_file=${2:-vmoutput.txt}
 
 vm_output_csv=${vmstat_file}.csv
 if [[ -e ${vmstat_file} ]]; then
@@ -112,7 +119,7 @@ do
     echo "processing ${zipfile_name}"
     name=$(echo ${zipfile_name} | cut -d '.' -f1 | cut -c5-)
 
-    parseZipFile ${zipfies_dir}/${zipfile_name} $name $vm_output_csv
+    parseZipFile ${zipfies_dir}/${zipfile_name} "$name" "$vm_output_csv"
 done
 
 generate_all_cases_summary

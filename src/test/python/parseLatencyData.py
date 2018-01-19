@@ -367,7 +367,7 @@ with open(inputMEStatsJsonFile) as json_data:
 
 
 plotTitle=output_file_prefix
-#df_e2e[30:] means remove the deading 0~29, because the session(FIX) needs setup(e.g. some lazy init) initially.
-genPlot(plotTitle,df_e2e[30:],df_sysUsage,df_vmstat, sysInfoContentList,df_match_us[30:],meStatsJson, output_file_prefix)
+#drop heading 5%, since they are during system warmup. df_e2e[30:] means remove the deading 0~29
+genPlot(plotTitle,df_e2e[int(df_e2e.size*0.05):],df_sysUsage,df_vmstat,sysInfoContentList,df_match_us[int(df_match_us.size*0.05):],meStatsJson,output_file_prefix)
 
 

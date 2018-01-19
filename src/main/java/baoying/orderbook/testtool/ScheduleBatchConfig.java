@@ -63,10 +63,10 @@ public class ScheduleBatchConfig {
                 msgNumPerPeriod = (int) Math.round(0.49 + ratePerMinute / (60 * 100* 1.0));
                 c = new Config(period,unit, msgNumPerPeriod);
             } else {
-                //1000 intervals
-                period = 1;
+                //500 intervals
+                period = 2;
                 unit = TimeUnit.MILLISECONDS;
-                msgNumPerPeriod = (int) Math.round(0.49 + ratePerMinute / (60 * 1000 * 1.0));
+                msgNumPerPeriod = (int) Math.round(0.49 + ratePerMinute / (60 * 500 * 1.0));
                 c = new Config(period,unit, msgNumPerPeriod);
             }
 
