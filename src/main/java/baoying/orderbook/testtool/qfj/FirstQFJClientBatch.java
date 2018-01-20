@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
 //This is a simplified version.   
 //For production code, please read common.DefaultQFJSingleSessionInitiator.
@@ -51,6 +50,9 @@ public class FirstQFJClientBatch {
     });
 
     final TestToolArgs _testToolArgs;
+    final List<String> clientIDs;
+    final List<TestToolUtil.OrderBrief> _orderInfoList;
+
     private String _latencyDataFile ;
     private final int bufferSize = 10*1024*1024;
     private final BufferedOutputStream output;
@@ -78,6 +80,9 @@ public class FirstQFJClientBatch {
         _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
         output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
 
+        clientIDs = TestToolUtil.generateClientList(_testToolArgs);
+        _orderInfoList = TestToolUtil.getOrderBriefList(_testToolArgs, clientIDs);
+
     }
 
 
@@ -86,20 +91,11 @@ public class FirstQFJClientBatch {
 
         start = Instant.now();
 
-        List<String> clientIDs = new ArrayList<>();
+
         List<SessionID> clientSessionIDs = new ArrayList<>();
-        {
-            IntStream.range(0, _testToolArgs.numOfClients).forEach(
-                    it -> {
-                        //you cannot use prefix+index, because it will conflict  while multi clients up with same prefix
-                        String clientEntityID = _testToolArgs.clientCompIDPrefix +"_"+UniqIDGenerator.next();
-                        clientIDs.add(clientEntityID);
-
-                        SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
-                        clientSessionIDs.add(sessionID);
-
-                    }
-            );
+        for(String clientEntityID : clientIDs){
+            SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
+            clientSessionIDs.add(sessionID);
         }
 
         AtomicInteger completedInCurrentPeriodCounter = new AtomicInteger(0);

@@ -1,7 +1,6 @@
 package baoying.orderbook.testtool;
 
-import baoying.orderbook.app.MatchingEngineApp;
-import baoying.orderbook.testtool.qfj.FirstQFJClientBatch;
+import baoying.orderbook.app.UniqIDGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.ConfigError;
@@ -9,14 +8,15 @@ import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
@@ -103,5 +103,76 @@ public class TestToolUtil {
 
         return latencyRecord;
 
+    }
+
+    public static List<String> generateClientList(TestToolArgs testToolArgs){
+        List<String> clientIDs = new ArrayList<>();
+        {
+            IntStream.range(0, testToolArgs.numOfClients).forEach(it ->{
+                String clientEntityID = testToolArgs.clientCompIDPrefix +"_"+ UniqIDGenerator.next()+"_"+it;
+                clientIDs.add(clientEntityID);
+            });
+        }
+
+        return clientIDs;
+    }
+
+    public static List<OrderBrief> getOrderBriefList(TestToolArgs testToolArgs, List<String> clientIDs){
+
+        List<String> localSides = new ArrayList<>();
+        if(testToolArgs.sides.size()>0){
+            localSides.addAll(testToolArgs.sides);
+        }else{
+            localSides.add(testToolArgs.side);
+        }
+
+        List<String> localPrices = new ArrayList<>();
+        if(testToolArgs.prices.size()>0){
+            localPrices.addAll(testToolArgs.prices);
+        }else{
+            localPrices.add(testToolArgs.px);
+        }
+
+
+        List<OrderBrief> result= new ArrayList<>();
+        for(String side : localSides){
+            for(String px : localPrices){
+                for(String clientEntity : clientIDs){
+
+                    result.add(new OrderBrief(clientEntity,
+                            testToolArgs.symbol,
+                            side,
+                            testToolArgs.qty,
+                            testToolArgs.orderType,
+                            px));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public static class OrderBrief{
+        public final String _clientEntity;
+        public final String _symbol;
+        public final String _side;
+        public final String _qty;
+        public final String _ordType;
+        public final String _px;
+        OrderBrief(
+                String clientEntity,
+                String symbol,
+                String side,
+                String qty,
+                String ordType,
+                String px){
+            _clientEntity=clientEntity;
+            _symbol=symbol;
+            _side=side;
+            _qty=qty;
+            _ordType=ordType;
+            _px=px;
+
+        }
     }
 }

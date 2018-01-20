@@ -1,6 +1,7 @@
 package baoying.orderbook.app;
 
 
+import com.beust.jcommander.IStringConverter;
 import io.vertx.core.buffer.Buffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +11,7 @@ import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Util {
     private final static Logger log = LoggerFactory.getLogger(Util.class);
@@ -87,4 +87,14 @@ public class Util {
             this._2 = arg2;
         }
     }
+
+    public class CSVListConverter implements IStringConverter<List<String>> {
+
+        @Override
+        public List<String> convert(String csvValues) {
+            String [] values = csvValues.split(",");
+            return Arrays.asList(values);
+        }
+    }
+
 }

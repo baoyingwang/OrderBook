@@ -7,29 +7,29 @@ MYSCRIPTDIR=`(cd \`${DIRNAMECMD} ${0}\` ; echo \`pwd\`)`
 
 function run_single_case(){
 
-    jarfile_full_path=$1
-    bg_rate_per_second=$2
-    lt_rate_per_second=$3
-    duration_in_seconds=$4
-    interfaceType=${5:-TCP}
+    local tmp_jarfile_full_path=$1
+    local tmp_bg_rate_per_second=$2
+    local tmp_lt_rate_per_second=$3
+    local tmp_duration_in_seconds=$4
+    local tmp_interfaceType=${5:-TCP}
 
-    test_name=${interfaceType}_bg${bg_rate_per_second}perS_lt${lt_rate_per_second}perS_${duration_in_seconds}S_$(date '+%Y%m%d_%H%M%S')
-    echo "$test_name on jar: $jarfile_full_path"
+    local tmp_test_name=${tmp_interfaceType}_bg${tmp_bg_rate_per_second}.${bg_client_num}_lt${tmp_lt_rate_per_second}.${lt_client_num}_${tmp_duration_in_seconds}S_$(date '+%Y%m%d_%H%M%S')
+    echo "$tmp_test_name on jar: $tmp_jarfile_full_path"
 
-    background_rate_per_min=$(($bg_rate_per_second*60))
-    latency_rate_per_min=$(($lt_rate_per_second*60))
-    if [[ "$interfaceType" == "TCP" ]]; then
+    local tmp_background_rate_per_min=$(($tmp_bg_rate_per_second*60))
+    local tmp_latency_rate_per_min=$(($tmp_lt_rate_per_second*60))
+    if [[ "$tmp_interfaceType" == "TCP" ]]; then
         testToolMainClass=baoying.orderbook.testtool.vertx.VertxClientRoundBatch
     else
         testToolMainClass=baoying.orderbook.testtool.qfj.FirstQFJClientBatch
     fi
 
 
-    bash run_single_scenario.sh ${test_name} ${jarfile_full_path} ${background_rate_per_min} ${latency_rate_per_min} ${duration_in_seconds} ${testToolMainClass}
+    bash run_single_scenario.sh ${tmp_test_name} ${tmp_jarfile_full_path} ${tmp_background_rate_per_min} ${tmp_latency_rate_per_min} ${tmp_duration_in_seconds} ${testToolMainClass}
 
     cd ${MYSCRIPTDIR}
-    zip -r zip_${test_name}.zip ${test_name}
-    rm -rf ${test_name}
+    zip -r zip_${tmp_test_name}.zip ${tmp_test_name}
+    rm -rf ${tmp_test_name}
 
 }
 
@@ -45,14 +45,17 @@ interfaceType=${2:-TCP}  #TCP or  FIX
 
 
 cd ${MYSCRIPTDIR}
+bg_client_num=5
+lt_client_num=1
+#duration_in_seconds=600
+#for bg_rate_per_second in 50 500 1000 5000 10000 20000 40000 50000 60000
 duration_in_seconds=600
-for bg_rate_per_second in 50 500 1000 5000 10000 20000 40000 50000 60000
-#for bg_rate_per_second in 50 1000 5000
+for bg_rate_per_second in 50
 do
     #for lt_rate_per_second in 1 2 5
     for lt_rate_per_second in 1
     do
-	    run_single_case $jarfile_full_path ${bg_rate_per_second} ${lt_rate_per_second} ${duration_in_seconds} $interfaceType
+	    run_single_case $jarfile_full_path ${bg_rate_per_second} ${lt_rate_per_second} ${duration_in_seconds} $interfaceType ${bg_client_num} ${lt_client_num}
 	done
 done
 

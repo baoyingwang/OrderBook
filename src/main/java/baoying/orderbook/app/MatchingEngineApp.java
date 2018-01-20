@@ -162,21 +162,14 @@ public class MatchingEngineApp {
             _vertxWrapper.start();
         }
     }
-    class CSVListConverter implements IStringConverter<List<String>> {
 
-        @Override
-        public List<String> convert(String csvValues) {
-            String [] values = csvValues.split(",");
-            return Arrays.asList(values);
-        }
-    }
 
     static class Args {
 
         @Parameter(names = {"--vertx_tcp_port", "-v_p"})
         int vertx_tcp_port = 10005;
 
-        @Parameter(names = {"--symbols", "-s"}, listConverter = CSVListConverter.class)
+        @Parameter(names = {"--symbols", "-s"}, listConverter = Util.CSVListConverter.class)
         List<String> symbols = Arrays.asList(new String[]{"USDJPY"});
 
         @Parameter(names = {"--snapshot_interval_in_second"}, description = "the internal simple market data engine will request snaphost periodically . default : 1")
