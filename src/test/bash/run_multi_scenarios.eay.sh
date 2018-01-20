@@ -45,17 +45,26 @@ interfaceType=${2:-TCP}  #TCP or  FIX
 
 
 cd ${MYSCRIPTDIR}
-bg_client_num=5
-lt_client_num=1
-#duration_in_seconds=600
-#for bg_rate_per_second in 50 500 1000 5000 10000 20000 40000 50000 60000
 duration_in_seconds=600
-for bg_rate_per_second in 50
+
+declare -a bg_client_num_array=(1 10 100 500)
+declare -a lt_client_num_array=(1)
+declare -a bg_rate_per_second_array=(50 500 1000 5000 50000)
+declare -a lt_rate_per_second_array=(1)
+
+for bg_client_num in "${bg_client_num_array[@]}"
 do
-    #for lt_rate_per_second in 1 2 5
-    for lt_rate_per_second in 1
-    do
-	    run_single_case $jarfile_full_path ${bg_rate_per_second} ${lt_rate_per_second} ${duration_in_seconds} $interfaceType ${bg_client_num} ${lt_client_num}
+	for lt_client_num in "${lt_client_num_array[@]}"
+	do
+		for bg_rate_per_second in "${bg_rate_per_second_array[@]}"
+		do
+			#for lt_rate_per_second in 1 2 5
+			for lt_rate_per_second in "${lt_rate_per_second_array[@]}"
+			do
+				run_single_case $jarfile_full_path ${bg_rate_per_second} ${lt_rate_per_second} ${duration_in_seconds} $interfaceType ${bg_client_num} ${lt_client_num}
+			done
+		done
+
 	done
 done
 

@@ -16,14 +16,28 @@ function parseZipFile(){
 
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
     head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp                 > $name.e2e_LxTxCx_FIX_RT.csv
+
+	local latency_records_num=$(wc -l $name.e2e_LxTxCx_FIX_RT.csv.tmp | cut -d ' ' -f1)
+	local max_sort_can_handle=50000 #just a guess number
     #on git bash, sort silently quit on big file, e.g. 80MB
     #I expect Python will handle the sequence, since i have convert them to datetime. But looks like python does not handle that well.
-    if (( $(wc -l $name.e2e_LxTxCx_FIX_RT.csv.tmp | cut -d ' ' -f1) < 5000 )); then
-        sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)   >> $name.e2e_LxTxCx_FIX_RT.csv
+    if (( $latency_records_num < $max_sort_can_handle )); then
+        sort $name.e2e_LxTxCx_FIX_RT.csv.tmp | grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp)   > $name.e2e_LxTxCx_FIX_RT.csv.no_header
     else
-        grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp >> $name.e2e_LxTxCx_FIX_RT.csv
+        grep -v $(head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp) $name.e2e_LxTxCx_FIX_RT.csv.tmp > $name.e2e_LxTxCx_FIX_RT.csv.no_header
     fi
     rm $name.e2e_LxTxCx_FIX_RT.csv.tmp
+
+    local max_python_handle_lines_num=$(( 100 * 1000 )) #just a guess number
+    local awk_mod_for_latency_records=1
+    if (( $latency_records_num > $max_python_handle_lines_num )); then
+        awk_mod_for_latency_records=$(( ($latency_records_num * 2)/max_python_handle_lines_num ))
+    else
+        awk_mod_for_latency_records=1
+    fi
+
+    awk " NR % $awk_mod_for_latency_records == 0" $name.e2e_LxTxCx_FIX_RT.csv.no_header >> $name.e2e_LxTxCx_FIX_RT.csv
+    rm $name.e2e_LxTxCx_FIX_RT.csv.no_header
 
 
 
@@ -117,7 +131,7 @@ ls -lrt ${zipfies_dir} | grep "zip_" | awk '{print $NF }' | while read zipfile_n
 do
 
     echo "processing ${zipfile_name}"
-    name=$(echo ${zipfile_name} | cut -d '.' -f1 | cut -c5-)
+    name=$(echo ${zipfile_name::(-4)} |  cut -c5-)
 
     parseZipFile ${zipfies_dir}/${zipfile_name} "$name" "$vm_output_csv"
 done
