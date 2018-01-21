@@ -131,9 +131,12 @@ task buildPackage(group: 'build', type: Zip, dependsOn: shadowJar) {
 	ext.zipDistribution = true
 
 	into('jars') { from shadowJar }
-    into('scripts'){from ('src/test/bash/') { include('**/*') } }
-    into('scripts'){from ('src/test/python/') { include('**/*') } }
 
-	into('scripts/btrace'){from ('src/test/java/') { include('baoying/orderbook/BTrace*') } }
+	into('scripts'){from ('src/main/bash/') { include('**/*') } }
+
+    into('test_scripts'){from ('src/test/bash/') { include('**/*') } }
+    into('test_scripts'){from ('src/test/python/') { include('**/*') } }
+	into('test_scripts/btrace'){from ('src/test/java/') { include('baoying/orderbook/BTrace*') } }
+
 }
 
