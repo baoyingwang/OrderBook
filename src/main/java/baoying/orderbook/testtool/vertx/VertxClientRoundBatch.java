@@ -284,6 +284,11 @@ public class VertxClientRoundBatch {
         log.info("testtool -{}, clientNum:{}, ratePerMin:{}, symbol:{}, px:{}, qty:{}, ordType:{},side:{}",
                 testToolArgsO.clientCompIDPrefix,clientNum,ratePerMinute,symbol, price, qty, ordType, side);
 
+        if(testToolArgsO.ratePerMinute <=0 || testToolArgsO.durationInSecond <=0 ){
+
+            log.warn("exit since rate:{} or duration:{} is 0", testToolArgsO.ratePerMinute, testToolArgsO.durationInSecond);
+            System.exit(-1);
+        }
         VertxClientRoundBatch clientBatch = new VertxClientRoundBatch(testToolArgsO);
 
         clientBatch.execute();

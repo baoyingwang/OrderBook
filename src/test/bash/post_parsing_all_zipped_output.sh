@@ -12,9 +12,11 @@ function parseZipFile(){
 	unzip -p $zipfile $name/log/btrace.csv                  > $name.btrace.csv
 	unzip -p $zipfile $name/log/MatchingEngine.console.log  > $name.MatchingEngine.console.log
 	unzip -p $zipfile $name/log/engine_statistics.json.txt  > $name.engine_statistics.json.txt
-
-
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
+
+	echo "-- unzip done"
+
+
     head -1 $name.e2e_LxTxCx_FIX_RT.csv.tmp                 > $name.e2e_LxTxCx_FIX_RT.csv
 
 	local latency_records_num=$(wc -l $name.e2e_LxTxCx_FIX_RT.csv.tmp | cut -d ' ' -f1)
@@ -54,6 +56,7 @@ function parseZipFile(){
 	#python_script_file=/c/baoying.wang/ws/gitnas/OrderBook/src/test/python/parseLatencyData.py
 	python ${python_script_file} $name.e2e_LxTxCx_FIX_RT.csv $name.sysUsage.csv $name.sysInfo.txt ${vm_output_csv} $name.btrace $name.engine_statistics.json.txt $name
 
+    echo "-- python process done"
 }
 
 function generate_all_cases_summary(){
