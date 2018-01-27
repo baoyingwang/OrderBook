@@ -31,8 +31,8 @@ public class FirstQFJClientBatch {
     private final Vertx _vertx = Vertx.vertx();
 
     private Instant start = null;
-    private final AtomicInteger totalSent = new AtomicInteger(0);
-    private final AtomicInteger totalRecv = new AtomicInteger(0);
+    private final AtomicInteger _totalSent = new AtomicInteger(0);
+    private final AtomicInteger _totalRecv = new AtomicInteger(0);
 
 
     private final ExecutorService _fixLatencyERResult = Executors.newFixedThreadPool(2,new ThreadFactory() {
@@ -50,13 +50,52 @@ public class FirstQFJClientBatch {
     });
 
     final TestToolArgs _testToolArgs;
-    final List<String> clientIDs;
+    final int _latencySampleMean;
+
+
+    final List<String> _clientIDs;
+    final List<SessionID> clientSessionIDs;
     final List<TestToolUtil.OrderBrief> _orderInfoList;
 
     private String _latencyDataFile ;
     private final int bufferSize = 10*1024*1024;
     private final BufferedOutputStream output;
 
+
+    FirstQFJClientBatch(TestToolArgs testToolArgs) throws Exception{
+
+        _testToolArgs = testToolArgs;
+
+        int calculatedLatencySampleMean = testToolArgs.ratePerMinute / testToolArgs.latencySampleRatePerMinute;
+        if(calculatedLatencySampleMean == 0){
+            _latencySampleMean = 1;
+        }else{
+            _latencySampleMean = calculatedLatencySampleMean;
+        }
+
+        _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
+        output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
+
+        _clientIDs = TestToolUtil.generateClientList(_testToolArgs.clientCompIDPrefix, _testToolArgs.numOfClients);
+        clientSessionIDs = new ArrayList<>();
+        for(String clientEntityID : _clientIDs){
+            SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
+            clientSessionIDs.add(sessionID);
+        }
+        _orderInfoList = TestToolUtil.getOrderBriefList(_testToolArgs, _clientIDs);
+
+    }
+
+    void setupFIXConnection(Application application)throws  Exception{
+        String qfjConfigContent = getQFJConfigContent(_clientIDs);
+        SessionSettings settings = new SessionSettings(new ByteArrayInputStream(qfjConfigContent.getBytes())) ;
+        MessageStoreFactory storeFactory = new FileStoreFactory(settings);
+        LogFactory logFactory = new SLF4JLogFactory(settings);
+        MessageFactory messageFactory = new DefaultMessageFactory();
+
+        ThreadedSocketInitiator initiator = new ThreadedSocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
+        initiator.start();
+    }
 
     String  getQFJConfigContent(List<String> clientCompIDs)throws Exception{
 
@@ -74,29 +113,12 @@ public class FirstQFJClientBatch {
         return qfjConfigBaseContent+clientSessions;
     }
 
-    FirstQFJClientBatch(TestToolArgs testToolArgs) throws Exception{
-
-        _testToolArgs = testToolArgs;
-        _latencyDataFile = "log/e2e_"+testToolArgs.clientCompIDPrefix+".csv";
-        output = TestToolUtil.setupOutputLatencyFile(_latencyDataFile, bufferSize);
-
-        clientIDs = TestToolUtil.generateClientList(_testToolArgs);
-        _orderInfoList = TestToolUtil.getOrderBriefList(_testToolArgs, clientIDs);
-
-    }
-
 
 
     public void execute() throws  Exception{
 
         start = Instant.now();
 
-
-        List<SessionID> clientSessionIDs = new ArrayList<>();
-        for(String clientEntityID : clientIDs){
-            SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
-            clientSessionIDs.add(sessionID);
-        }
 
         AtomicInteger completedInCurrentPeriodCounter = new AtomicInteger(0);
 
@@ -114,11 +136,12 @@ public class FirstQFJClientBatch {
                     }
                     long erTimeNano = System.nanoTime();
 
-                    totalRecv.incrementAndGet();
+                    _totalRecv.incrementAndGet();
                     int completedInCurrentPeriod = completedInCurrentPeriodCounter.incrementAndGet();
 
                     //TODO add SOH in the index
-                    if(msg.getHeader().getString(56).indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX) ==0){
+                    if(msg.getHeader().getString(56).startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX)
+                            && _totalSent.get() % _latencySampleMean == 0){
 
                         String latencyRecord= TestToolUtil.getLantecyRecord(msg,erTimeNano);
                         if(latencyRecord.length() < 1){
@@ -135,21 +158,9 @@ public class FirstQFJClientBatch {
                     }
 
                     if(completedInCurrentPeriod < batchConfig._msgNumPerPeriod) {
-                        int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
-                        String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
-                        SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
 
-                        Message order = buildOrder(nextClientCompID);
-                        _fixSendingBatchOrder.submit(()->{
-                            try {
-                                Session.sendToTarget(order, nextClientSessionID);
-                            }catch (Exception e){
-                                log.error("fail to send order to target:"+nextClientSessionID.toString(), e);
-                            }
-                        });
+                        asyncSendNextOrder();
 
-
-                        totalSent.incrementAndGet();
                     }else{
                         completedInCurrentPeriodCounter.set(0);
                     }
@@ -168,37 +179,24 @@ public class FirstQFJClientBatch {
             }
         };
 
-        String qfjConfigContent = getQFJConfigContent(clientIDs);
-        SessionSettings settings = new SessionSettings(new ByteArrayInputStream(qfjConfigContent.getBytes())) ;
-        MessageStoreFactory storeFactory = new FileStoreFactory(settings);
-        LogFactory logFactory = new SLF4JLogFactory(settings);
-        MessageFactory messageFactory = new DefaultMessageFactory();
 
-        ThreadedSocketInitiator initiator = new ThreadedSocketInitiator(application, storeFactory, settings, logFactory,messageFactory);
-        initiator.start();
+        setupFIXConnection(application);
 
         while(true){
-            if(connectedClients.get() < clientIDs.size()){
-                log.info("testtool - {} - wait all connections ready, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, clientIDs.size(), connectedClients.get());
-                TimeUnit.SECONDS.sleep(3);
+            if(connectedClients.get() < _clientIDs.size()){
+                log.info("testtool - {} - wait all connections ready, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, _clientIDs.size(), connectedClients.get());
+                TimeUnit.SECONDS.sleep(1);
             }else{
                 break;
             }
         }
-        TimeUnit.SECONDS.sleep(3);
+        TimeUnit.SECONDS.sleep(1);
         log.info("{} all connections ready", _testToolArgs.clientCompIDPrefix);
 
         //the schedule is to trigger the first order of each period
         Runnable command = ()-> {
             try {
-                int nextClientCompIDIndex = totalSent.get() % _testToolArgs.numOfClients;
-                String nextClientCompID = clientIDs.get(nextClientCompIDIndex);
-                SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
-
-                Message order = buildOrder(nextClientCompID);
-                Session.sendToTarget(order, nextClientSessionID);
-
-                totalSent.incrementAndGet();
+                asyncSendNextOrder();
             } catch (Exception e) {
                 log.error("exception while sending",e);
             }
@@ -210,10 +208,29 @@ public class FirstQFJClientBatch {
 
         start = Instant.now();
         _vertx.setPeriodic(30 * 1000, (v)->{
-            double sendRateInSecond = TestToolUtil.getCurrentRateInSecond(start, totalSent);
-            log.warn("{} - totalSent:{}, rotalRecv:{}, sendRateInSecond:{}", _testToolArgs.clientCompIDPrefix, totalSent, totalRecv, String.format("%.2f", sendRateInSecond));
+            double sendRateInSecond = TestToolUtil.getCurrentRateInSecond(start, _totalSent);
+            log.warn("{} - _totalSent:{}, rotalRecv:{}, sendRateInSecond:{}", _testToolArgs.clientCompIDPrefix, _totalSent, _totalRecv, String.format("%.2f", sendRateInSecond));
         });
 
+    }
+
+    void asyncSendNextOrder() throws Exception{
+
+        int nextClientCompIDIndex = _totalSent.get() % _testToolArgs.numOfClients;
+        String nextClientCompID = _clientIDs.get(nextClientCompIDIndex);
+        SessionID nextClientSessionID = clientSessionIDs.get(nextClientCompIDIndex);
+
+        Message order = buildOrder(nextClientCompID);
+
+        _fixSendingBatchOrder.submit(()->{
+            try {
+                Session.sendToTarget(order, nextClientSessionID);
+            }catch (Exception e){
+                log.error("fail to send order to target:"+nextClientSessionID.toString(), e);
+            }
+        });
+
+        _totalSent.incrementAndGet();
     }
 
     Message buildOrder(String clientCompID) throws Exception{

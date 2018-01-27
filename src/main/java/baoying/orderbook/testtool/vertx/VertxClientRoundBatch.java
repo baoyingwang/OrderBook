@@ -32,9 +32,10 @@ public class VertxClientRoundBatch {
     private final Vertx _vertx = Vertx.vertx();
 
     final TestToolArgs _testToolArgs;
+    final int _latencySampleMean;
+
     final List<String> clientIDs;
     final List<TestToolUtil.OrderBrief> _orderInfoList;
-
 
     final Map<String, NetSocket> liveSockets = new HashMap<>();
 
@@ -60,7 +61,14 @@ public class VertxClientRoundBatch {
 
         _testToolArgs = testToolArgs;
 
-        clientIDs = TestToolUtil.generateClientList(_testToolArgs);
+        int calculatedLatencySampleMean = testToolArgs.ratePerMinute / testToolArgs.latencySampleRatePerMinute;
+        if(calculatedLatencySampleMean == 0){
+            _latencySampleMean = 1;
+        }else{
+            _latencySampleMean = calculatedLatencySampleMean;
+        }
+
+        clientIDs = TestToolUtil.generateClientList(_testToolArgs.clientCompIDPrefix, _testToolArgs.numOfClients);
         _orderInfoList = TestToolUtil.getOrderBriefList(_testToolArgs, clientIDs);
 
 
@@ -102,7 +110,7 @@ public class VertxClientRoundBatch {
         while(true){
             if(connectedClients.get() < clientIDs.size()){
                 log.info("testtool - {} - wait all connections ready, expect:{}, now:{}", _testToolArgs.clientCompIDPrefix, clientIDs.size(), connectedClients.get());
-                TimeUnit.SECONDS.sleep(3);
+                TimeUnit.SECONDS.sleep(1);
             }else{
                 break;
             }
@@ -132,7 +140,12 @@ public class VertxClientRoundBatch {
 
                     if(completedInCurrentPeriod < c._msgNumPerPeriod) {
 
-                        sendNextOrder(totalSent.get());
+                        //you should NOT run the socket.write in this callback directly
+                        //it maybe cause deadlock on the event loop threads, for the waring of NetSocketImpl
+                        //since it is holding the NetSocketImpl in this callback, and maybe try to lock another NetSocketImpl for sending.
+                        _vertx.runOnContext((v)->{
+                            sendNextOrder(totalSent.get());
+                        });
 
                         totalSent.incrementAndGet();
 
@@ -228,18 +241,11 @@ public class VertxClientRoundBatch {
         return orderAsBuffer;
     }
 
-    static DataDictionary dd50sp1 ;
-    static{
-        try {
-            dd50sp1= new DataDictionary("FIX50SP1.xml");
-        } catch (ConfigError configError) {
-            configError.printStackTrace();
-        }
-    }
-    static boolean fixMsgDoValidation = false;
+
     void handleER(String fixER, long recvTimeNano){
 
-        if(fixER.indexOf("\u000156="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0){
+        if(fixER.indexOf("\u000156="+MatchingEngineApp.LATENCY_ENTITY_PREFIX) > 0
+                && totalSent.get() % _latencySampleMean == 0){
 
 
             String latencyRecord= TestToolUtil.getLantecyRecord(fixER,recvTimeNano);

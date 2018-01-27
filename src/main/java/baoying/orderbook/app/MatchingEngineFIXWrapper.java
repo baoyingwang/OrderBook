@@ -201,8 +201,10 @@ public class MatchingEngineFIXWrapper {
                     }
 
                     long zeroOLatencyOrdRrecvTimeNano = 0;
-                    boolean isLatencyClient;
-                    if(paramSessionID.getSenderCompID().indexOf(MatchingEngineApp.LATENCY_ENTITY_PREFIX)>0){
+
+                    //here, the targetCompID of session is the client ID
+                    boolean isLatencyClient = paramSessionID.getTargetCompID().startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX);
+                    if(isLatencyClient){
                         zeroOLatencyOrdRrecvTimeNano = System.nanoTime();
                     }
                     processIncomingOrder(paramMessage,paramSessionID ,zeroOLatencyOrdRrecvTimeNano);

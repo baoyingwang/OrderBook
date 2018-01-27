@@ -13,6 +13,7 @@ function parseZipFile(){
 	unzip -p $zipfile $name/log/MatchingEngine.console.log  > $name.MatchingEngine.console.log
 	unzip -p $zipfile $name/log/engine_statistics.json.txt  > $name.engine_statistics.json.txt
 	unzip -p $zipfile $name/log/e2e_LxTxCx_FIX_RT*          > $name.e2e_LxTxCx_FIX_RT.csv.tmp
+    unzip -p $zipfile $name.console.log                     > $name.testscript.console.log
 
 	echo "-- unzip done"
 

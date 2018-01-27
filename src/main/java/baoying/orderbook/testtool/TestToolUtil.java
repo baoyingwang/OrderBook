@@ -105,11 +105,11 @@ public class TestToolUtil {
 
     }
 
-    public static List<String> generateClientList(TestToolArgs testToolArgs){
+    public static List<String> generateClientList(final String clientCompIDPrefix, final int numOfClients){
         List<String> clientIDs = new ArrayList<>();
         {
-            IntStream.range(0, testToolArgs.numOfClients).forEach(it ->{
-                String clientEntityID = testToolArgs.clientCompIDPrefix +"_"+ UniqIDGenerator.next()+"_"+it;
+            IntStream.range(0, numOfClients).forEach(it ->{
+                String clientEntityID = clientCompIDPrefix +"_"+ UniqIDGenerator.next()+"_"+it;
                 clientIDs.add(clientEntityID);
             });
         }

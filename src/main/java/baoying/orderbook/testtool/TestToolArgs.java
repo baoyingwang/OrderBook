@@ -50,4 +50,8 @@ public class TestToolArgs {
     @Parameter(names = {"-prices"}, description="comma separated price. higher priority than -px.", listConverter = Util.CSVListConverter.class)
     public List<String> prices = new ArrayList<>();
 
+    @Parameter(names =  "-latencySampleRatePerMin", description = "if the real number is less then 600 per minute, all are recorded")
+    public int latencySampleRatePerMinute = 600;
+
+
 }

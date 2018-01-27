@@ -36,6 +36,7 @@ function run_single_case(){
     cd ${MYSCRIPTDIR}
     zip -r zip_${tmp_test_name}.zip ${tmp_test_name} ${tmp_test_name}.console.log
     rm -rf ${tmp_test_name}
+    rm ${tmp_test_name}.console.log
 
 }
 
