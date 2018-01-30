@@ -1,16 +1,12 @@
 package baoying.orderbook.app;
 
+import baoying.orderbook.MarketDataMessage;
 import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
-import baoying.orderbook.testtool.FirstQFJClientBatch;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
-import com.lmax.disruptor.BusySpinWaitStrategy;
-import com.lmax.disruptor.SleepingWaitStrategy;
-import com.lmax.disruptor.WaitStrategy;
-import com.lmax.disruptor.YieldingWaitStrategy;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -24,6 +20,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -34,13 +31,16 @@ import static java.nio.file.StandardOpenOption.CREATE;
 public class MatchingEngineApp {
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineApp.class);
+
+    public static String LATENCY_ENTITY_PREFIX = "LxTxCx";
+
     private static List<String> _symbolList;
-    private static String _queueType;
-    private static String _disruptorStrategy;
-    private static int _queueSize;
     private static int _snapshotRequestIntervalInSecond;
+    private static int _vertx_tcp_port;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
+
+
 
     MatchingEngineApp() throws Exception{
         _internalMatchingEngineApp = new InternalMatchingEngineApp(_symbolList);
@@ -65,9 +65,14 @@ public class MatchingEngineApp {
     @Bean
     MatchingEngine engine() { return _internalMatchingEngineApp._engine;}
 
+    @Bean
+    Vertx vertx() { return _internalMatchingEngineApp._vertx;}
+
     class InternalMatchingEngineApp {
 
         private final MatchingEngine _engine;
+
+        private final Vertx _vertx = Vertx.vertx();
 
         private final AsyncEventBus _marketDataBus;
         private final AsyncEventBus _executionReportsBus;
@@ -77,10 +82,9 @@ public class MatchingEngineApp {
 
         private final MatchingEngineWebWrapper _webWrapper;
         private final MatchingEngineFIXWrapper _fixWrapper;
+        private final MatchingEngineVertxWrapper _vertxWrapper;
 
-        private final SysPerfDataCollectionEngine sysPerfEngine;
-
-
+        private final JVMDataCollectionEngine sysPerfEngine;
 
         public InternalMatchingEngineApp(List<String> symbols) throws Exception {
 
@@ -88,7 +92,7 @@ public class MatchingEngineApp {
             String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
             Path usageFile = Paths.get("log/sysUsage_app.start" + startTimeAsFileName + ".csv");
             Path sysInfoFile = Paths.get("log/sysInfo_app.start" + startTimeAsFileName + ".txt");
-            sysPerfEngine = SysPerfDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
+            sysPerfEngine = JVMDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
             Map<String, String> config = sysPerfEngine.config();
             config.forEach((k, v) -> {
                 try {
@@ -99,114 +103,90 @@ public class MatchingEngineApp {
                 }
             });
 
-            _executionReportsBus = new AsyncEventBus("async evt ER bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
-                                                                                                                                 @Override
-                                                                                                                                 public Thread newThread(Runnable r) {
-                                                                                                                                     return new Thread(r, "Thread - async evt ER bus - for all engines");
-                                                                                                                                 }
-                                                                                                                             }
+            _executionReportsBus = new AsyncEventBus("async ER bus", Executors.newSingleThreadExecutor(new ThreadFactory() {
+                                                                                     @Override
+                                                                                     public Thread newThread(Runnable r) {
+                                                                                         return new Thread(r, "Thread - async ER Bus");
+                                                                                     }
+}
             )
             );
-            _marketDataBus = new AsyncEventBus("async evt MD bus - for all engines", Executors.newSingleThreadExecutor(new ThreadFactory() {
+            _marketDataBus = new AsyncEventBus("async MD bus", Executors.newSingleThreadExecutor(new ThreadFactory() {
                                                                                                                            @Override
                                                                                                                            public Thread newThread(Runnable r) {
-                                                                                                                               return new Thread(r, "Thread - async evt MD bus - for all engines");
+                                                                                                                               return new Thread(r, "Thread - async MD bus");
                                                                                                                            }
                                                                                                                        }
             )
             );
 
-            switch (_queueType) {
-                case "Disruptor":
-                    final WaitStrategy waitStrategy;
-                    switch (_disruptorStrategy) {
-                        case "SleepingWaitStrategy":
-                            waitStrategy = new SleepingWaitStrategy();
-                            break;
-                        case "YieldingWaitStrategy":
-                            waitStrategy = new YieldingWaitStrategy();
-                            break;
-                        case "BusySpinWaitStrategy":
-                            waitStrategy = new BusySpinWaitStrategy();
-                            break;
-                        default:
-                            throw new RuntimeException("unknown disruptor strategy:" + _disruptorStrategy + ". Only SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy  is supported.");
+            _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus);
 
-                    }
-
-                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize, waitStrategy);
-                    break;
-
-                case "BlockingQueue":
-                    _engine = new MatchingEngine(_symbolList, _executionReportsBus, _marketDataBus, _queueSize);
-                    break;
-                default:
-                    throw new RuntimeException("unknown queue type:" + _queueType + ". Only Disruptor and BlockingQueue is supported.");
-            }
 
             _simpleOMSEngine = new SimpleOMSEngine();
-            _simpleMarkderDataEngine = new SimpleMarkderDataEngine(_engine, _snapshotRequestIntervalInSecond);
+            _simpleMarkderDataEngine = new SimpleMarkderDataEngine();
             _executionReportsBus.register(_simpleOMSEngine);
+
             _marketDataBus.register(_simpleMarkderDataEngine);
 
 
             _webWrapper = new MatchingEngineWebWrapper(_engine,
+                    _vertx,
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine);
 
             _fixWrapper = new MatchingEngineFIXWrapper(_engine,
-                    _simpleOMSEngine,
-                    _simpleMarkderDataEngine,
+                    _vertx,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
-            //register FIX, for streaming output
+
             _executionReportsBus.register(_fixWrapper);
+
+
+            _vertxWrapper = new MatchingEngineVertxWrapper(_engine,_vertx, _vertx_tcp_port);
+            _executionReportsBus.register(_vertxWrapper);
+
         }
 
         public void start() throws Exception {
 
             log.info("start the MatchingEngineApp");
-            _engine.start();
             _simpleMarkderDataEngine.start();
-
             _fixWrapper.start();
-        }
-    }
-    class CSVListConverter implements IStringConverter<List<String>> {
 
-        @Override
-        public List<String> convert(String csvValues) {
-            String [] values = csvValues.split(",");
-            return Arrays.asList(values);
+            _vertx.setPeriodic(_snapshotRequestIntervalInSecond * 1000, id ->{
+                for(String symbol: _engine._symbols){
+                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+                }
+            });
+
+            _vertxWrapper.start();
         }
     }
+
+
     static class Args {
-        @Parameter(names = {"--symbols", "-s"}, listConverter = CSVListConverter.class)
+
+        @Parameter(names = {"--vertx_tcp_port", "-v_p"})
+        int vertx_tcp_port = 10005;
+
+        @Parameter(names = {"--symbols", "-s"}, listConverter = Util.CSVListConverter.class)
         List<String> symbols = Arrays.asList(new String[]{"USDJPY"});
 
-        @Parameter(names = {"--queue_type", "-qt"}, description = "queue type: BlockingQueue(default), Disruptor")
-        private String queueType = "BlockingQueue";
-
-        @Parameter(names = {"--strategy", "-sn"}, description = "strategy for Disruptor : SleepingWaitStrategy(default), YieldingWaitStrategy, and BusySpinWaitStrategy")
-        private String disruptorStrategy = "SleepingWaitStrategy";
-
-        @Parameter(names = {"--queue_size", "-qs"}, description = "queue size. default : 65536. 2^x is required for Disruptor Q type")
-        private int queueSize = 65536;
-
         @Parameter(names = {"--snapshot_interval_in_second"}, description = "the internal simple market data engine will request snaphost periodically . default : 1")
-        private int snapshotRequestIntervalInSecond = 1;
+        private int snapshotRequestIntervalInSecond = 2;
 
     }
 
     public static void main(String[] args) {
+
         Args argsO = new Args();
         JCommander.newBuilder().addObject(argsO).build().parse(args);
 
         //TODO how to pass the argument in to MatchingEngineApp? right now, static fields are used
-        _queueType = argsO.queueType;
-        _disruptorStrategy = argsO.disruptorStrategy;
-        _queueSize = argsO.queueSize;
         _symbolList = argsO.symbols;
         _snapshotRequestIntervalInSecond = argsO.snapshotRequestIntervalInSecond;
+        _vertx_tcp_port = argsO.vertx_tcp_port;
+
 
         SpringApplication.run(MatchingEngineApp.class);
     }

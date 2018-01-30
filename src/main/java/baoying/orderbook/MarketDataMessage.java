@@ -3,12 +3,11 @@ package baoying.orderbook;
 import java.util.TreeMap;
 
 import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
-import baoying.orderbook.OrderBook.MatchingEngineInputMessageFlag;
+import baoying.orderbook.OrderBook.MDMarketDataMessageFlag;
 
 public class MarketDataMessage {
 	
-	public static class OrderBookDelta implements MatchingEnginOutputMessageFlag {
+	public static class OrderBookDelta implements MDMarketDataMessageFlag {
 
 		final String _symbol;
 		final Side _side;
@@ -24,7 +23,7 @@ public class MarketDataMessage {
 
 	}
 
-	public static class AggregatedOrderBook implements MatchingEnginOutputMessageFlag{
+	public static class AggregatedOrderBook implements MDMarketDataMessageFlag{
 
 		public long _msgID;
 
@@ -43,7 +42,7 @@ public class MarketDataMessage {
 
 	}
 
-	public static class AggregatedOrderBookRequest implements MatchingEngineInputMessageFlag{
+	public static class AggregatedOrderBookRequest{
 
 		final String _requestID;
 		final String _symbol;

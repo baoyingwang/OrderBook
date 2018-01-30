@@ -3,6 +3,8 @@ package baoying.orderbook.app;
 import baoying.orderbook.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,17 +23,22 @@ public class MatchingEngineWebWrapper {
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
 
     private final MatchingEngine _engine;
+
+    private final Vertx _vertx;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
     MatchingEngineWebWrapper(MatchingEngine engine,
+                             Vertx vertx,
                              SimpleOMSEngine simpleOMSEngine,
                              SimpleMarkderDataEngine simpleMarkderDataEngine){
 
+        _engine = engine;
+        _vertx = vertx;
+
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
-        _engine = engine;
 
     }
 
@@ -63,16 +70,18 @@ public class MatchingEngineWebWrapper {
 
 
         TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
-        if(clientEntity.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-            originalOrder._recvFromClient_sysNano_test = System.nanoTime();
-        }
+        _vertx.runOnContext((v)->{
 
-        TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-        _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
+            final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
 
-        Gson gson = new GsonBuilder().create();
-        String jsonString = gson.toJson(erNew);
-        return jsonString;
+
+
+        });
+
+        //Gson gson = new GsonBuilder().create();
+        //String jsonString = gson.toJson(erNew);
+        return "place order done, orderID:" + orderID;
+
 
     }
 
@@ -105,63 +114,35 @@ public class MatchingEngineWebWrapper {
 
     @RequestMapping("/reset_test_data")
     public String resetBeforeTest(){
-        _simpleOMSEngine.perfTestDataForWeb.resetBeforeTest();
+        _engine.statistics.reset();
         log.info("===============reset_test_data===============");
         return "reset done";
     }
 
     @RequestMapping("/get_test_summary")
-    public String endTest(){
+    public String summary(){
+
+        MatchingDataStatistics stat = _engine.statistics;
+        //return _engine.statistics.summary();
 
         String jsonString ="";
         try {
-            log.info("get_test_summary enter");
-            Map<String, Object> data = new HashMap<>();
 
-            long allOrderCount = _simpleOMSEngine.perfTestDataForWeb.count();
-            data.put("order_count", allOrderCount);
+            Map<String, String> overall = _engine.statistics.overallSummary();
 
-            if (allOrderCount < 2) {
-                log.error("get_test_summary - ERROR - no order during the test");
-                return "ERROR - not calculate summary if order count less than 2, now:" + allOrderCount;
+            List<Map<String, String>> periods = new ArrayList<>();
+            List<MatchingDataStatistics.CurrentPeriod> periodsList = _engine.statistics.dataList();
+            for(MatchingDataStatistics.CurrentPeriod p: periodsList){
+                periods.add(p.summaryAsHash());
             }
 
-            long startTimeInEpochMS = _simpleOMSEngine.perfTestDataForWeb.startInEpochMS();
-            Instant instantStart = Instant.ofEpochMilli(startTimeInEpochMS);
-            data.put("start_time", instantStart.toString());
-            log.info("get_test_summary - start_time");
-
-            final Instant instantEnd;
-            final long endTimeInEpochMS;
-            {
-                endTimeInEpochMS = _simpleOMSEngine.perfTestDataForWeb.lastInEpochMS();
-                instantEnd = Instant.ofEpochMilli(endTimeInEpochMS);
-            }
-            data.put("end_time", instantEnd.toString());
-            log.info("get_test_summary - end_time");
-
-            long durationInSecond = (endTimeInEpochMS - startTimeInEpochMS) / 1000; //TODO use Instant diff
-            if (durationInSecond < 1) {
-                log.error("get_test_summary - ERROR - not proceed calculation for test within 1 second");
-                return "ERROR - not proceed calculation for test within 1 second";
-            }
-            data.put("duration_in_second", durationInSecond);
-            log.info("get_test_summary - duration_in_second");
-
-            final double ratePerSecond = allOrderCount * 1.0 / durationInSecond;
-            data.put("rate_per_second", String.format("%.2f", ratePerSecond));
-
-            final long latency_data_count_all = _simpleOMSEngine.perfTestDataForWeb.latencyOrdCount();
-            data.put("latency_data_count", latency_data_count_all);
-            data.put("latency_data_rate_per_second", String.format("%.2f",latency_data_count_all*1.0/durationInSecond));
-
-            List<long[]> tailResponseLatencyData = _simpleOMSEngine.perfTestDataForWeb.getListCopy();
-            data.put("latency_data", tailResponseLatencyData);
+            Map<String, Object> result = new HashMap<>();
+            result.put("overall", overall);
+            result.put("periods", periods);
 
             Gson gson = new GsonBuilder().create();
-            jsonString = gson.toJson(data);
+            jsonString = gson.toJson(result);
 
-            log.info("get_test_summary end");
         }catch(Exception e){
             log.error("exception during get_test_summary", e);
         }

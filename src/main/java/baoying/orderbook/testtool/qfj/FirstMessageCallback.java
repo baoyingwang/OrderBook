@@ -1,16 +1,10 @@
-package baoying.orderbook.testtool;
+package baoying.orderbook.testtool.qfj;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.Application;
-import quickfix.DoNotSend;
-import quickfix.FieldNotFound;
-import quickfix.IncorrectDataFormat;
-import quickfix.IncorrectTagValue;
 import quickfix.Message;
-import quickfix.RejectLogon;
 import quickfix.SessionID;
-import quickfix.UnsupportedMessageType;
 
 /**
  * 

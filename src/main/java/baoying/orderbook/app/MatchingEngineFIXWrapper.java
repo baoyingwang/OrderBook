@@ -2,18 +2,16 @@ package baoying.orderbook.app;
 
 import baoying.orderbook.CommonMessage;
 import baoying.orderbook.MatchingEngine;
+import baoying.orderbook.OrderBook;
 import baoying.orderbook.TradeMessage;
-import baoying.orderbook.testtool.LatencyMessageCallback;
+import baoying.orderbook.qfj.QFJDynamicSessionAcceptor;
+import baoying.orderbook.testtool.FIXMessageUtil;
 import com.google.common.eventbus.Subscribe;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.*;
-import quickfix.mina.acceptor.AcceptorSessionProvider;
-import quickfix.mina.acceptor.DynamicAcceptorSessionProvider;
 
-import javax.annotation.PostConstruct;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,50 +20,48 @@ import java.util.concurrent.ThreadFactory;
 //https://www.java2blog.com/spring-boot-web-application-example/
 public class MatchingEngineFIXWrapper {
 
+
+
     //warn : should be exactly same with the value in the quickfix configuration file
     public static String serverCompID = "BaoyingMatchingCompID";
 
     private final static Logger log = LoggerFactory.getLogger(MatchingEngineFIXWrapper.class);
 
     private final MatchingEngine _engine;
-    private final SimpleOMSEngine _simpleOMSEngine;
-    private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
-    private final DynamicSessionQFJAcceptor _dynamicSessionQFJAcceptor;
+    private final Vertx _vertx;
+
+    private final QFJDynamicSessionAcceptor _QFJDynamicSessionAcceptor;
     private final String _appConfigInClasspath;
 
     private final Set<String> _triedLogonClientCompIDs = new HashSet<>();
 
 
-    private final ExecutorService _fixERSendingExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+    private final ExecutorService _fixProcessMatchResultExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
-            return new Thread(r, "Thread - FIXInterface Sending ER");
+            return new Thread(r, "Thread - FIXInterface processes match result");
         }
-    }
-            );
-
+    });
 
     MatchingEngineFIXWrapper(MatchingEngine engine,
-                             SimpleOMSEngine simpleOMSEngine,
-                             SimpleMarkderDataEngine simpleMarkderDataEngine,
+                             Vertx vertx,
                              String appConfigInClasspath) throws Exception{
 
-        _simpleOMSEngine=simpleOMSEngine;
-        _simpleMarkderDataEngine=simpleMarkderDataEngine;
         _engine = engine;
 
+        _vertx = vertx;
 
         _appConfigInClasspath = appConfigInClasspath;
-        _dynamicSessionQFJAcceptor = new DynamicSessionQFJAcceptor(_appConfigInClasspath, new InternalQFJApplicationCallback());
+        _QFJDynamicSessionAcceptor = new QFJDynamicSessionAcceptor(_appConfigInClasspath, new InternalQFJApplicationCallback());
 
     }
-    @PostConstruct
+
     public void start() throws Exception{
 
         log.info("start the MatchingEngineFIXWrapper");
 
-        _dynamicSessionQFJAcceptor.start();
+        _QFJDynamicSessionAcceptor.start();
 
         log.info("start the MatchingEngineFIXWrapper - done");
     }
@@ -73,24 +69,56 @@ public class MatchingEngineFIXWrapper {
     @Subscribe
     public void process(TradeMessage.SingleSideExecutionReport singleSideExecutionReport) {
 
-        if(!_triedLogonClientCompIDs.contains(singleSideExecutionReport._originOrder._clientEntityID)){
-            //orders from web/jmeter(etc) could also reach here
+        if(! (singleSideExecutionReport._originOrder._source == CommonMessage.ExternalSource.FIX)){
             return;
         }
 
-        final SessionID sessionID ;
-        Message er = buildFIXExecutionReport(singleSideExecutionReport);
-        sendER(er, singleSideExecutionReport._originOrder._clientEntityID);
+        _fixProcessMatchResultExecutor.submit(()->{
+
+            Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
+            try {
+                sendER(fixER, singleSideExecutionReport._originOrder._clientEntityID);
+            } catch (Exception e) {
+                log.error("problem while processing:"+fixER.toString(),e);
+            }
+        });
+
 
     }
 
     @Subscribe
-    public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport) {
-        processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.MAKER);
-        processOneSideOfMatchingReport(matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER.TAKER);
+    public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport){
+
+        List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
+                = MatchingEngineFIXHelper.translateMatchedER(
+                CommonMessage.ExternalSource.FIX,
+                matchedExecutionReport);
+
+        for(Util.Tuple<Message,TradeMessage.OriginalOrder> fixER_ord : fixERs){
+
+            if(fixER_ord._2._isLatencyTestOrder){
+                long order_process_done_sysNano_test = System.nanoTime();
+                String latencyTimes = fixER_ord._2._latencyTimesFromClient
+                        +","+fixER_ord._2._recvFromClient_sysNano_test
+                        +","+ order_process_done_sysNano_test ;
+                fixER_ord._1.setString(FIXMessageUtil.latencyTimesField, latencyTimes);
+            }
+
+            _fixProcessMatchResultExecutor.submit(()->{
+
+                try {
+                    sendER(fixER_ord._1, fixER_ord._2._clientEntityID);
+                } catch (Exception e) {
+                    log.error("problem while processing:"+fixER_ord._1.toString(),e);
+                }
+
+
+            });
+        }
     }
 
-    public void processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
+
+    public Util.Tuple<Message,TradeMessage.OriginalOrder> processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){
 
         final TradeMessage.OriginalOrder originalOrder;
         switch(maker_taker){
@@ -104,185 +132,6 @@ public class MatchingEngineFIXWrapper {
                 throw new RuntimeException("unknown side : "+maker_taker);
         }
 
-        if(!_triedLogonClientCompIDs.contains(originalOrder._clientEntityID)){
-            //orders from web/jmeter(etc) could also reach here
-            return;
-        }
-
-        if( originalOrder._clientEntityID.startsWith(SimpleOMSEngine.IGNORE_ENTITY_PREFIX)) {
-            return;
-        }
-
-
-        Message er = buildExternalERfromInternalER(matchedExecutionReport, maker_taker);
-
-
-        //TODO move before build ER
-        if(originalOrder._isLatencyTestOrder) {
-            long pickedFromOutputBus_nano = System.nanoTime();
-            String latencyTimes = originalOrder._latencyTimesFromClient
-                    + "," + matchedExecutionReport._takerOriginOrder._recvFromClient_sysNano_test
-                    + "," + matchedExecutionReport._taker_enterInputQ_sysNano_test
-                    + "," + matchedExecutionReport._taker_pickFromInputQ_sysNano_test
-                    + "," + matchedExecutionReport._matched_sysNano_test
-                    + "," + pickedFromOutputBus_nano;
-            er.setString(LatencyMessageCallback.latencyTimesField, latencyTimes);
-        }
-
-
-        sendER(er, originalOrder._clientEntityID);
-
-    }
-
-    private void sendER(Message er, String clientEntityID){
-
-        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
-        sendER(er, sessionID);
-    }
-
-    private void sendER(Message er, SessionID sessionID){
-
-        if(! Session.doesSessionExist(sessionID)){
-            log.warn("ignore the realtime ER to client, since the session:{} is not online now", sessionID.toString());
-            return;
-        }
-
-        _fixERSendingExecutor.submit(new Runnable() {
-            @Override
-            public void run() {
-                try{
-                    Session.sendToTarget(er, sessionID);
-                }catch (Exception e){
-                    log.error("failure", e);
-                }
-            }
-        });
-    }
-
-    class InternalQFJApplicationCallback implements Application {
-
-            @Override
-            public void fromAdmin(Message message, SessionID sessionId) {
-                log.debug("fromAdmin session:{}, received : {} ", sessionId, message);
-            }
-
-            @Override
-            public void fromApp(final Message paramMessage, final SessionID paramSessionID)  {
-                log.debug("fromApp session:{}, received : {} ", paramSessionID, paramMessage);
-
-                try {
-
-                    String msgType = paramMessage.getHeader().getString(35);
-                    if(! "D".equals(msgType) ){
-                        log.error("msg type:{} is not supported. msg:{}", msgType, paramMessage.toString());
-                        return;
-                    }
-
-                    String orderID = UniqIDGenerator.next();
-                    TradeMessage.OriginalOrder originalOrder = buildOriginalOrder(paramMessage, orderID);
-                    if(originalOrder._clientEntityID.startsWith(MatchingEngine.LATENCY_ENTITY_PREFIX)){
-                        originalOrder._isLatencyTestOrder = true;
-                        originalOrder._recvFromClient_sysNano_test = System.nanoTime();
-
-                        if(paramMessage.isSetField(LatencyMessageCallback.latencyTimesField)){
-                            originalOrder._latencyTimesFromClient = paramMessage.getString(LatencyMessageCallback.latencyTimesField);
-                        }
-                    }
-
-
-                    TradeMessage.SingleSideExecutionReport erNew = _engine.addOrder(originalOrder);
-                    _simpleOMSEngine.perfTestDataForWeb.recordNewOrder(originalOrder);
-
-                    final Message fixNewER = buildFIXExecutionReport(erNew);
-                    sendER(fixNewER, paramSessionID);
-
-                }catch (Exception e){
-                    log.error("failure", e);
-                }
-
-
-
-
-            }
-
-            @Override
-            public void onCreate(SessionID paramSessionID) {
-                log.debug("onCreate session:{}", paramSessionID);
-            }
-
-            @Override
-            public void onLogon(SessionID paramSessionID) {
-                log.debug("onLogon session:{}", paramSessionID);
-                _triedLogonClientCompIDs.add(paramSessionID.getTargetCompID());
-
-            }
-
-            @Override
-            public void onLogout(SessionID paramSessionID) {
-                log.debug("onLogout session:{}", paramSessionID);
-
-            }
-
-            @Override
-            public void toAdmin(Message paramMessage, SessionID paramSessionID) {
-                log.debug("toAdmin session:{}, send : {} ", paramSessionID, paramMessage);
-
-            }
-
-            @Override
-            public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
-                log.debug("toApp session:{}, send : {} ", paramSessionID, paramMessage);
-
-            }
-
-    }
-
-    TradeMessage.OriginalOrder buildOriginalOrder(Message paramMessage, String orderID)throws FieldNotFound{
-
-        String symbol = paramMessage.getString(55);
-        String clientEntity = paramMessage.getHeader().getString(49);
-        CommonMessage.Side orderSide = CommonMessage.Side.fixValueOf(paramMessage.getChar(54));  //1 buy, 2 sell
-        String clientOrdID = paramMessage.getString(11);
-
-        final double price; //Price
-        if(paramMessage.isSetField(44)){
-            price = paramMessage.getDouble(44); //Price
-        }else{
-            price = -1;
-        }
-        CommonMessage.OrderType ordType = CommonMessage.OrderType.fixValueOf(paramMessage.getChar(40)); //OrdType 1:Market, 2:Limit
-        int qty = paramMessage.getInt(38);
-
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide ,ordType, price, qty, orderID, clientOrdID, clientEntity);
-
-        return originalOrder;
-    }
-
-    Message buildFIXExecutionReport(TradeMessage.SingleSideExecutionReport singleSideER){
-
-        Message executionReport = new Message();
-        executionReport.getHeader().setString(35, "8"); // ExecutionReport
-        executionReport.setString(37, singleSideER._originOrder._orderID); //OrderID
-        executionReport.setString(17, String.valueOf(singleSideER._msgID)); //ExecID
-        executionReport.setChar(150, singleSideER._type.getFIX150Type()); // ExecType http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_150.html
-
-        final TradeMessage.OrderStatus ordStatus;
-        switch (singleSideER._type){
-            case NEW : ordStatus = TradeMessage.OrderStatus.NEW; break;
-            case CANCELLED: ordStatus = TradeMessage.OrderStatus.CANCELLED; break;
-            case  REJECTED: ordStatus = TradeMessage.OrderStatus.REJECTED; break;
-            default: throw new RuntimeException("Cannot translate execType:"+singleSideER._type.toString()+" to order status" );
-        }
-        executionReport.setChar(39, ordStatus.getFIX39OrdStatus()); // NEW //OrderStatus http://www.onixs.biz/fix-dictionary/5.0.SP1/tagNum_39.html
-        executionReport.setString(55, singleSideER._originOrder._symbol); // non-repeating group
-        executionReport.setChar(54, singleSideER._originOrder._side.getFIX54Side());// Side 54 - 1:buy, 2:sell
-        executionReport.setInt(151, singleSideER._leavesQty);// LeavesQty
-        executionReport.setInt(14, singleSideER._originOrder._qty - singleSideER._leavesQty);
-        executionReport.setString(11, singleSideER._originOrder._clientOrdID);
-        return executionReport;
-    }
-
-    private Message buildExternalERfromInternalER(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker ){
 
         final int leavesQty ;
         final String executionID ;
@@ -317,97 +166,109 @@ public class MatchingEngineFIXWrapper {
         executionReport.setInt(14, _originOrder._qty - leavesQty); //CumQty http://www.onixs.biz/fix-dictionary/4.4/tagNum_14.html
         executionReport.setString(11, _originOrder._clientOrdID);
 
-        return executionReport;
+        return new Util.Tuple<Message,TradeMessage.OriginalOrder>(executionReport,originalOrder);
+
     }
 
-    class DynamicSessionQFJAcceptor {
+    private void sendER(Message er, String clientEntityID) throws Exception{
 
-        private final String _appConfigInClasspath;
-        private final SessionSettings _settings;
-        private final MessageStoreFactory _storeFactory;
-        private final LogFactory _logFactory;
-        private final Application _msgCallback;
+        SessionID sessionID =  new SessionID("FIXT.1.1", serverCompID,clientEntityID, "");
+        if(! Session.doesSessionExist(sessionID)){
+            log.debug("FIX : not sending ER to {}, since it is off now", clientEntityID);
+            return;
+        }
 
-        private final SocketAcceptor _acceptor;
+        Session.sendToTarget(er, sessionID);
+    }
 
-        public DynamicSessionQFJAcceptor(String appConfigInClasspath, Application msgCallback) throws Exception {
+    class InternalQFJApplicationCallback implements Application {
 
-            _appConfigInClasspath = appConfigInClasspath;
-            log.info("qfj server begin initializing, with app configuration file in classpath:{}", appConfigInClasspath);
-
-            _msgCallback = msgCallback;
-
-            _settings = new SessionSettings(appConfigInClasspath);
-            for (final Iterator<SessionID> i = _settings.sectionIterator(); i.hasNext();) {
-                final SessionID sessionID = i.next();
-                log.info("session in the configuration :{} ", sessionID);
+            @Override
+            public void fromAdmin(Message message, SessionID sessionId) {
+                log.debug("fromAdmin session:{}, received : {} ", sessionId, message);
             }
 
-            // It also supports other store factory, e.g. JDBC, memory. Maybe you
-            // could use them in some advanced cases.
-            _storeFactory = new FileStoreFactory(_settings);
+            @Override
+            public void fromApp(final Message paramMessage, final SessionID paramSessionID)  {
+                log.debug("fromApp session:{}, received:{} ", paramSessionID, paramMessage);
 
-            // It also supports other log factory, e.g. JDBC. But I think SL4J is
-            // good enough.
-            _logFactory = new SLF4JLogFactory(_settings);
+                try {
 
-            // This is single thread. For multi-thread, see
-            // quickfix.ThreadedSocketInitiator, and QFJ Advanced.
-            _acceptor = new SocketAcceptor(_msgCallback, _storeFactory, _settings, _logFactory,
-                    new DefaultMessageFactory());
+                    String msgType = paramMessage.getHeader().getString(35);
+                    if(! "D".equals(msgType) ){
+                        log.error("msg type:{} is not supported. msg:{}", msgType, paramMessage.toString());
+                        return;
+                    }
 
-            setupDynamicSessionProvider(msgCallback , _acceptor);
-            log.info("qfj server initialized, with app configuration file in classpath:{}", appConfigInClasspath);
+                    long zeroOLatencyOrdRrecvTimeNano = 0;
 
-        }
+                    //here, the targetCompID of session is the client ID
+                    boolean isLatencyClient = paramSessionID.getTargetCompID().startsWith(MatchingEngineApp.LATENCY_ENTITY_PREFIX);
+                    if(isLatencyClient){
+                        zeroOLatencyOrdRrecvTimeNano = System.nanoTime();
+                    }
+                    processIncomingOrder(paramMessage,paramSessionID ,zeroOLatencyOrdRrecvTimeNano);
 
-        // start is NOT put in constructor deliberately, to let it pair with
-        // shutdown
-        public void start() throws Exception {
 
-            log.info("qfj server start, {}", _appConfigInClasspath);
-
-            _acceptor.start();
-
-            log.info("qfj server started, {}", _appConfigInClasspath);
-        }
-
-        public void stop() throws Exception {
-
-            log.info("qfj server stop, {}", _appConfigInClasspath);
-
-            _acceptor.stop();
-
-            log.info("qfj server stopped, {}", _appConfigInClasspath);
-        }
-
-        private void setupDynamicSessionProvider(Application application, SocketAcceptor connectorAsAcc)
-                throws ConfigError, FieldConvertError {
-            for (final Iterator<SessionID> i = _settings.sectionIterator(); i.hasNext();) {
-                final SessionID sessionID = i.next();
-
-                boolean isAcceptorTemplateSet = _settings.isSetting(sessionID, "AcceptorTemplate");
-                if (isAcceptorTemplateSet && _settings.getBool(sessionID, "AcceptorTemplate")) {
-
-                    log.info("dynamic acceptor is configured on {}", sessionID);
-                    AcceptorSessionProvider provider = new DynamicAcceptorSessionProvider(_settings, sessionID, application,
-                            _storeFactory, _logFactory, new DefaultMessageFactory());
-                    // SocketAcceptAddress
-                    // SocketAcceptPort
-                    SocketAddress address = new InetSocketAddress(_settings.getString(sessionID, "SocketAcceptAddress"),
-                            (int) (_settings.getLong(sessionID, "SocketAcceptPort")));
-                    connectorAsAcc.setSessionProvider(address, provider);
-
-                    // we have to skip setup SessionStateListener,
-                    // since the concrete session is not identified yet for
-                    // dynamic acceptor.
-                    // TODO try to figure out how to setup
-                    // SessionStateListener
-                    // when the concrete session is created.
+                }catch (Exception e){
+                    log.error("failure", e);
                 }
+
             }
-        }
+
+            @Override
+            public void onCreate(SessionID paramSessionID) {
+                log.debug("onCreate session:{}", paramSessionID);
+            }
+
+            @Override
+            public void onLogon(SessionID paramSessionID) {
+                log.debug("onLogon session:{}", paramSessionID);
+                _triedLogonClientCompIDs.add(paramSessionID.getTargetCompID());
+
+            }
+
+            @Override
+            public void onLogout(SessionID paramSessionID) {
+                log.debug("onLogout session:{}", paramSessionID);
+
+            }
+
+            @Override
+            public void toAdmin(Message paramMessage, SessionID paramSessionID) {
+                log.debug("toAdmin session:{}, send : {} ", paramSessionID, paramMessage);
+
+            }
+
+            @Override
+            public void toApp(Message paramMessage, SessionID paramSessionID) throws DoNotSend {
+                log.debug("TX session:{}, send : {} ", paramSessionID, paramMessage);
+
+            }
 
     }
+
+    private void processIncomingOrder(final Message paramMessage, final SessionID paramSessionID, long zeroOLatencyOrdRrecvTimeNano) throws Exception{
+
+        String orderID = UniqIDGenerator.next();
+        _vertx.runOnContext((v)->{
+
+            try {
+
+                final TradeMessage.OriginalOrder originalOrder
+                        = MatchingEngineFIXHelper.buildOriginalOrder(
+                        CommonMessage.ExternalSource.FIX,
+                        paramMessage,
+                        orderID,
+                        zeroOLatencyOrdRrecvTimeNano);
+                final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
+                //NOT process the match result here for FIX, because maybe the counterparty is on other interfaces(e.g. vertx).
+
+            }catch (Exception e){
+                log.error("fail to process FIX order:"+paramMessage.toString(), e);
+            }
+        });
+    }
+
 
 }

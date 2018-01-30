@@ -7,6 +7,7 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import baoying.orderbook.app.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class OrderBook {
 		_offerBook = createAskBook();
 	}
 
-	Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>  processInputOrder(ExecutingOrder executingOrder) {
+    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(ExecutingOrder executingOrder) {
 
 		final PriorityQueue<ExecutingOrder> contraSideBook;
 		final PriorityQueue<ExecutingOrder> sameSideBook;
@@ -71,7 +72,7 @@ public class OrderBook {
 			}
 		}
 
-		Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
+		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchResult = match(executingOrder, contraSideBook, sameSideBook);
 
 		return matchResult;
 	}
@@ -81,11 +82,11 @@ public class OrderBook {
 	 * - TODO all clients could trade with each other. There is NO relationship/credit check. 
 	 * - not private, because of UT
 	 */
-	Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> match(ExecutingOrder executingOrder,
+	Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> match(ExecutingOrder executingOrder,
 																			PriorityQueue<ExecutingOrder> contraSideBook,
 	        																PriorityQueue<ExecutingOrder> sameSideBook) {
 
-		List<MatchingEnginOutputMessageFlag> execReportsAsResult = new ArrayList<>();
+		List<MEExecutionReportMessageFlag> execReportsAsResult = new ArrayList<>();
 		List<OrderBookDelta> orderbookDeltasAsResult= new ArrayList<>();
 
 		boolean rejected = false;
@@ -140,30 +141,14 @@ public class OrderBook {
 			executingOrder._leavesQty = executingOrder._leavesQty - lastQty;
 
 			final MatchedExecutionReport executionReport ;
-			if(executingOrder._origOrder._isLatencyTestOrder){
-                //only track taker side latency, since maker maybe has sit in orderbook long time
 
-				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-						System.currentTimeMillis(),
-						lastPrice,
-						lastQty,
+			executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
+					System.currentTimeMillis(),
+					lastPrice,
+					lastQty,
+					peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
+					executingOrder._origOrder, executingOrder._leavesQty);
 
-						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
-						executingOrder._origOrder, executingOrder._leavesQty,
-
-						executingOrder._origOrder._enterInputQ_sysNano_test,
-                        executingOrder._pickFromInputQ_sysNano_test,
-                        System.nanoTime());
-			}else{
-				executionReport = new MatchedExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),
-						System.currentTimeMillis(),
-
-						lastPrice,
-						lastQty,
-
-						peekedContraBestPriceOrder._origOrder, peekedContraBestPriceOrder._leavesQty,
-						executingOrder._origOrder, executingOrder._leavesQty);
-			}
 			execReportsAsResult.add(executionReport);
 			orderbookDeltasAsResult.add(
 			        new OrderBookDelta(_symbol, peekedContraBestPriceOrder._origOrder._side, lastPrice, 0 - lastQty));
@@ -185,6 +170,11 @@ public class OrderBook {
                             TradeMessage.ExecutionType.CANCELLED, executingOrder._leavesQty,"No available liquidity for this market order"));
                         break;
                     case LIMIT :
+                    	if(execReportsAsResult.size() ==0){
+                    		//partially filled or fully filled, such NEW execution report is not required.
+							execReportsAsResult.add(new SingleSideExecutionReport(_msgIDBase + _msgIDIncreament.incrementAndGet(),  System.currentTimeMillis(),executingOrder._origOrder,
+									TradeMessage.ExecutionType.NEW, executingOrder._leavesQty,"Entered OrderBook"));
+						}
                         sameSideBook.add(executingOrder);
                         orderbookDeltasAsResult.add(new OrderBookDelta(_symbol, executingOrder._origOrder._side,
                                 executingOrder._origOrder._price, executingOrder._leavesQty));
@@ -194,20 +184,10 @@ public class OrderBook {
             }
 		}
 
-		return new Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>>(execReportsAsResult,orderbookDeltasAsResult);
+		return new Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>>(execReportsAsResult,orderbookDeltasAsResult);
 	}
 
-	//https://dzone.com/articles/whats-wrong-java-8-part-v
-	//just internal use, don't public since it is NOT general for others.
-	static class Tuple<T, U> {
-		public final T _1;
-		public final U _2;
-		public Tuple(T arg1, U arg2) {
-			super();
-			this._1 = arg1;
-			this._2 = arg2;
-		}
-	}
+
 	AggregatedOrderBook buildAggregatedOrderBook(int depth) {
 
 		TreeMap<Double, Integer> bidBookMap = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
@@ -281,10 +261,9 @@ public class OrderBook {
 		return bookMap;
 	}
 
-    public static interface MatchingEngineInputMessageFlag {
+	public static interface MDMarketDataMessageFlag {
 	}
-
-    public static interface MatchingEnginOutputMessageFlag {
+	public static interface MEExecutionReportMessageFlag {
 	}
 
 	static class ExecutingOrder{
@@ -293,7 +272,6 @@ public class OrderBook {
 
 		// this value will change on each matching
 		int _leavesQty;
-        long _pickFromInputQ_sysNano_test;
 
 		ExecutingOrder(OriginalOrder originalOrder) {
 			_origOrder = originalOrder;
@@ -310,9 +288,9 @@ public class OrderBook {
 
 				// note: not required, it should also be considered equal price, if the diff is
 		        // very minor.
-				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-				}
+//				if (o1._origOrder._price == o2._origOrder._price) {
+//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
+//				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return -1;
@@ -332,9 +310,9 @@ public class OrderBook {
 
 				// TODO it should also be considered equal price, if the diff is
 		        // very minor.
-				if (o1._origOrder._price == o2._origOrder._price) {
-					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-				}
+//				if (o1._origOrder._price == o2._origOrder._price) {
+//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
+//				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return 1;
@@ -345,16 +323,6 @@ public class OrderBook {
 			}
 		});
 
-	}
-
-	static class MatchingEngineInputMessageEvent
-	{
-		private MatchingEngineInputMessageFlag _value;
-
-		public void set(MatchingEngineInputMessageFlag value)
-		{
-			this._value = value;
-		}
 	}
 
 }

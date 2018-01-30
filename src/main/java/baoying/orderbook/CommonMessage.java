@@ -2,8 +2,14 @@ package baoying.orderbook;
 
 public interface CommonMessage {
 
+	enum ExternalSource {
+		FIX,
+		VertxTCP,
+		Web
+	}
+
 	// buy or sell the base ccy
-	static enum Side {
+	enum Side {
 		BID('1'), OFFER('2');
 
 		private  final char _fix54Side;
@@ -30,7 +36,7 @@ public interface CommonMessage {
 	}
 
 	//https://www.onixs.biz/fix-dictionary/4.4/tagNum_40.html
-	static enum OrderType {
+	enum OrderType {
 		MARKET, LIMIT;
 
 		public static OrderType fixValueOf(char fixTag40OrdType){

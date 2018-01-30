@@ -4,12 +4,13 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
 
+import baoying.orderbook.app.Util;
 import org.junit.Test;
 
 import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.MarketDataMessage.OrderBookDelta;
 import baoying.orderbook.OrderBook.ExecutingOrder;
-import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
+import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 import baoying.orderbook.TradeMessage.MatchedExecutionReport;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 
@@ -112,10 +113,10 @@ public class OrderBookTest {
 		
 		OriginalOrder bid_145_1point5Mio = new OriginalOrder( System.currentTimeMillis(),symbol, CommonMessage.Side.BID,CommonMessage.OrderType.LIMIT, 155, 1500_000,  "orderID", "clientOrdID", "clientEntityID");
 
-		OrderBook.Tuple<List<MatchingEnginOutputMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
-		List<MatchingEnginOutputMessageFlag> reports = result._1;
+		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
+		List<MEExecutionReportMessageFlag> reports = result._1;
 		List<OrderBookDelta> orderbookDeltas = result._2;
-		for(MatchingEnginOutputMessageFlag r : reports){
+		for(MEExecutionReportMessageFlag r : reports){
 			
 			MatchedExecutionReport er = (MatchedExecutionReport)r;
 			

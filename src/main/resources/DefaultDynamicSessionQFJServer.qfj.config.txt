@@ -10,7 +10,7 @@ ReconnectInterval=5
 
 #Persist is disabled for ultra performance. OMS(or post trade) should be used to query possible loss data if there is disconnection.
 #You can set it to Y and assign FileStorePath if you still expect FIX re-send gap messages.
-PersistMessages=N
+PersistMessages=Y
 #FileStorePath is still required for seq number etc(?)
 FileStorePath=./log/engineQFJFileStore
 
@@ -30,6 +30,9 @@ UseDataDictionary=Y
 AppDataDictionary=FIX50SP1.xml
 
 ResetOnLogon=Y
+ResetOnLogout=N
+ResetOnDisconnect=N
+
 
 #If set to N, fields that are out of order (i.e. body fields in the header, or header fields in the body) will not be rejected. 
 #Useful for connecting to systems which do not properly order fields.

@@ -3,7 +3,7 @@ package baoying.orderbook;
 import baoying.orderbook.CommonMessage.Side;
 import baoying.orderbook.MarketDataMessage.OrderBookDelta;
 import baoying.orderbook.OrderBook.ExecutingOrder;
-import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
+import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 import baoying.orderbook.TradeMessage.OriginalOrder;
 import org.junit.Test;
 
@@ -68,12 +68,12 @@ public class OrderBookPerfTest {
 		OriginalOrder b_160_1mio = new OriginalOrder( System.currentTimeMillis(),symbol, bid,CommonMessage.OrderType.LIMIT, 160.1, 2,  "orderID", "clientOrdID", "clientEntityID_latnecy");
 
 		int loopCount = 1000_000;
- 		List<MatchingEnginOutputMessageFlag> execReportsAsResult = new ArrayList<>();
+ 		List<MEExecutionReportMessageFlag> execReportsAsResult = new ArrayList<>();
 		List<OrderBookDelta> orderbookDeltasAsResult = new ArrayList<>();
+		ExecutingOrder e = new ExecutingOrder(b_160_1mio);
 		long start = System.nanoTime();
 		for(int i=0; i<loopCount; i++ ){
-			//_exchange.match(new ExecutingOrder(b_160_1mio,System.nanoTime()),offerBook,bidBook,execReportsAsResult, orderbookDeltasAsResult);
-			System.nanoTime();
+			_exchange.match(e,offerBook,bidBook);
 		}
 		long end = System.nanoTime();
 		System.out.println("avg nano second per matching:" + (end - start)/loopCount);

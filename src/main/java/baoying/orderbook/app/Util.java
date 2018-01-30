@@ -1,15 +1,17 @@
 package baoying.orderbook.app;
 
 
+import com.beust.jcommander.IStringConverter;
+import io.vertx.core.buffer.Buffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import quickfix.Message;
 
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Util {
     private final static Logger log = LoggerFactory.getLogger(Util.class);
@@ -61,4 +63,38 @@ public class Util {
         final long totalLineNum = java.nio.file.Files.lines(csvFile).count(); //http://www.adam-bien.com/roller/abien/entry/counting_lines_with_java_8
         return loadTailCsvLines(csvFile,  n,totalLineNum);
     }
+
+    public static Buffer buildBuffer(Message fixMsg, String tailAsDelim){
+
+        String fixString = fixMsg.toString();
+
+        Buffer buffer = Buffer.buffer();
+        buffer.appendInt(fixString.length());
+        buffer.appendString(fixString);
+        buffer.appendString(tailAsDelim);
+
+        return buffer;
+    }
+
+    //https://dzone.com/articles/whats-wrong-java-8-part-v
+    //just internal use, don't public since it is NOT general for others.
+    public static class Tuple<T, U> {
+        public final T _1;
+        public final U _2;
+        public Tuple(T arg1, U arg2) {
+            super();
+            this._1 = arg1;
+            this._2 = arg2;
+        }
+    }
+
+    public class CSVListConverter implements IStringConverter<List<String>> {
+
+        @Override
+        public List<String> convert(String csvValues) {
+            String [] values = csvValues.split(",");
+            return Arrays.asList(values);
+        }
+    }
+
 }

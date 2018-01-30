@@ -1,17 +1,20 @@
 package baoying.orderbook;
 
 import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.OrderBook.MatchingEnginOutputMessageFlag;
-import baoying.orderbook.OrderBook.MatchingEngineInputMessageFlag;
+import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
 
 public class TradeMessage {
-    public static class OriginalOrder implements MatchingEngineInputMessageFlag {
+
+    public static class OriginalOrder{
 
 		/**
 		 * price is ignored, if orderType is Market.
          */
-		public OriginalOrder(long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+		public OriginalOrder(CommonMessage.ExternalSource source,
+                             long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
 		        String clientOrdID, String clientEntityID) {
+
+            _source = source;
             _recvFromClientEpochMS = recvFromClientEpochMS;
 			_symbol = symbol;
 			_side = side;
@@ -23,6 +26,24 @@ public class TradeMessage {
 			_clientEntityID = clientEntityID;
 		}
 
+        public OriginalOrder(
+                             long recvFromClientEpochMS,String symbol, Side side, CommonMessage.OrderType type, double price, int qty,  String orderID,
+                             String clientOrdID, String clientEntityID) {
+
+		    //TODO - high - remove this default
+            _source = CommonMessage.ExternalSource.VertxTCP;
+            _recvFromClientEpochMS = recvFromClientEpochMS;
+            _symbol = symbol;
+            _side = side;
+            _type = type;
+            _price = price;
+            _qty = qty;
+            _orderID = orderID;
+            _clientOrdID = clientOrdID;
+            _clientEntityID = clientEntityID;
+        }
+
+		public final CommonMessage.ExternalSource _source;
         public final String _symbol;
 
         public final Side _side;
@@ -36,9 +57,8 @@ public class TradeMessage {
         public final String _clientEntityID; // to avoid execution with himself
 
 		public boolean _isLatencyTestOrder= false;
-		public long _recvFromClient_sysNano_test;
-		public long _enterInputQ_sysNano_test;
 		public String _latencyTimesFromClient="";
+		public long _recvFromClient_sysNano_test=-1;
 	}
 
 	//https://stackoverflow.com/questions/8157755/how-to-convert-enum-value-to-int
@@ -79,7 +99,7 @@ public class TradeMessage {
         }
     }
 	// maker: who sit in the book
-    public static class SingleSideExecutionReport implements MatchingEnginOutputMessageFlag{
+    public static class SingleSideExecutionReport implements MEExecutionReportMessageFlag{
 
         public final long _msgID;
 		public final long _msgEpochMS;
@@ -98,7 +118,7 @@ public class TradeMessage {
 		}
 	}
 	// maker: who sit in the book
-    public static class MatchedExecutionReport implements MatchingEnginOutputMessageFlag{
+    public static class MatchedExecutionReport implements MEExecutionReportMessageFlag{
 
         public final long _matchID;
 		public final long _matchingEpochMS;
@@ -111,10 +131,6 @@ public class TradeMessage {
 
         public final int _makerLeavesQty;
         public final int _takerLeavesQty;
-
-		public final long _matched_sysNano_test;
-        public final long _taker_enterInputQ_sysNano_test;
-        public final long _taker_pickFromInputQ_sysNano_test;
 
         public MatchedExecutionReport(long matchID,
                                       long matchingEpochMS,
@@ -152,9 +168,6 @@ public class TradeMessage {
 			_makerLeavesQty = makerLeavesQty;
 			_takerLeavesQty = takerLeavesQty;
 
-            _taker_enterInputQ_sysNano_test =taker_enterInputQ_sysNano_test;
-            _taker_pickFromInputQ_sysNano_test = taker_pickFromInputQ_sysNano_test;
-            _matched_sysNano_test = matchingSysNanoTime;
 		}
 	}
 
