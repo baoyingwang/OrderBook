@@ -20,12 +20,12 @@ function populateOB(){
     local tmp_side=${2:-Bid}
     local tmp_symbol=${3:-USDJPY}
     local tmp_prices=${4:-110}
-    local tmp_qty=${5:-1000000000}
+    local tmp_qty=${5:-100000000}
 
 
     local tmp_ordType=Limit
     local tmp_clientNum=1
-    local tmp_ratePerMinute=10
+    local tmp_ratePerMinute=60
     local tmp_duration=5
     local tmp_client_prefix=BACKGROUND_FIX_OB_${tmp_side}_${RANDOM}
 
@@ -46,7 +46,7 @@ function populateOB10Levels(){
     local tmp_side=${2:-Bid}
     local tmp_symbol=${3:-USDJPY}
     local px_int_part=${4:-110}
-    local tmp_qty=${5:-1000000000}
+    local tmp_qty=${5:-100000000}
 
 
     local tmp_prices="${px_int_part}.1,${px_int_part}.2,${px_int_part}.3,${px_int_part}.4,${px_int_part}.5,${px_int_part}.6,${px_int_part}.7,${px_int_part}.8,${px_int_part}.9"

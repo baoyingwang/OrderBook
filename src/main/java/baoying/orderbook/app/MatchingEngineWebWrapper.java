@@ -48,7 +48,7 @@ public class MatchingEngineWebWrapper {
     }
 
     @RequestMapping("/place_order")
-    public String placeOrder(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol,
+    public String placeOrder(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol,
                              @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
                              @RequestParam(value = "side", defaultValue="Bid") String side,
                              @RequestParam(value = "price", defaultValue="126.0") double price,

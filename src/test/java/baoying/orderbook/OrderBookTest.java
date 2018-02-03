@@ -1,10 +1,9 @@
 package baoying.orderbook;
 
-import java.util.List;
-import java.util.PriorityQueue;
-import java.util.TreeMap;
+import java.util.*;
 
 import baoying.orderbook.app.Util;
+import org.junit.Assert;
 import org.junit.Test;
 
 import baoying.orderbook.CommonMessage.Side;
@@ -35,15 +34,21 @@ public class OrderBookTest {
 		book.add(new ExecutingOrder(o_130_1mio_sysT1));
 		book.add(new ExecutingOrder(o_120_1mio));
 		book.add(new ExecutingOrder(o_130_1mio_sysT2));
-		
-		//TODO add assert, rather than view by eyes!
-//		for(ExecutingOrder o : bidBook){
-//			System.out.println(o._origOrder._price + " " + o._origOrder._enteringSystemTime);
-//		}
+
+		List<ExecutingOrder> books = new ArrayList<>();
 		while( !book.isEmpty() ){
-			ExecutingOrder o = book.poll();
-			System.out.println(o._origOrder._price + " " + o._origOrder._recvFromClientEpochMS);
-		}		
+			books.add(book.poll());
+		}
+
+		int[] expectedQties = new int[]{1000_000,1000_000,1000_000,1000_000};
+		double[] expectedPrices = new double[]{130.1,130.1,120.1,100.1};
+
+		for(int i=0; i<books.size(); i++){
+			Assert.assertEquals(expectedQties[i],books.get(i)._origOrder._qty);
+			Assert.assertTrue(Math.abs(expectedPrices[i]-books.get(i)._origOrder._price) < OrderBook.MIN_DIFF_FOR_PRICE);
+		}
+
+
 	}
 	
 	@Test
@@ -60,20 +65,24 @@ public class OrderBookTest {
 		
 		PriorityQueue<ExecutingOrder> book = _exchange.createAskBook();
 		book.add(new ExecutingOrder(o_140_1mio));
-		book.add(new ExecutingOrder(o_160_1mio_sysT1));
 		book.add(new ExecutingOrder(o_150_1mio));
 		book.add(new ExecutingOrder(o_160_1mio_sysT1));
 		book.add(new ExecutingOrder(o_160_1mio_sysT2));
-		
+
+		List<ExecutingOrder> books = new ArrayList<>();
 		while( !book.isEmpty() ){
-			ExecutingOrder o = book.poll();
-			System.out.println(o._origOrder._price + " " + o._origOrder._recvFromClientEpochMS);
+			books.add(book.poll());
 		}
-		
-		//TODO add assert, rather than view by eyes!
-//		for(ExecutingOrder o : book){
-//			System.out.println(o._origOrder._price + " " + o._origOrder._enteringSystemTime);
-//		}
+
+		int[] expectedQties = new int[]{1000_000,1000_000,1000_000,1000_000};
+		double[] expectedPrices = new double[]{140.1,150.1,160.1,160.1};
+        CommonMessage.Side[] expectedSides = new CommonMessage.Side[]{Side.OFFER,Side.OFFER,Side.OFFER,Side.OFFER};
+
+		for(int i=0; i<books.size(); i++){
+			Assert.assertEquals(expectedQties[i],books.get(i)._origOrder._qty);
+			Assert.assertTrue(Math.abs(expectedPrices[i]-books.get(i)._origOrder._price) < OrderBook.MIN_DIFF_FOR_PRICE);
+            Assert.assertEquals(expectedSides[i],books.get(i)._origOrder._side);
+		}
 	}
 	
 	
@@ -116,23 +125,41 @@ public class OrderBookTest {
 		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> result = this._exchange.match(new ExecutingOrder(bid_145_1point5Mio), askBook, bidBook);
 		List<MEExecutionReportMessageFlag> reports = result._1;
 		List<OrderBookDelta> orderbookDeltas = result._2;
-		for(MEExecutionReportMessageFlag r : reports){
-			
-			MatchedExecutionReport er = (MatchedExecutionReport)r;
-			
-			System.out.println("last px:"+er._lastPrice +" last qty:"+ er._lastQty);
-		}
 
-		System.out.println("bid book");
-		while( !bidBook.isEmpty() ){
-			ExecutingOrder o = bidBook.poll();
-			System.out.println(o._origOrder._price + " " + o._leavesQty);
+		List<String> expectedERs = Arrays.asList(new String[]{"last px:140.1 last qty:1000000",
+				"last px:150.1 last qty:500000"
+		});
+		List<String> actualERs = new ArrayList<>();
+		for(MEExecutionReportMessageFlag r : reports){
+			MatchedExecutionReport er = (MatchedExecutionReport)r;
+			actualERs.add("last px:"+er._lastPrice +" last qty:"+ er._lastQty);
 		}
-		System.out.println("ask book");
-		while( !askBook.isEmpty() ){
-			ExecutingOrder o = askBook.poll();
-			System.out.println(o._origOrder._price + " " + o._leavesQty);
+		Assert.assertEquals(expectedERs, actualERs);
+
+
+		List<String> expectedDeltas = Arrays.asList(new String[]{"delta:USDJPY -1000000 140.1 OFFER",
+				"delta:USDJPY -500000 150.1 OFFER"
+		});
+		List<String> actualDeltas = new ArrayList<>();
+		for(OrderBookDelta r : orderbookDeltas){
+			actualDeltas.add("delta:"+r._symbol+" "+ r._deltaQty_couldNegative+" " +r._px + " "+r._side);
 		}
+		Assert.assertEquals(expectedDeltas, actualDeltas);
+
+		List<String> expectedBidBook = Arrays.asList(new String[]{
+				"130.1 1000000",
+				"130.1 1000000",
+				"120.1 1000000",
+				"100.1 1000000",
+		});
+		compareOrderBook(bidBook, expectedBidBook);
+
+		List<String> expectedAskBook = Arrays.asList(new String[]{
+				"150.1 500000",
+				"160.1 1000000",
+				"160.1 1000000"
+		});
+		compareOrderBook(askBook, expectedAskBook);
 	}
 	
 	@Test
@@ -170,18 +197,46 @@ public class OrderBookTest {
 			askBook.add(new ExecutingOrder(o_160_1mio_sysT2));
 			askBook.add(new ExecutingOrder(o_170_1mio));
 		}
-		
+
+		List<String> expectedAggBidBook = Arrays.asList(new String[]{
+				"130.1 2000000",
+				"120.1 1000000",
+				"100.1 1000000",
+		});
+		List<String> actualAggBidBook = new ArrayList<>();
 		TreeMap<Double, Integer> bidBookSnapshot = _exchange.buildOneSideAggOrdBook(3, Side.BID, bidBook);
 		for(Double price : bidBookSnapshot.keySet() ){
 			int aggQty = bidBookSnapshot.get(price);
-			System.out.println(price  + " : " + aggQty);
+			actualAggBidBook.add(price  + " " + aggQty);
 		}
+		Assert.assertEquals(expectedAggBidBook, actualAggBidBook);
 
+
+		List<String> expectedAggAskBook = Arrays.asList(new String[]{
+				"140.1 1000000",
+				"150.1 1000000",
+				"160.1 2000000",
+				"170.1 1000000",
+		});
+		List<String> actualAggAskBook = new ArrayList<>();
 		TreeMap<Double, Integer> offerBookSnapshot = _exchange.buildOneSideAggOrdBook(5, Side.OFFER, askBook);
 		for(Double price : offerBookSnapshot.keySet() ){
 			int aggQty = offerBookSnapshot.get(price);
-			System.out.println(price  + " : " + aggQty);
+			actualAggAskBook.add(price  + " " + aggQty);
 		}
+		Assert.assertEquals(expectedAggAskBook, actualAggAskBook);
+	}
+
+	//TODO make a copy of the book, rather than drain it
+	//NOTE: not easy to make a copy, because the comparator is customized.
+	private void compareOrderBook(PriorityQueue<ExecutingOrder> book, List<String> expectedBook){
+
+		List<String> acturalBidBook = new ArrayList<>();
+		while( !book.isEmpty() ){
+			ExecutingOrder o = book.poll();
+			acturalBidBook.add(o._origOrder._price + " " + o._leavesQty);
+		}
+		Assert.assertEquals(expectedBook, acturalBidBook);
 
 	}
 }
