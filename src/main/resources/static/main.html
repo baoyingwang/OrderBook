@@ -155,17 +155,27 @@
             $scope.ccypair_list = ["USDJPY", "USDHKD"];
         });
 
-        mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
-            $http.get('/matching/query_order_book').
-                then(function(response) {
-                    $scope.order_book = response.data;
-                });
+        function refreshOrderBook($url, $scope, $http, $interval){
+            //$interval - http://tutorials.jenkov.com/angularjs/timeout-interval.html
+            tmpFunc = function(){
+                            $http.get($url).
+                                then(function(response) {
+                                    $scope.order_book = response.data;
+                                });
+                      };
+            tmpFunc();
+            $interval(tmpFunc, 2000); //every 2 seconds
+        }
+
+        mainApp.controller('order_book_table_USDJPY', function($scope, $http, $interval) {
+
+            refreshOrderBook('/matching/query_order_book', $scope, $http, $interval);
         });
-        mainApp.controller('order_book_table_USDHKD', function($scope, $http) {
-            $http.get('/matching/query_order_book?symbol=USDHKD').
-                then(function(response) {
-                    $scope.order_book = response.data;
-                });
+
+        mainApp.controller('order_book_table_USDHKD', function($scope, $http, $interval) {
+
+            refreshOrderBook('/matching/query_order_book?symbol=USDHKD', $scope, $http, $interval);
+
         });
 
         mainApp.controller('order_book_plain', function($scope, $http) {
