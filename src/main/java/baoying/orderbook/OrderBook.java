@@ -199,7 +199,7 @@ public class OrderBook {
 	MarketDataMessage.DetailOrderBook buildDetailedOrderBook(int depth){
 
 		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> bidBookMap   = buildOneSideDetailOrdBook(depth, Side.BID, _bidBook);
-		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> offerBookMap = buildOneSideDetailOrdBook(depth, Side.OFFER, _bidBook);
+		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> offerBookMap = buildOneSideDetailOrdBook(depth, Side.OFFER, _offerBook);
 
 		return new MarketDataMessage.DetailOrderBook(_symbol, depth, _msgIDBase + _msgIDIncreament.incrementAndGet(), bidBookMap, offerBookMap);
 
