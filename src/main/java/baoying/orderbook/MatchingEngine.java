@@ -47,10 +47,10 @@ public class MatchingEngine {
 		statistics.increaseRecvOrder();
 
 		OrderBook orderBook = orderBook(order._symbol);
-		OrderBook.ExecutingOrder executingOrder = new OrderBook.ExecutingOrder(order);
+
 
 		Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchResult
-				= orderBook.matchOrder(executingOrder);
+				= orderBook.matchOrder(order);
 
 		sendToBus(matchResult);
 

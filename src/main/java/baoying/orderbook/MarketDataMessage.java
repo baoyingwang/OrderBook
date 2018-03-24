@@ -42,14 +42,18 @@ public class MarketDataMessage {
 		}
 
 		static class MDOrder{
-            MDOrder(String clientName, int leavesQty, long enteringTime){
+            MDOrder(String clientName, String clientOrdID, int leavesQty, long enteringTimeMS, long internalID){
                 _clientName = clientName;
+                _clientOrdID = clientOrdID;
                 _leavesQty = leavesQty;
-                _enteringTime = enteringTime;
+                _enteringTimeMS = enteringTimeMS;
+                _internalID = internalID;
             }
-			String _clientName;
-			int _leavesQty;
-			long _enteringTime;
+			final String _clientName;
+            final String _clientOrdID;
+            final int _leavesQty;
+            final long _enteringTimeMS;
+            final long _internalID;
 		}
 
 	}

@@ -53,7 +53,9 @@ public class OrderBook {
 		_offerBook = createAskBook();
 	}
 
-    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(ExecutingOrder executingOrder) {
+    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(OriginalOrder order) {
+
+        ExecutingOrder executingOrder = new ExecutingOrder(order);
 
 		final PriorityQueue<ExecutingOrder> contraSideBook;
 		final PriorityQueue<ExecutingOrder> sameSideBook;
@@ -104,6 +106,7 @@ public class OrderBook {
 					break;
 				case LIMIT :
 					switch (executingOrder._origOrder._side) {
+					    //MIN_DIFF_FOR_PRICE is not required, if we promises that all prices have been rounded with same scale, in advance
 						case BID:
 							isExecutablePrice = executingOrder._origOrder._price
 									+ MIN_DIFF_FOR_PRICE > peekedContraBestPriceOrder._origOrder._price;
@@ -269,7 +272,10 @@ public class OrderBook {
 
             List<MarketDataMessage.DetailOrderBook.MDOrder> mdOrders = bookMap.get(price) == null ?
                             new ArrayList<>(): bookMap.get(price);
-            mdOrders.add(new MarketDataMessage.DetailOrderBook.MDOrder(o._origOrder._clientEntityID, o._leavesQty, o._origOrder._recvFromClientEpochMS));
+
+            mdOrders.add(new MarketDataMessage.DetailOrderBook.MDOrder(o._origOrder._clientEntityID,
+                    o._origOrder._clientOrdID,
+                    o._leavesQty, o._enteringMS, o._increasingID));
             bookMap.put(price, mdOrders);
 
             if (bookMap.size() == depth + 1) {
@@ -369,12 +375,24 @@ public class OrderBook {
 
 		final OriginalOrder _origOrder;
 
+        private static final AtomicLong _msgIDIncreament = new  AtomicLong(0);
+        final long _enteringMS;
+        //_increasingID is only useful when comparing 2 executing orders with same _enteringMS
+        //why only use System.nanoTime directly, but _enteringMS+_increasingID? Because
+        //1. nanoTime would be reset of server restart
+        //2. _enteringMS is more meaningful time
+        final long _increasingID = _msgIDIncreament.getAndIncrement();
+
+
 		// this value will change on each matching
 		int _leavesQty;
+
+
 
 		ExecutingOrder(OriginalOrder originalOrder) {
 			_origOrder = originalOrder;
 			_leavesQty = originalOrder._qty;
+            _enteringMS = System.currentTimeMillis();
 		}
 
 	}
@@ -385,11 +403,12 @@ public class OrderBook {
 			@Override
 			public int compare(ExecutingOrder o1, ExecutingOrder o2) {
 
-				// note: not required, it should also be considered equal price, if the diff is
-		        // very minor.
-//				if (o1._origOrder._price == o2._origOrder._price) {
-//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-//				}
+                //MIN_DIFF_FOR_PRICE - not required if we promise all input prices have been rounded with same scale
+                //same for bid and offer
+				if ( Math.abs(o1._origOrder._price - o2._origOrder._price) < MIN_DIFF_FOR_PRICE) {
+				    long x = o1._enteringMS - o2._enteringMS != 0 ? o1._enteringMS - o2._enteringMS : o1._increasingID - o2._increasingID;
+					return (int) x;
+				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return -1;
@@ -407,11 +426,12 @@ public class OrderBook {
 			@Override
 			public int compare(ExecutingOrder o1, ExecutingOrder o2) {
 
-				// TODO it should also be considered equal price, if the diff is
-		        // very minor.
-//				if (o1._origOrder._price == o2._origOrder._price) {
-//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-//				}
+                //MIN_DIFF_FOR_PRICE - not required if we promise all input prices have been rounded with same scale
+                //same for bid and offer
+                if ( Math.abs(o1._origOrder._price - o2._origOrder._price) < MIN_DIFF_FOR_PRICE) {
+                    long x = o1._enteringMS - o2._enteringMS != 0 ? o1._enteringMS - o2._enteringMS : o1._increasingID - o2._increasingID;
+                    return (int) x;
+                }
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return 1;
