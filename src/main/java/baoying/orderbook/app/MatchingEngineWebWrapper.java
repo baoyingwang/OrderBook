@@ -113,6 +113,20 @@ public class MatchingEngineWebWrapper {
         return jsonString;
     }
 
+    @RequestMapping("/query_detail_order_book")
+    public String queryDetailOrderBook(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol){
+
+        log.info("query_detail_order_book on symbol:{}", symbol);
+
+        Map<String, Object> orderBook = new HashMap<>();
+        orderBook.put("symbol", symbol);
+        orderBook.put("detail_order_book", _simpleMarkderDataEngine.getDetailOrderBookBySymbol(symbol));
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(orderBook);
+        return jsonString;
+    }
+
     @RequestMapping("/reset_test_data")
     public String resetBeforeTest(){
         _engine.statistics.reset();

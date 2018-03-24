@@ -1,5 +1,6 @@
 package baoying.orderbook;
 
+import java.util.List;
 import java.util.TreeMap;
 
 import baoying.orderbook.CommonMessage.Side;
@@ -19,6 +20,36 @@ public class MarketDataMessage {
 			_side = side;
 			_px = px;
 			_deltaQty_couldNegative = deltaQty_couldNegative;
+		}
+
+	}
+
+	public static class DetailOrderBook implements MDMarketDataMessageFlag{
+
+		public long _msgID;
+
+		public final String _symbol;
+		public final int _depth;
+		TreeMap<Double, List<MDOrder>> _bidBookMap;
+		TreeMap<Double, List<MDOrder>> _offerBookMap;
+
+		public DetailOrderBook(String symbol, int depth, long msgID, TreeMap<Double, List<MDOrder>> bidBookMap, TreeMap<Double, List<MDOrder>> offerBookMap) {
+			_symbol = symbol;
+			_depth = depth;
+			_msgID = msgID;
+			_bidBookMap = bidBookMap;
+			_offerBookMap= offerBookMap;
+		}
+
+		static class MDOrder{
+            MDOrder(String clientName, int leavesQty, long enteringTime){
+                _clientName = clientName;
+                _leavesQty = leavesQty;
+                _enteringTime = enteringTime;
+            }
+			String _clientName;
+			int _leavesQty;
+			long _enteringTime;
 		}
 
 	}
@@ -53,4 +84,16 @@ public class MarketDataMessage {
 			_depth = depth;
 		}
 	}
+
+    public static class DetailOrderBookRequest{
+
+        final String _requestID;
+        final String _symbol;
+        final int _depth;
+        public DetailOrderBookRequest(String requestID,String symbol, int depth){
+            _requestID = requestID;
+            _symbol = symbol;
+            _depth = depth;
+        }
+    }
 }

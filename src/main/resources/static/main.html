@@ -34,7 +34,7 @@
       
    </head>
    <body>
-        <h2>Order Book</h2>
+        <h2>Aggregated Order Book</h2>
 
         <table>
             <tr>
@@ -113,6 +113,90 @@
         </table>
 
 
+        <h2>Detail Order Book</h2>
+
+        <table>
+            <tr>
+                <td  align="middle" valign="top">
+                    <div ng-controller = "detail_order_book_table_USDJPY">
+                        <table>
+                            <tr colspan="2">Symbol:{{detail_order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._bidBookMap">
+                                            <!--
+                                            https://docs.angularjs.org/api/ng/filter/number
+                                            https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                                            -->
+                                            <td align="right">
+                                                <table>
+                                                    <tr ng-repeat = "ord in ordList">
+                                                        <td>{{ ord._clientName }}</td><td>{{ ord._leavesQty }}</td>
+                                                    </tr>
+                                                </table>
+
+                                            </td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td align="right">{{ qty | number : 0}}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+
+
+                <td align="middle" valign="top">
+                    <!-- TODO remove duplicate code with detail_order_book_table_USDJPY -->
+                    <div ng-controller = "detail_order_book_table_USDHKD">
+                        <table>
+                            <tr colspan="2">Symbol:{{order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._bidBookMap">
+                                            <!--
+                                            https://docs.angularjs.org/api/ng/filter/number
+                                            https://stackoverflow.com/questions/36091421/how-to-add-thousand-separating-commas-for-numbers-in-angularjs
+                                            -->
+                                            <td align="right">{{ qty | number : 0}}</td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, qty) in order_book.order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td  align="right">{{ qty | number : 0}}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+
+            </tr>
+
+        </table>
 
         <br>
         <br>
@@ -256,6 +340,33 @@
         mainApp.controller('order_book_table_USDHKD', function($scope, $http, $interval) {
 
             refreshOrderBook('/matching/query_order_book?symbol=USDHKD', $scope, $http, $interval);
+
+        });
+
+
+        //**************detail order book TODO: remove duplicate code with order book********
+
+        function refreshDetailOrderBook($url, $scope, $http, $interval){
+            //$interval - http://tutorials.jenkov.com/angularjs/timeout-interval.html
+            tmpFunc = function(){
+                            $http.get($url).
+                                then(function(response) {
+                                    $scope.detail_order_book = response.data;
+                                });
+                      };
+            tmpFunc();
+            $interval(tmpFunc, 2000); //every 2 seconds
+
+        }
+
+        mainApp.controller('detail_order_book_table_USDJPY', function($scope, $http, $interval) {
+
+            refreshDetailOrderBook('/matching/query_detail_order_book?symbol=USDJPY', $scope, $http, $interval);
+        });
+
+        mainApp.controller('detail_order_book_table_USDHKD', function($scope, $http, $interval) {
+
+            refreshDetailOrderBook('/matching/query_detail_order_book?symbol=USDHKD', $scope, $http, $interval);
 
         });
 

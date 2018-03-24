@@ -71,12 +71,19 @@ public class MatchingEngine {
 
 	}
 
-	public void addAggOrdBookRequest(AggregatedOrderBookRequest aggOrdBookRequest) {
+	public void addOrdBookRequest(AggregatedOrderBookRequest aggOrdBookRequest) {
 
 		OrderBook orderBook = orderBook(aggOrdBookRequest._symbol);
 		MarketDataMessage.AggregatedOrderBook aggOrderBook = orderBook.buildAggregatedOrderBook(aggOrdBookRequest._depth);
 		_outputMarketDataBus.post(aggOrderBook);
     }
+
+	public void addOrdBookRequest(MarketDataMessage.DetailOrderBookRequest request) {
+
+		OrderBook orderBook = orderBook(request._symbol);
+		MarketDataMessage.DetailOrderBook detailOrderBookSS = orderBook.buildDetailedOrderBook(request._depth);
+		_outputMarketDataBus.post(detailOrderBookSS);
+	}
 
 	private OrderBook orderBook(String symbol){
 

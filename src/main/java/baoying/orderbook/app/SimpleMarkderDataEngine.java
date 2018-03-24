@@ -16,15 +16,21 @@ public class SimpleMarkderDataEngine {
     private final static Logger log = LoggerFactory.getLogger(SimpleMarkderDataEngine.class);
 
     private Map<String, MarketDataMessage.AggregatedOrderBook> orderbookBySymbol;
+    private Map<String, MarketDataMessage.DetailOrderBook> detailOrderbookBySymbol;
 
 
     SimpleMarkderDataEngine(){
 
         orderbookBySymbol = new ConcurrentHashMap<>();
+        detailOrderbookBySymbol = new ConcurrentHashMap<>();
     }
 
     MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
         return orderbookBySymbol.get(symbol);
+    }
+
+    MarketDataMessage.DetailOrderBook getDetailOrderBookBySymbol(String symbol){
+        return detailOrderbookBySymbol.get(symbol);
     }
 
     public void start(){
@@ -34,6 +40,11 @@ public class SimpleMarkderDataEngine {
     @Subscribe
     public void process(MarketDataMessage.AggregatedOrderBook aggBook) {
         orderbookBySymbol.put(aggBook._symbol,aggBook);
+    }
+
+    @Subscribe
+    public void process(MarketDataMessage.DetailOrderBook detailBook) {
+        detailOrderbookBySymbol.put(detailBook._symbol,detailBook);
     }
 
     @Subscribe

@@ -190,13 +190,98 @@ public class OrderBook {
 
 	AggregatedOrderBook buildAggregatedOrderBook(int depth) {
 
-		TreeMap<Double, Integer> bidBookMap = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
+		TreeMap<Double, Integer> bidBookMap   = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
 		TreeMap<Double, Integer> offerBookMap = buildOneSideAggOrdBook(depth, Side.OFFER, _offerBook);
 
 		return new AggregatedOrderBook(_symbol, depth, _msgIDBase + _msgIDIncreament.incrementAndGet(), bidBookMap, offerBookMap);
 	}
 
-	/*-
+	MarketDataMessage.DetailOrderBook buildDetailedOrderBook(int depth){
+
+		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> bidBookMap   = buildOneSideDetailOrdBook(depth, Side.BID, _bidBook);
+		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> offerBookMap = buildOneSideDetailOrdBook(depth, Side.OFFER, _bidBook);
+
+		return new MarketDataMessage.DetailOrderBook(_symbol, depth, _msgIDBase + _msgIDIncreament.incrementAndGet(), bidBookMap, offerBookMap);
+
+	}
+
+    /*-
+     * - the map key is sorted. bid - reverse, offer - natural ordering
+     * - the map value's order is same with the one of matching order book
+     */
+    TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> buildOneSideDetailOrdBook(int depth, Side side, PriorityQueue<ExecutingOrder> sameSideBook) {
+
+        final PriorityQueue<ExecutingOrder> shadowCopyOfSameSideBook;
+        final TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> bookMap;
+        switch (side) {
+            case BID:
+                shadowCopyOfSameSideBook = createBidBook();
+                shadowCopyOfSameSideBook.addAll(sameSideBook); // TODO possible
+                // performance issue
+                // on
+                // huge book. Not found better way, yet.
+                bookMap = new TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>>(new Comparator<Double>() {
+
+                    @Override
+                    public int compare(Double o1, Double o2) {
+
+                        // TODO i assume there is no 1.300000000000000000001 and
+                        // 1.29999999999999 case. why? I expect the incoming FIX
+                        // message will be checked on the decimal scale of price.
+                        if( o1.equals(o2)) return 0;
+
+                        return o1 - o2 > 0 ? -1 : 1;
+                    }
+                });
+                break;
+            case OFFER:
+                shadowCopyOfSameSideBook = createAskBook();
+                shadowCopyOfSameSideBook.addAll(sameSideBook);// TODO possible
+                // performance issue
+                // on huge
+                // book
+                bookMap = new TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>>(new Comparator<Double>() {
+
+                    @Override
+                    public int compare(Double o1, Double o2) {
+
+                        // TODO i assume there is no 1.300000000000000000001 and
+                        // 1.29999999999999 case. why? I expect the incoming FIX
+                        // message will be checked on the decimal scale of price.
+                        if( o1.equals(o2)) return 0;
+
+                        return o1 - o2 > 0 ? 1 : -1;
+                    }
+                });                break;
+            default:
+                // TODO log error, and don't throw exception to avoid the engine
+                // shutdown
+                throw new RuntimeException("");
+        }
+
+
+
+        while (!shadowCopyOfSameSideBook.isEmpty()) {
+            ExecutingOrder o = shadowCopyOfSameSideBook.poll();
+            double price = o._origOrder._price;
+            int leavesQty = o._leavesQty;
+
+
+            List<MarketDataMessage.DetailOrderBook.MDOrder> mdOrders = bookMap.get(price) == null ?
+                            new ArrayList<>(): bookMap.get(price);
+            mdOrders.add(new MarketDataMessage.DetailOrderBook.MDOrder(o._origOrder._clientEntityID, o._leavesQty, o._origOrder._recvFromClientEpochMS));
+            bookMap.put(price, mdOrders);
+
+            if (bookMap.size() == depth + 1) {
+                bookMap.remove(price);
+                break;
+            }
+        }
+
+        return bookMap;
+    }
+
+    /*-
 	 * - the map key is sorted. bid - reverse, offer - natural ordering
 	 * - the map value's order is same with the one of matching order book
 	 */
@@ -213,21 +298,20 @@ public class OrderBook {
 			// huge book. Not found better way, yet.
 			bookMap = new TreeMap<Double, Integer>(new Comparator<Double>() {
 
-				@Override
-				public int compare(Double o1, Double o2) {
 
-					// TODO i assume there is no 1.300000000000000000001 and
-			        // 1.29999999999999 case. why? I expect the incoming FIX
-			        // message will be checked on the decimal scale of price.
-					double r = o1 - o2;
-					if (r > 0) {
-						return -1;
-					} else if (r < 0) {
-						return 1;
-					} else {
-						return 0;
-					}
-				}
+                // TODO i assume there is no 1.300000000000000000001 and
+                // 1.29999999999999 case. why? I expect the incoming FIX
+                // message will be checked on the decimal scale of price.
+                @Override
+                public int compare(Double o1, Double o2) {
+
+                    // TODO i assume there is no 1.300000000000000000001 and
+                    // 1.29999999999999 case. why? I expect the incoming FIX
+                    // message will be checked on the decimal scale of price.
+                    if( o1.equals(o2)) return 0;
+
+                    return o1 - o2 > 0 ? -1 : 1;
+                }
 			});
 			break;
 		case OFFER:
@@ -236,7 +320,22 @@ public class OrderBook {
 			                                              // performance issue
 			                                              // on huge
 			// book
-			bookMap = new TreeMap<Double, Integer>();
+            bookMap = new TreeMap<Double, Integer>(new Comparator<Double>() {
+
+                // TODO i assume there is no 1.300000000000000000001 and
+                // 1.29999999999999 case. why? I expect the incoming FIX
+                // message will be checked on the decimal scale of price.
+                @Override
+                public int compare(Double o1, Double o2) {
+
+                    // TODO i assume there is no 1.300000000000000000001 and
+                    // 1.29999999999999 case. why? I expect the incoming FIX
+                    // message will be checked on the decimal scale of price.
+                    if( o1.equals(o2)) return 0;
+
+                    return o1 - o2 > 0 ? 1 : -1;
+                }
+            });
 			break;
 		default:
 			// TODO log error, and don't throw exception to avoid the engine

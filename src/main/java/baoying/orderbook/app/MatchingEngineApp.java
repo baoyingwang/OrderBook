@@ -155,7 +155,8 @@ public class MatchingEngineApp {
 
             _vertx.setPeriodic(_snapshotRequestIntervalInSecond * 1000, id ->{
                 for(String symbol: _engine._symbols){
-                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+                    _engine.addOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+                    _engine.addOrdBookRequest(new MarketDataMessage.DetailOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
                 }
             });
 
