@@ -53,7 +53,9 @@ public class OrderBook {
 		_offerBook = createAskBook();
 	}
 
-    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(ExecutingOrder executingOrder) {
+    Util.Tuple<List<MEExecutionReportMessageFlag>, List<OrderBookDelta>> matchOrder(OriginalOrder order) {
+
+        ExecutingOrder executingOrder = new ExecutingOrder(order);
 
 		final PriorityQueue<ExecutingOrder> contraSideBook;
 		final PriorityQueue<ExecutingOrder> sameSideBook;
@@ -104,6 +106,7 @@ public class OrderBook {
 					break;
 				case LIMIT :
 					switch (executingOrder._origOrder._side) {
+					    //MIN_DIFF_FOR_PRICE is not required, if we promises that all prices have been rounded with same scale, in advance
 						case BID:
 							isExecutablePrice = executingOrder._origOrder._price
 									+ MIN_DIFF_FOR_PRICE > peekedContraBestPriceOrder._origOrder._price;
@@ -190,13 +193,101 @@ public class OrderBook {
 
 	AggregatedOrderBook buildAggregatedOrderBook(int depth) {
 
-		TreeMap<Double, Integer> bidBookMap = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
+		TreeMap<Double, Integer> bidBookMap   = buildOneSideAggOrdBook(depth, Side.BID, _bidBook);
 		TreeMap<Double, Integer> offerBookMap = buildOneSideAggOrdBook(depth, Side.OFFER, _offerBook);
 
 		return new AggregatedOrderBook(_symbol, depth, _msgIDBase + _msgIDIncreament.incrementAndGet(), bidBookMap, offerBookMap);
 	}
 
-	/*-
+	MarketDataMessage.DetailOrderBook buildDetailedOrderBook(int depth){
+
+		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> bidBookMap   = buildOneSideDetailOrdBook(depth, Side.BID, _bidBook);
+		TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> offerBookMap = buildOneSideDetailOrdBook(depth, Side.OFFER, _offerBook);
+
+		return new MarketDataMessage.DetailOrderBook(_symbol, depth, _msgIDBase + _msgIDIncreament.incrementAndGet(), bidBookMap, offerBookMap);
+
+	}
+
+    /*-
+     * - the map key is sorted. bid - reverse, offer - natural ordering
+     * - the map value's order is same with the one of matching order book
+     */
+    TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> buildOneSideDetailOrdBook(int depth, Side side, PriorityQueue<ExecutingOrder> sameSideBook) {
+
+        final PriorityQueue<ExecutingOrder> shadowCopyOfSameSideBook;
+        final TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>> bookMap;
+        switch (side) {
+            case BID:
+                shadowCopyOfSameSideBook = createBidBook();
+                shadowCopyOfSameSideBook.addAll(sameSideBook); // TODO possible
+                // performance issue
+                // on
+                // huge book. Not found better way, yet.
+                bookMap = new TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>>(new Comparator<Double>() {
+
+                    @Override
+                    public int compare(Double o1, Double o2) {
+
+                        // TODO i assume there is no 1.300000000000000000001 and
+                        // 1.29999999999999 case. why? I expect the incoming FIX
+                        // message will be checked on the decimal scale of price.
+                        if( o1.equals(o2)) return 0;
+
+                        return o1 - o2 > 0 ? -1 : 1;
+                    }
+                });
+                break;
+            case OFFER:
+                shadowCopyOfSameSideBook = createAskBook();
+                shadowCopyOfSameSideBook.addAll(sameSideBook);// TODO possible
+                // performance issue
+                // on huge
+                // book
+                bookMap = new TreeMap<Double, List<MarketDataMessage.DetailOrderBook.MDOrder>>(new Comparator<Double>() {
+
+                    @Override
+                    public int compare(Double o1, Double o2) {
+
+                        // TODO i assume there is no 1.300000000000000000001 and
+                        // 1.29999999999999 case. why? I expect the incoming FIX
+                        // message will be checked on the decimal scale of price.
+                        if( o1.equals(o2)) return 0;
+
+                        return o1 - o2 > 0 ? 1 : -1;
+                    }
+                });                break;
+            default:
+                // TODO log error, and don't throw exception to avoid the engine
+                // shutdown
+                throw new RuntimeException("");
+        }
+
+
+
+        while (!shadowCopyOfSameSideBook.isEmpty()) {
+            ExecutingOrder o = shadowCopyOfSameSideBook.poll();
+            double price = o._origOrder._price;
+            int leavesQty = o._leavesQty;
+
+
+            List<MarketDataMessage.DetailOrderBook.MDOrder> mdOrders = bookMap.get(price) == null ?
+                            new ArrayList<>(): bookMap.get(price);
+
+            mdOrders.add(new MarketDataMessage.DetailOrderBook.MDOrder(o._origOrder._clientEntityID,
+                    o._origOrder._clientOrdID,
+                    o._leavesQty, o._enteringMS, o._increasingID));
+            bookMap.put(price, mdOrders);
+
+            if (bookMap.size() == depth + 1) {
+                bookMap.remove(price);
+                break;
+            }
+        }
+
+        return bookMap;
+    }
+
+    /*-
 	 * - the map key is sorted. bid - reverse, offer - natural ordering
 	 * - the map value's order is same with the one of matching order book
 	 */
@@ -213,21 +304,20 @@ public class OrderBook {
 			// huge book. Not found better way, yet.
 			bookMap = new TreeMap<Double, Integer>(new Comparator<Double>() {
 
-				@Override
-				public int compare(Double o1, Double o2) {
 
-					// TODO i assume there is no 1.300000000000000000001 and
-			        // 1.29999999999999 case. why? I expect the incoming FIX
-			        // message will be checked on the decimal scale of price.
-					double r = o1 - o2;
-					if (r > 0) {
-						return -1;
-					} else if (r < 0) {
-						return 1;
-					} else {
-						return 0;
-					}
-				}
+                // TODO i assume there is no 1.300000000000000000001 and
+                // 1.29999999999999 case. why? I expect the incoming FIX
+                // message will be checked on the decimal scale of price.
+                @Override
+                public int compare(Double o1, Double o2) {
+
+                    // TODO i assume there is no 1.300000000000000000001 and
+                    // 1.29999999999999 case. why? I expect the incoming FIX
+                    // message will be checked on the decimal scale of price.
+                    if( o1.equals(o2)) return 0;
+
+                    return o1 - o2 > 0 ? -1 : 1;
+                }
 			});
 			break;
 		case OFFER:
@@ -236,7 +326,22 @@ public class OrderBook {
 			                                              // performance issue
 			                                              // on huge
 			// book
-			bookMap = new TreeMap<Double, Integer>();
+            bookMap = new TreeMap<Double, Integer>(new Comparator<Double>() {
+
+                // TODO i assume there is no 1.300000000000000000001 and
+                // 1.29999999999999 case. why? I expect the incoming FIX
+                // message will be checked on the decimal scale of price.
+                @Override
+                public int compare(Double o1, Double o2) {
+
+                    // TODO i assume there is no 1.300000000000000000001 and
+                    // 1.29999999999999 case. why? I expect the incoming FIX
+                    // message will be checked on the decimal scale of price.
+                    if( o1.equals(o2)) return 0;
+
+                    return o1 - o2 > 0 ? 1 : -1;
+                }
+            });
 			break;
 		default:
 			// TODO log error, and don't throw exception to avoid the engine
@@ -270,12 +375,24 @@ public class OrderBook {
 
 		final OriginalOrder _origOrder;
 
+        private static final AtomicLong _msgIDIncreament = new  AtomicLong(0);
+        final long _enteringMS;
+        //_increasingID is only useful when comparing 2 executing orders with same _enteringMS
+        //why only use System.nanoTime directly, but _enteringMS+_increasingID? Because
+        //1. nanoTime would be reset of server restart
+        //2. _enteringMS is more meaningful time
+        final long _increasingID = _msgIDIncreament.getAndIncrement();
+
+
 		// this value will change on each matching
 		int _leavesQty;
+
+
 
 		ExecutingOrder(OriginalOrder originalOrder) {
 			_origOrder = originalOrder;
 			_leavesQty = originalOrder._qty;
+            _enteringMS = System.currentTimeMillis();
 		}
 
 	}
@@ -286,11 +403,12 @@ public class OrderBook {
 			@Override
 			public int compare(ExecutingOrder o1, ExecutingOrder o2) {
 
-				// note: not required, it should also be considered equal price, if the diff is
-		        // very minor.
-//				if (o1._origOrder._price == o2._origOrder._price) {
-//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-//				}
+                //MIN_DIFF_FOR_PRICE - not required if we promise all input prices have been rounded with same scale
+                //same for bid and offer
+				if ( Math.abs(o1._origOrder._price - o2._origOrder._price) < MIN_DIFF_FOR_PRICE) {
+				    long x = o1._enteringMS - o2._enteringMS != 0 ? o1._enteringMS - o2._enteringMS : o1._increasingID - o2._increasingID;
+					return (int) x;
+				}
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return -1;
@@ -308,11 +426,12 @@ public class OrderBook {
 			@Override
 			public int compare(ExecutingOrder o1, ExecutingOrder o2) {
 
-				// TODO it should also be considered equal price, if the diff is
-		        // very minor.
-//				if (o1._origOrder._price == o2._origOrder._price) {
-//					return (int) (o1._origOrder._enterInputQ_sysNano_test - o2._origOrder._enterInputQ_sysNano_test);
-//				}
+                //MIN_DIFF_FOR_PRICE - not required if we promise all input prices have been rounded with same scale
+                //same for bid and offer
+                if ( Math.abs(o1._origOrder._price - o2._origOrder._price) < MIN_DIFF_FOR_PRICE) {
+                    long x = o1._enteringMS - o2._enteringMS != 0 ? o1._enteringMS - o2._enteringMS : o1._increasingID - o2._increasingID;
+                    return (int) x;
+                }
 
 				if (o1._origOrder._price > o2._origOrder._price) {
 					return 1;

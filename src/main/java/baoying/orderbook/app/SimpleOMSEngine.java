@@ -140,6 +140,7 @@ public class SimpleOMSEngine {
         erMap.put("execType", singleSideExecutionReport._type.toString());
         //TODO maybe this order status is NOT good/correct
         erMap.put("ordSatus", singleSideExecutionReport._type.toString());
+        erMap.put("description", singleSideExecutionReport._description);
 
         return erMap;
     }

@@ -155,7 +155,8 @@ public class MatchingEngineApp {
 
             _vertx.setPeriodic(_snapshotRequestIntervalInSecond * 1000, id ->{
                 for(String symbol: _engine._symbols){
-                    _engine.addAggOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+                    _engine.addOrdBookRequest(new MarketDataMessage.AggregatedOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
+                    _engine.addOrdBookRequest(new MarketDataMessage.DetailOrderBookRequest(String.valueOf(System.nanoTime()), symbol,5));
                 }
             });
 
@@ -170,7 +171,7 @@ public class MatchingEngineApp {
         int vertx_tcp_port = 10005;
 
         @Parameter(names = {"--symbols", "-s"}, listConverter = Util.CSVListConverter.class)
-        List<String> symbols = Arrays.asList(new String[]{"USDJPY"});
+        List<String> symbols = Arrays.asList(new String[]{"USDJPY","USDHKD"});
 
         @Parameter(names = {"--snapshot_interval_in_second"}, description = "the internal simple market data engine will request snaphost periodically . default : 1")
         private int snapshotRequestIntervalInSecond = 2;

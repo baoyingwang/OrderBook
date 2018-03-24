@@ -8,6 +8,7 @@ import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,8 +48,8 @@ public class MatchingEngineWebWrapper {
         log.info("start the MatchingEngineWebWrapper");
     }
 
-    @RequestMapping("/place_order")
-    public String placeOrder(@RequestParam(value = "symboL", defaultValue = "USDJPY") String symbol,
+    @RequestMapping(value="/place_order", method = { RequestMethod.GET, RequestMethod.POST })
+    public String placeOrder(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol,
                              @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
                              @RequestParam(value = "side", defaultValue="Bid") String side,
                              @RequestParam(value = "price", defaultValue="126.0") double price,
@@ -106,6 +107,20 @@ public class MatchingEngineWebWrapper {
         Map<String, Object> orderBook = new HashMap<>();
         orderBook.put("symbol", symbol);
         orderBook.put("order_book", _simpleMarkderDataEngine.getOrderBookBySymbol(symbol));
+
+        Gson gson = new GsonBuilder().create();
+        String jsonString = gson.toJson(orderBook);
+        return jsonString;
+    }
+
+    @RequestMapping("/query_detail_order_book")
+    public String queryDetailOrderBook(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol){
+
+        log.info("query_detail_order_book on symbol:{}", symbol);
+
+        Map<String, Object> orderBook = new HashMap<>();
+        orderBook.put("symbol", symbol);
+        orderBook.put("detail_order_book", _simpleMarkderDataEngine.getDetailOrderBookBySymbol(symbol));
 
         Gson gson = new GsonBuilder().create();
         String jsonString = gson.toJson(orderBook);

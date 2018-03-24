@@ -4,8 +4,18 @@
       <title>Angular JS Table</title>
        <!-- why not https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js?
        google is blocked by great wall
+
+       TODO : why not /ajax.libs.angularjs.1.4.3/angular.min.js? But /jquery.dev.3.3.1/jquery-3.3.1.js?
+
        -->
        <script src = "/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+
+       <!-- LOAD JQUERY as mentioned in https://scotch.io/tutorials/submitting-ajax-forms-the-angularjs-way -->
+       <!-- when building an angular app, you generally DO NOT want to use jquery -->
+       <!-- we are breaking this rule here because jQuery's $.param will help us send data to our PHP script so that PHP can recognize it -->
+       <!-- this is jQuery's only use. avoid it in Angular apps and if anyone has tips on how to send data to a PHP script w/o jQuery, please state it in the comments -->
+       <script src = "/jquery.dev.3.3.1/jquery-3.3.1.js"></script>
+
       <style>
          table, th , td {
             border: 1px solid grey;
@@ -24,7 +34,7 @@
       
    </head>
    <body>
-        <h2>Order Book</h2>
+        <h2>Aggregated Order Book</h2>
 
         <table>
             <tr>
@@ -103,43 +113,175 @@
         </table>
 
 
+        <h2>Detail Order Book</h2>
+
+        <table>
+            <tr>
+                <td  align="middle" valign="top">
+
+
+                    <div ng-controller = "detail_order_book_table_USDJPY">
+                        <table>
+                            <tr colspan="2">Symbol:{{detail_order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._bidBookMap">
+                                            <td align="right">
+                                                <table>
+                                                    <tr ng-repeat = "ord in ordList">
+                                                        <td>{{ ord._clientName }}</td><td>{{ ord._leavesQty }}</td>
+                                                    </tr>
+                                                </table>
+
+                                            </td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td align="right">
+                                                <table>
+                                                    <tr ng-repeat = "ord in ordList">
+                                                        <td>{{ ord._clientName }}</td><td>{{ ord._leavesQty }}</td>
+                                                    </tr>
+                                                </table>
+
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+
+                </td>
+
+
+                <td align="middle" valign="top">
+                    <div ng-controller = "detail_order_book_table_USDHKD">
+                        <table>
+                            <tr colspan="2">Symbol:{{detail_order_book.symbol}}</tr>
+                            <tr>
+                                <td style="width:130px" align="center">Buy</td><td  style="width:130px" align="center">Sell</td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="top">
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._bidBookMap">
+                                            <td align="right">
+                                                <table>
+                                                    <tr ng-repeat = "ord in ordList">
+                                                        <td>{{ ord._clientName }}</td><td>{{ ord._leavesQty }}</td>
+                                                    </tr>
+                                                </table>
+
+                                            </td>
+                                            <td>{{ price }}</td>
+
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td align="left" valign="top">
+
+                                    <table>
+                                        <tr ng-repeat = "(price, ordList) in detail_order_book.detail_order_book._offerBookMap">
+                                            <td>{{ price }}</td>
+                                            <td align="right">
+                                                <table>
+                                                    <tr ng-repeat = "ord in ordList">
+                                                        <td>{{ ord._clientName }}</td><td>{{ ord._leavesQty }}</td>
+                                                    </tr>
+                                                </table>
+
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+
+                </td>
+
+            </tr>
+
+        </table>
 
         <br>
         <br>
         <br>
       <div ng-controller="placeOrderDiv">
 
-          Act as
-          <select ng-init="selectedName = clientEntityNames[0]" ng-model="selectedName" ng-options="x for x in clientEntityNames">
-          </select>
-          <table>
-              <tr>
-                  <td>ccy pair</td>
-                  <td>
-                    <select ng-init="ccypair = ccypair_list[0]" ng-model="ccypair" ng-options="x for x in ccypair_list">
-                  </td>
-              </tr>
-              <tr>
-                  <td>price</td><td>120</td>
-              </tr>
-              <tr>
-                  <td>qty</td><td>1000000</td>
-              </tr>
-              <tr>
-                  <td>side</td>
-                  <td>
-                      <!-- https://docs.angularjs.org/api/ng/directive/select -->
-                      <select name="singleSelect" ng-model="data.singleSelect">
-                        <option value="Bid">Bid</option>
-                        <option value="Offer">Offer</option>
-                      </select>
-                  </td>
-              </tr>
+          <form ng-submit="processOrderForm()">
+              Act as
+              <!-- //http://www.runoob.com/angularjs/angularjs-select.html -->
+              <select
+                      ng-init="orderData.selectedName = orderData.clientEntityNames[0]"
+                      ng-model="orderData.selectedName"
+                      ng-options="x for x in orderData.clientEntityNames">
+              </select>
+              <table>
+                  <tr>
+                      <td>ccy pair</td>
+                      <td>
+                        <select
+                                ng-init="orderData.ccypair = orderData.ccypair_list[0]"
+                                ng-model="orderData.ccypair"
+                                ng-options="x for x in orderData.ccypair_list">
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>price</td>
+                      <td>
+                          <input type="text" name="price" class="form-control" placeholder="120"
+                                 ng-model="orderData.price">
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>qty</td>
+                      <td>
+                          <input type="text" name="price" class="form-control" placeholder="5000"
+                                 ng-model="orderData.qty">
+                      </td>
+                  </tr>
+                  <tr>
+                      <td>side</td>
+                      <td>
+                          <select
+                                  ng-init="orderData.side = orderData.side_list[0]"
+                                  ng-model="orderData.side"
+                                  ng-options="x for x in orderData.side_list">
+                          </select>
 
+                      </td>
+                  </tr>
 
-          </table>
+                  <tr>
+                      <td>side
+                          <button type="submit" class="btn btn-success btn-lg btn-block">
+                              <span class="glyphicon glyphicon-flash"></span> Submit!
+                          </button>
+                       </td>
+                  </tr>
+
+              </table>
           <br>
+
           TODO : support to input the order by clicking related orderbook<BR>
+          </form>
       </div>
 
       <div ng-controller="order_book_plain">
@@ -149,23 +291,105 @@
 
          var mainApp = angular.module("mainApp", []);
 
-        //http://www.runoob.com/angularjs/angularjs-select.html
-         mainApp.controller('placeOrderDiv', function($scope) {
-            $scope.clientEntityNames = ["BankA", "BankB", "BankC"];
-            $scope.ccypair_list = ["USDJPY", "USDHKD"];
+
+        //***************Place Order***************************
+        //https://scotch.io/tutorials/submitting-ajax-forms-the-angularjs-way
+         mainApp.controller('placeOrderDiv', function($scope, $http) {
+
+            $scope.orderData={};
+            $scope.orderData.clientEntityNames = ["BankA", "BankB", "BankC"];
+            $scope.orderData.ccypair_list = ["USDJPY", "USDHKD"];
+            $scope.orderData.side_list = ["Bid", "Offer"];
+            $scope.orderData.price=121.5;
+            $scope.orderData.qty=5100;
+
+
+            $scope.processOrderForm = function() {
+
+                  var data = $.param({
+
+                        client_entity : $scope.orderData.selectedName,
+                        symbol : $scope.orderData.ccypair,
+                        qty  : $scope.orderData.qty,
+                        price: $scope.orderData.price,
+                        side : $scope.orderData.side,
+
+                  }); //$.param is from jQuery
+
+                  $http({
+                          method  : 'POST',
+                          url     : '/matching/place_order',
+                          data    : data ,
+                          headers : { 'Content-Type': 'application/x-www-form-urlencoded' }  // set the headers so angular passing info as form data (not request payload)
+                         })
+                  .success(function(data) {
+                        console.log(data);
+
+                        if (!data.success) {
+                          // if not successful, bind errors to error variables
+                          $scope.errorName = data.errors.name;
+                          $scope.errorSuperhero = data.errors.superheroAlias;
+                        } else {
+                          // if successful, bind success message to message
+                          $scope.message = data.message;
+                        }
+                  });
+            };
+         });
+
+
+        //***************OrderBook***************************
+
+
+        function refreshOrderBook($url, $scope, $http, $interval){
+            //$interval - http://tutorials.jenkov.com/angularjs/timeout-interval.html
+            tmpFunc = function(){
+                            $http.get($url).
+                                then(function(response) {
+                                    $scope.order_book = response.data;
+                                });
+                      };
+            tmpFunc();
+            $interval(tmpFunc, 2000); //every 2 seconds
+
+        }
+
+        mainApp.controller('order_book_table_USDJPY', function($scope, $http, $interval) {
+
+            refreshOrderBook('/matching/query_order_book', $scope, $http, $interval);
         });
 
-        mainApp.controller('order_book_table_USDJPY', function($scope, $http) {
-            $http.get('/matching/query_order_book').
-                then(function(response) {
-                    $scope.order_book = response.data;
-                });
+        mainApp.controller('order_book_table_USDHKD', function($scope, $http, $interval) {
+
+            refreshOrderBook('/matching/query_order_book?symbol=USDHKD', $scope, $http, $interval);
+
         });
-        mainApp.controller('order_book_table_USDHKD', function($scope, $http) {
-            $http.get('/matching/query_order_book?symbol=USDHKD').
-                then(function(response) {
-                    $scope.order_book = response.data;
-                });
+
+
+        //**************detail order book TODO: remove duplicate code with order book********
+
+        function refreshDetailOrderBook($url, $scope, $http, $interval){
+            //$interval - http://tutorials.jenkov.com/angularjs/timeout-interval.html
+            tmpFunc = function(){
+                            $http.get($url).
+                                then(function(response) {
+                                    $scope.detail_order_book = response.data;
+                                });
+                      };
+            tmpFunc();
+            $interval(tmpFunc, 2000); //every 2 seconds
+
+        }
+
+        mainApp.controller('detail_order_book_table_USDJPY', function($scope, $http, $interval) {
+
+            refreshDetailOrderBook('/matching/query_detail_order_book?symbol=USDJPY', $scope, $http, $interval);
+        });
+
+        mainApp.controller('detail_order_book_table_USDHKD', function($scope, $http, $interval) {
+
+            refreshDetailOrderBook('/matching/query_detail_order_book?symbol=USDHKD', $scope, $http, $interval);
+
         });
 
         mainApp.controller('order_book_plain', function($scope, $http) {
@@ -174,6 +398,9 @@
                     $scope.order_book = response.data;
                 });
         });
+
+
+
 
       </script>
       
