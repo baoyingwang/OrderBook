@@ -8,6 +8,7 @@ import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,7 +48,7 @@ public class MatchingEngineWebWrapper {
         log.info("start the MatchingEngineWebWrapper");
     }
 
-    @RequestMapping("/place_order")
+    @RequestMapping(value="/place_order", method = { RequestMethod.GET, RequestMethod.POST })
     public String placeOrder(@RequestParam(value = "symbol", defaultValue = "USDJPY") String symbol,
                              @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
                              @RequestParam(value = "side", defaultValue="Bid") String side,

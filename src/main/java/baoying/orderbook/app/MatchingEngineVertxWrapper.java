@@ -83,6 +83,7 @@ public class MatchingEngineVertxWrapper {
 
     private void handleMessage(Buffer buffer, NetSocket socket) {
 
+
         long zeroOLatencyOrdRrecvTimeNano = 0;
         final int     msgSize   = buffer.getInt(0);
         final String  msgString = buffer.getString(4, msgSize+4);
