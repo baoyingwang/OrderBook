@@ -6,6 +6,7 @@ import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
+import io.vertx.core.Context;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,11 +40,15 @@ public class MatchingEngineApp {
     private static int _vertx_tcp_port;
 
     private final InternalMatchingEngineApp _internalMatchingEngineApp;
+    private final Context _uniqContext;
+    private final Vertx _vertx = Vertx.vertx();
 
 
 
     MatchingEngineApp() throws Exception{
-        _internalMatchingEngineApp = new InternalMatchingEngineApp(_symbolList);
+        _uniqContext = _vertx.getOrCreateContext();
+        _internalMatchingEngineApp = new InternalMatchingEngineApp(_symbolList, _uniqContext);
+
     }
 
     @PostConstruct
@@ -66,13 +71,16 @@ public class MatchingEngineApp {
     MatchingEngine engine() { return _internalMatchingEngineApp._engine;}
 
     @Bean
-    Vertx vertx() { return _internalMatchingEngineApp._vertx;}
+    Vertx vertx() { return _vertx;}
+
+    @Bean
+    Context context() { return _uniqContext;}
 
     class InternalMatchingEngineApp {
 
         private final MatchingEngine _engine;
 
-        private final Vertx _vertx = Vertx.vertx();
+
 
         private final AsyncEventBus _marketDataBus;
         private final AsyncEventBus _executionReportsBus;
@@ -86,7 +94,7 @@ public class MatchingEngineApp {
 
         private final JVMDataCollectionEngine sysPerfEngine;
 
-        public InternalMatchingEngineApp(List<String> symbols) throws Exception {
+        public InternalMatchingEngineApp(List<String> symbols, Context uniqContext) throws Exception {
 
             //TODO configurable. It should be be printed per minute, or per 2 minutes on production
             String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
@@ -130,13 +138,14 @@ public class MatchingEngineApp {
             _marketDataBus.register(_simpleMarkderDataEngine);
 
 
+
             _webWrapper = new MatchingEngineWebWrapper(_engine,
-                    _vertx,
+                    uniqContext,
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine);
 
             _fixWrapper = new MatchingEngineFIXWrapper(_engine,
-                    _vertx,
+                    uniqContext,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
 
             _executionReportsBus.register(_fixWrapper);

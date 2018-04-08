@@ -9,8 +9,17 @@
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
-        <RollingFile name="RollingFile" fileName="log/${app_name}.log" filePattern="logarchive/${app_name}-%d{MM-dd-yyyy}.log.gz"
-                     ignoreExceptions="false" bufferSize="8192000">
+
+        <!--
+            section : Rollover Strategies of  https://logging.apache.org/log4j/2.x/manual/appenders.html
+            the bufferSize does not work, since immediateFlush is true(as default)
+        -->
+        <RollingFile name="RollingFile"
+                     fileName="log/${app_name}.log"
+                     filePattern="logarchive/${app_name}-%d{MM-dd-yyyy}.log.gz"
+                     ignoreExceptions="false"
+                     immediateFlush="true"
+                     bufferSize="8192000">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
             </PatternLayout>
@@ -18,6 +27,7 @@
         </RollingFile>
 
         <!-- https://logging.apache.org/log4j/2.x/manual/async.html -->
+        <!--
         <RandomAccessFile name="RandomAccessFile" fileName="log/${app_name}_async.log" immediateFlush="false" append="false">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m %ex%n</Pattern>
@@ -28,7 +38,7 @@
             <AppenderRef ref="RollingFile"/>
             <LinkedTransferQueue/>
         </Async>
-
+        -->
     </Appenders>
 
     <Loggers>

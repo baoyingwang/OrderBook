@@ -18,7 +18,7 @@ public class MatchingDataStatistics {
 
     ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-    final CurrentPeriod _currentPeriod;
+    CurrentPeriod _currentPeriod;
     final CurrentPeriod _theWholeLifeCycle;
 
 

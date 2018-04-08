@@ -7,6 +7,7 @@ import baoying.orderbook.TradeMessage;
 import baoying.orderbook.qfj.QFJDynamicSessionAcceptor;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import com.google.common.eventbus.Subscribe;
+import io.vertx.core.Context;
 import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +30,8 @@ public class MatchingEngineFIXWrapper {
 
     private final MatchingEngine _engine;
 
-    private final Vertx _vertx;
+    //private final Vertx _vertx;
+    private final Context _vertxContext;
 
     private final QFJDynamicSessionAcceptor _QFJDynamicSessionAcceptor;
     private final String _appConfigInClasspath;
@@ -45,12 +47,13 @@ public class MatchingEngineFIXWrapper {
     });
 
     MatchingEngineFIXWrapper(MatchingEngine engine,
-                             Vertx vertx,
+                             Context vertxContext,
                              String appConfigInClasspath) throws Exception{
 
         _engine = engine;
 
-        _vertx = vertx;
+        //_vertx = vertx;
+        _vertxContext = vertxContext;
 
         _appConfigInClasspath = appConfigInClasspath;
         _QFJDynamicSessionAcceptor = new QFJDynamicSessionAcceptor(_appConfigInClasspath, new InternalQFJApplicationCallback());
@@ -251,7 +254,7 @@ public class MatchingEngineFIXWrapper {
     private void processIncomingOrder(final Message paramMessage, final SessionID paramSessionID, long zeroOLatencyOrdRrecvTimeNano) throws Exception{
 
         String orderID = UniqIDGenerator.next();
-        _vertx.runOnContext((v)->{
+        _vertxContext.runOnContext((v)->{
 
             try {
 

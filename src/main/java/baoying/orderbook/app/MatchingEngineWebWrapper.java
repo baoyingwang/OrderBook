@@ -3,6 +3,7 @@ package baoying.orderbook.app;
 import baoying.orderbook.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.vertx.core.Context;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
@@ -25,18 +26,19 @@ public class MatchingEngineWebWrapper {
 
     private final MatchingEngine _engine;
 
-    private final Vertx _vertx;
+    //private final Vertx _vertx;
+    private final Context _vertxContext;
     private final SimpleOMSEngine _simpleOMSEngine;
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
     MatchingEngineWebWrapper(MatchingEngine engine,
-                             Vertx vertx,
+                             Context vertxContext,
                              SimpleOMSEngine simpleOMSEngine,
                              SimpleMarkderDataEngine simpleMarkderDataEngine){
 
         _engine = engine;
-        _vertx = vertx;
+        _vertxContext = vertxContext;
 
         _simpleOMSEngine=simpleOMSEngine;
         _simpleMarkderDataEngine=simpleMarkderDataEngine;
@@ -53,7 +55,9 @@ public class MatchingEngineWebWrapper {
                              @RequestParam(value = "client_entity", defaultValue = "BankA") String clientEntity,
                              @RequestParam(value = "side", defaultValue="Bid") String side,
                              @RequestParam(value = "price", defaultValue="126.0") double price,
-                             @RequestParam(value = "qty", defaultValue = "5000") int qty){
+                             @RequestParam(value = "qty", defaultValue = "5000") int qty,
+                             @RequestParam(value = "ordType", defaultValue = "2") String fixOrdType //1 : market, 2 : limit
+        ){
 
         final String clientOrdID = clientEntity+"_"+ UniqIDGenerator.next();
         final String orderID = symbol+"_"+clientEntity+"_"+ UniqIDGenerator.next();
@@ -69,13 +73,14 @@ public class MatchingEngineWebWrapper {
             return "ERROR - unknown side : " + side;
         }
 
+        CommonMessage.OrderType ordType = CommonMessage.OrderType.fixValueOf(fixOrdType.charAt(0));
 
-        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide , CommonMessage.OrderType.LIMIT, price, qty, orderID, clientOrdID, clientEntity);
-        _vertx.runOnContext((v)->{
+        TradeMessage.OriginalOrder originalOrder  = new TradeMessage.OriginalOrder( System.currentTimeMillis(),symbol,orderSide ,ordType , price, qty, orderID, clientOrdID, clientEntity);
+
+
+        _vertxContext.runOnContext((v)->{
 
             final List<OrderBook.MEExecutionReportMessageFlag> matchResult = _engine.matchOrder(originalOrder);
-
-
 
         });
 
