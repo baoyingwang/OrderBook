@@ -1,7 +1,9 @@
-package baoying.orderbook.app;
+package baoying.orderbook.connector;
 
-import baoying.orderbook.CommonMessage;
-import baoying.orderbook.TradeMessage;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.util.Util;
+import baoying.orderbook.core.CommonMessage;
+import baoying.orderbook.core.TradeMessage;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
-public class MatchingEngineFIXHelper {
+public class FIXHelper {
 
-    private final static Logger log = LoggerFactory.getLogger(MatchingEngineFIXHelper.class);
+    private final static Logger log = LoggerFactory.getLogger(FIXHelper.class);
 
 
     public static Util.Tuple<Message,TradeMessage.OriginalOrder> processOneSideOfMatchingReport(TradeMessage.MatchedExecutionReport matchedExecutionReport, SimpleOMSEngine.MAKER_TAKER maker_taker){

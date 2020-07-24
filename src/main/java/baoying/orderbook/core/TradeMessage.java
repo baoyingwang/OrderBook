@@ -1,7 +1,7 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
-import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
+import baoying.orderbook.core.CommonMessage.Side;
+import baoying.orderbook.core.OrderBook.MEExecutionReportMessageFlag;
 
 public class TradeMessage {
 

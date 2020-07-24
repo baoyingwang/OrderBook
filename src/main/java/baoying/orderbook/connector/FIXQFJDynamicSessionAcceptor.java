@@ -1,4 +1,4 @@
-package baoying.orderbook.qfj;
+package baoying.orderbook.connector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,9 +10,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Iterator;
 
-public class QFJDynamicSessionAcceptor {
+public class FIXQFJDynamicSessionAcceptor {
 
-    private final static Logger log = LoggerFactory.getLogger(QFJDynamicSessionAcceptor.class);
+    private final static Logger log = LoggerFactory.getLogger(FIXQFJDynamicSessionAcceptor.class);
 
     private final String _appConfigInClasspath;
     private final SessionSettings _settings;
@@ -22,7 +22,7 @@ public class QFJDynamicSessionAcceptor {
 
     private final SocketAcceptor _acceptor;
 
-    public QFJDynamicSessionAcceptor(String appConfigInClasspath, Application msgCallback) throws Exception {
+    public FIXQFJDynamicSessionAcceptor(String appConfigInClasspath, Application msgCallback) throws Exception {
 
         _appConfigInClasspath = appConfigInClasspath;
         log.info("qfj server begin initializing, with app configuration file in classpath:{}", appConfigInClasspath);

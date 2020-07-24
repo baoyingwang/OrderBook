@@ -1,10 +1,10 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
 import java.util.List;
 import java.util.TreeMap;
 
-import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.OrderBook.MDMarketDataMessageFlag;
+import baoying.orderbook.core.CommonMessage.Side;
+import baoying.orderbook.core.OrderBook.MDMarketDataMessageFlag;
 
 public class MarketDataMessage {
 	

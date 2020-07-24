@@ -1,7 +1,8 @@
-package baoying.orderbook.app;
+package baoying.orderbook.connector;
 
 
-import baoying.orderbook.TradeMessage;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.core.TradeMessage;
 import com.google.common.eventbus.Subscribe;
 
 import java.util.ArrayList;
@@ -9,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class SimpleOMSEngine {
 
@@ -25,11 +25,11 @@ public class SimpleOMSEngine {
     private final Map<String, List<Map<String, String>>> executionReportsByOrderID;
 
 
-    SimpleOMSEngine(){
+    public SimpleOMSEngine(){
         executionReportsByOrderID = new ConcurrentHashMap<>();
     }
 
-    List<Map<String, String>> getERsByOrderID(String orderID){
+    public List<Map<String, String>> getERsByOrderID(String orderID){
         return executionReportsByOrderID.get(orderID);
     }
 

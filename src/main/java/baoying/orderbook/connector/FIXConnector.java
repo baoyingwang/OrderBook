@@ -1,10 +1,12 @@
-package baoying.orderbook.app;
+package baoying.orderbook.connector;
 
-import baoying.orderbook.CommonMessage;
-import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
-import baoying.orderbook.TradeMessage;
-import baoying.orderbook.qfj.QFJDynamicSessionAcceptor;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.util.UniqIDGenerator;
+import baoying.orderbook.util.Util;
+import baoying.orderbook.core.CommonMessage;
+import baoying.orderbook.core.MatchingEngine;
+import baoying.orderbook.core.OrderBook;
+import baoying.orderbook.core.TradeMessage;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import com.google.common.eventbus.Subscribe;
 import io.vertx.core.Vertx;
@@ -17,21 +19,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
-//https://www.java2blog.com/spring-boot-web-application-example/
-public class MatchingEngineFIXWrapper {
-
+public class FIXConnector {
 
 
     //warn : should be exactly same with the value in the quickfix configuration file
     public static String serverCompID = "BaoyingMatchingCompID";
 
-    private final static Logger log = LoggerFactory.getLogger(MatchingEngineFIXWrapper.class);
+    private final static Logger log = LoggerFactory.getLogger(FIXConnector.class);
 
     private final MatchingEngine _engine;
 
     private final Vertx _vertx;
 
-    private final QFJDynamicSessionAcceptor _QFJDynamicSessionAcceptor;
+    private final FIXQFJDynamicSessionAcceptor _FIXQFJDynamicSessionAcceptor;
     private final String _appConfigInClasspath;
 
     private final Set<String> _triedLogonClientCompIDs = new HashSet<>();
@@ -44,16 +44,16 @@ public class MatchingEngineFIXWrapper {
         }
     });
 
-    MatchingEngineFIXWrapper(MatchingEngine engine,
-                             Vertx vertx,
-                             String appConfigInClasspath) throws Exception{
+    public FIXConnector(MatchingEngine engine,
+                        Vertx vertx,
+                        String appConfigInClasspath) throws Exception{
 
         _engine = engine;
 
         _vertx = vertx;
 
         _appConfigInClasspath = appConfigInClasspath;
-        _QFJDynamicSessionAcceptor = new QFJDynamicSessionAcceptor(_appConfigInClasspath, new InternalQFJApplicationCallback());
+        _FIXQFJDynamicSessionAcceptor = new FIXQFJDynamicSessionAcceptor(_appConfigInClasspath, new InternalQFJApplicationCallback());
 
     }
 
@@ -61,7 +61,7 @@ public class MatchingEngineFIXWrapper {
 
         log.info("start the MatchingEngineFIXWrapper");
 
-        _QFJDynamicSessionAcceptor.start();
+        _FIXQFJDynamicSessionAcceptor.start();
 
         log.info("start the MatchingEngineFIXWrapper - done");
     }
@@ -75,7 +75,7 @@ public class MatchingEngineFIXWrapper {
 
         _fixProcessMatchResultExecutor.submit(()->{
 
-            Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
+            Message fixER = FIXHelper.translateSingeSideER(singleSideExecutionReport);
             try {
                 sendER(fixER, singleSideExecutionReport._originOrder._clientEntityID);
             } catch (Exception e) {
@@ -90,7 +90,7 @@ public class MatchingEngineFIXWrapper {
     public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport){
 
         List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
-                = MatchingEngineFIXHelper.translateMatchedER(
+                = FIXHelper.translateMatchedER(
                 CommonMessage.ExternalSource.FIX,
                 matchedExecutionReport);
 
@@ -256,7 +256,7 @@ public class MatchingEngineFIXWrapper {
             try {
 
                 final TradeMessage.OriginalOrder originalOrder
-                        = MatchingEngineFIXHelper.buildOriginalOrder(
+                        = FIXHelper.buildOriginalOrder(
                         CommonMessage.ExternalSource.FIX,
                         paramMessage,
                         orderID,

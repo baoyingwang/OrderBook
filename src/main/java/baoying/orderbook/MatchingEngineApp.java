@@ -1,8 +1,14 @@
-package baoying.orderbook.app;
+package baoying.orderbook;
 
-import baoying.orderbook.MarketDataMessage;
-import baoying.orderbook.MatchingEngine;
-import com.beust.jcommander.IStringConverter;
+import baoying.orderbook.monitor.JVMMonitorEngine;
+import baoying.orderbook.util.*;
+import baoying.orderbook.connector.FIXConnector;
+import baoying.orderbook.connector.VertxConnector;
+import baoying.orderbook.connector.WebConnector;
+import baoying.orderbook.connector.SimpleOMSEngine;
+import baoying.orderbook.core.MarketDataMessage;
+import baoying.orderbook.core.MatchingEngine;
+import baoying.orderbook.marketdata.SimpleMarkderDataEngine;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.google.common.eventbus.AsyncEventBus;
@@ -20,7 +26,6 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -51,14 +56,15 @@ public class MatchingEngineApp {
         _internalMatchingEngineApp.start();
     }
 
-    //Why are the Bean declarations required?  MatchingEnginWebWrapper depends on Spring Rest feature. That needs Beans as constructor arguments.
+    //Why are the Bean declarations required?  MatchingEnginWebWrapper depends on Spring Rest feature.
+    //That needs Beans as constructor arguments.
     @Bean
     SimpleOMSEngine createSimpleOMSEngine() {
         return _internalMatchingEngineApp._simpleOMSEngine;
     }
 
     @Bean
-    SimpleMarkderDataEngine createSimpleMarkderDataEngine() {
+    SimpleMarkderDataEngine createSimpleMarkerDataEngine() {
         return _internalMatchingEngineApp._simpleMarkderDataEngine;
     }
 
@@ -80,11 +86,11 @@ public class MatchingEngineApp {
         private final SimpleOMSEngine _simpleOMSEngine;
         private final SimpleMarkderDataEngine _simpleMarkderDataEngine;
 
-        private final MatchingEngineWebWrapper _webWrapper;
-        private final MatchingEngineFIXWrapper _fixWrapper;
-        private final MatchingEngineVertxWrapper _vertxWrapper;
+        private final WebConnector _webWrapper;
+        private final FIXConnector _fixWrapper;
+        private final VertxConnector _vertxWrapper;
 
-        private final JVMDataCollectionEngine sysPerfEngine;
+        private final JVMMonitorEngine sysPerfEngine;
 
         public InternalMatchingEngineApp(List<String> symbols) throws Exception {
 
@@ -92,7 +98,7 @@ public class MatchingEngineApp {
             String startTimeAsFileName = Util.fileNameFormatter.format(Instant.now());
             Path usageFile = Paths.get("log/sysUsage_app.start" + startTimeAsFileName + ".csv");
             Path sysInfoFile = Paths.get("log/sysInfo_app.start" + startTimeAsFileName + ".txt");
-            sysPerfEngine = JVMDataCollectionEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
+            sysPerfEngine = JVMMonitorEngine.asEngine(5, TimeUnit.SECONDS, usageFile);
             Map<String, String> config = sysPerfEngine.config();
             config.forEach((k, v) -> {
                 try {
@@ -130,19 +136,19 @@ public class MatchingEngineApp {
             _marketDataBus.register(_simpleMarkderDataEngine);
 
 
-            _webWrapper = new MatchingEngineWebWrapper(_engine,
+            _webWrapper = new WebConnector(_engine,
                     _vertx,
                     _simpleOMSEngine,
                     _simpleMarkderDataEngine);
 
-            _fixWrapper = new MatchingEngineFIXWrapper(_engine,
+            _fixWrapper = new FIXConnector(_engine,
                     _vertx,
                     "DefaultDynamicSessionQFJServer.qfj.config.txt");
 
             _executionReportsBus.register(_fixWrapper);
 
 
-            _vertxWrapper = new MatchingEngineVertxWrapper(_engine,_vertx, _vertx_tcp_port);
+            _vertxWrapper = new VertxConnector(_engine,_vertx, _vertx_tcp_port);
             _executionReportsBus.register(_vertxWrapper);
 
         }

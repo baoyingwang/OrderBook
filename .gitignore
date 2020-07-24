@@ -2,9 +2,12 @@
 /log
 /logarchive
 /build
+/out
 /ide_bin
 /.gradle
+
 /.idea
+/**/*.iml
 /classes
 /fileStore
 /out

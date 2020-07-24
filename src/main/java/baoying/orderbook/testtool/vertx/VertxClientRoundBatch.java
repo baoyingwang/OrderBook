@@ -1,6 +1,9 @@
 package baoying.orderbook.testtool.vertx;
 
-import baoying.orderbook.app.*;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.util.*;
+import baoying.orderbook.connector.FIXConnector;
+import baoying.orderbook.connector.VertxConnector;
 import baoying.orderbook.testtool.*;
 import com.beust.jcommander.JCommander;
 import io.vertx.core.Vertx;
@@ -11,8 +14,6 @@ import io.vertx.core.net.NetSocket;
 import io.vertx.core.parsetools.RecordParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import quickfix.ConfigError;
-import quickfix.DataDictionary;
 import quickfix.Message;
 
 import java.io.BufferedOutputStream;
@@ -121,7 +122,7 @@ public class VertxClientRoundBatch {
         liveSockets.forEach( (clientID, socket)->{
 
             //http://vertx.io/docs/vertx-core/java/#_record_parser
-            final RecordParser parser = RecordParser.newDelimited(MatchingEngineVertxWrapper.vertxTCPDelimiter, buffer -> {
+            final RecordParser parser = RecordParser.newDelimited(VertxConnector.vertxTCPDelimiter, buffer -> {
 
                 long recvTimeNano = System.nanoTime();
 
@@ -164,8 +165,8 @@ public class VertxClientRoundBatch {
         });
 
         liveSockets.forEach( (clientID, socket)-> {
-            Message logon = FIXMessageUtil.buildLogon(clientID, MatchingEngineFIXWrapper.serverCompID);
-            Buffer logonAsBuffer = Util.buildBuffer(logon, MatchingEngineVertxWrapper.vertxTCPDelimiter);
+            Message logon = FIXMessageUtil.buildLogon(clientID, FIXConnector.serverCompID);
+            Buffer logonAsBuffer = Util.buildBuffer(logon, VertxConnector.vertxTCPDelimiter);
             socket.write(logonAsBuffer);
         });
 
@@ -236,7 +237,7 @@ public class VertxClientRoundBatch {
             FIXMessageUtil.addLatencyText(newOrder);
         }
 
-        Buffer orderAsBuffer = Util.buildBuffer(newOrder, MatchingEngineVertxWrapper.vertxTCPDelimiter);
+        Buffer orderAsBuffer = Util.buildBuffer(newOrder, VertxConnector.vertxTCPDelimiter);
 
         return orderAsBuffer;
     }

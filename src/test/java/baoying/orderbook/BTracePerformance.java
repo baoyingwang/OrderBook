@@ -27,7 +27,7 @@ public class BTracePerformance {
         }
     }
 
-    @OnMethod(clazz = "baoying.orderbook.OrderBook",
+    @OnMethod(clazz = "baoying.orderbook.core.OrderBook",
             location=@Location(Kind.RETURN),
             method = "matchOrder")
     @Sampled(kind = Sampled.Sampler.Const, mean=sampleMean)
@@ -41,7 +41,7 @@ public class BTracePerformance {
 
     }
 
-    @OnMethod(clazz = "baoying.orderbook.MatchingEngine",
+    @OnMethod(clazz = "baoying.orderbook.core.MatchingEngine",
             location=@Location(Kind.RETURN),
             method = "sendToBus")
     @Sampled(kind = Sampled.Sampler.Const, mean=sampleMean)
@@ -54,7 +54,7 @@ public class BTracePerformance {
         }
     }
 
-    @OnMethod(clazz = "baoying.orderbook.MatchingEngine",
+    @OnMethod(clazz = "baoying.orderbook.core.MatchingEngine",
             location=@Location(Kind.RETURN),
             method = "matchOrder")
     //@Sampled(kind = Sampled.Sampler.Adaptive) //http://btraceio.github.io/btrace/2015/02/sampled-profiling/

@@ -1,4 +1,6 @@
-package baoying.orderbook.app;
+package baoying.orderbook.monitor;
+
+import baoying.orderbook.util.Util;
 
 import javax.management.*;
 import java.lang.management.*;
@@ -15,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 
-public class JVMDataCollectionEngine {
+public class JVMMonitorEngine {
 
     private final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
     private final OperatingSystemMXBean osMXBean = ManagementFactory.getOperatingSystemMXBean();
@@ -24,22 +26,21 @@ public class JVMDataCollectionEngine {
     private final ScheduledExecutorService executor;
 
     //as a util, without starting executor service
-    JVMDataCollectionEngine(){
+    JVMMonitorEngine(){
         executor = null;
     }
 
-    public static JVMDataCollectionEngine asUtil(){
-        return new JVMDataCollectionEngine();
+    public static JVMMonitorEngine asUtil(){
+        return new JVMMonitorEngine();
     }
 
-    public static JVMDataCollectionEngine asEngine(long period, TimeUnit unit, Path usageFile)throws Exception{
-        return new JVMDataCollectionEngine( period,  unit,  usageFile);
+    public static JVMMonitorEngine asEngine(long period, TimeUnit unit, Path usageFile)throws Exception{
+        return new JVMMonitorEngine( period,  unit,  usageFile);
     }
 
-    private JVMDataCollectionEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
+    private JVMMonitorEngine(long period, TimeUnit unit, Path usageFile) throws Exception{
 
         if (!Files.exists(usageFile)) {
-            //Files.createFile(usageFile); TODO is it required to create here? since CREATE option is used next/while-writing?
             Files.write(usageFile, (csvUsageHeader() + "\n").getBytes(), APPEND, CREATE);
         }
 
@@ -143,7 +144,8 @@ public class JVMDataCollectionEngine {
         usage.putAll(gcUsage());
         return  usage;
     }
-    Map<String, String> config(){
+
+    public Map<String, String> config(){
 
         Map<String, String> data = new TreeMap<>();
         data.put("os Arch", osMXBean.getArch()); //amd64
@@ -206,7 +208,7 @@ public class JVMDataCollectionEngine {
     }
 
     public static void main(String[] args){
-        JVMDataCollectionEngine u = JVMDataCollectionEngine.asUtil();
+        JVMMonitorEngine u = JVMMonitorEngine.asUtil();
         u.config().forEach((k,v) ->{
             if(k.startsWith("gc")) {
                 System.out.println(k + ":" + v);

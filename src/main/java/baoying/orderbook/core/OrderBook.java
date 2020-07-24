@@ -1,4 +1,4 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -7,21 +7,19 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import baoying.orderbook.app.Util;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import baoying.orderbook.util.Util;
 
-import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.MarketDataMessage.AggregatedOrderBook;
-import baoying.orderbook.MarketDataMessage.OrderBookDelta;
-import baoying.orderbook.TradeMessage.MatchedExecutionReport;
-import baoying.orderbook.TradeMessage.OriginalOrder;
-import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
+import baoying.orderbook.core.CommonMessage.Side;
+import baoying.orderbook.core.MarketDataMessage.AggregatedOrderBook;
+import baoying.orderbook.core.MarketDataMessage.OrderBookDelta;
+import baoying.orderbook.core.TradeMessage.MatchedExecutionReport;
+import baoying.orderbook.core.TradeMessage.OriginalOrder;
+import baoying.orderbook.core.TradeMessage.SingleSideExecutionReport;
 
 /**
  * //TODO check minimize qty - if the leaves qty is less than min_qty, it will be rejeted.
  * An OrderBook for a specific symbol.
- * note: NOT threadsafe. The {@link baoying.orderbook.MatchingEngine} promises single thread context.
+ * note: NOT threadsafe. The {@link MatchingEngine} promises single thread context.
  * note: consider use other data structure(instead of simply priority queue) for book, to 1) simplify dump order book. 2) for FX, support match 2nd best price, if no relationship with 1st one(should this be supported?).
  * note: for FX swap, we could use same logic, symbol like USDJPY_1W. But only support Spot+Fwd as standard way.
  *
@@ -29,8 +27,6 @@ import baoying.orderbook.TradeMessage.SingleSideExecutionReport;
 public class OrderBook {
 
 	public final String _symbol;
-
-	private final static Logger log = LoggerFactory.getLogger(OrderBook.class);
 
 	public static double MIN_DIFF_FOR_PRICE = 0.00000001;
 

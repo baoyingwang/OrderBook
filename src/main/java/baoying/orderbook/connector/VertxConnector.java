@@ -1,9 +1,12 @@
-package baoying.orderbook.app;
+package baoying.orderbook.connector;
 
-import baoying.orderbook.CommonMessage;
-import baoying.orderbook.MatchingEngine;
-import baoying.orderbook.OrderBook;
-import baoying.orderbook.TradeMessage;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.util.UniqIDGenerator;
+import baoying.orderbook.util.Util;
+import baoying.orderbook.core.CommonMessage;
+import baoying.orderbook.core.MatchingEngine;
+import baoying.orderbook.core.OrderBook;
+import baoying.orderbook.core.TradeMessage;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -21,12 +24,12 @@ import quickfix.*;
 import java.util.*;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
-public class MatchingEngineVertxWrapper {
+public class VertxConnector {
 
 
     public static String vertxTCPDelimiter = "\nXYZ\n";
 
-    private final static Logger log = LoggerFactory.getLogger(MatchingEngineVertxWrapper.class);
+    private final static Logger log = LoggerFactory.getLogger(VertxConnector.class);
 
     private final MatchingEngine _engine;
 
@@ -36,8 +39,8 @@ public class MatchingEngineVertxWrapper {
     private final BiMap<String, NetSocket> _liveClientCompIDs = HashBiMap.create();
     //private final BiMap<NetSocket, String> _liveSockets = _liveClientCompIDs.inverse();
 
-    MatchingEngineVertxWrapper(MatchingEngine engine,
-                               Vertx vertx, int vertx_tcp_port) throws Exception{
+    public VertxConnector(MatchingEngine engine,
+                          Vertx vertx, int vertx_tcp_port) throws Exception{
 
         _engine = engine;
 
@@ -91,7 +94,7 @@ public class MatchingEngineVertxWrapper {
 
 
         boolean isLatencyClient;
-        if(msgString.indexOf("\u000149="+MatchingEngineApp.LATENCY_ENTITY_PREFIX)>0){
+        if(msgString.indexOf("\u000149="+ MatchingEngineApp.LATENCY_ENTITY_PREFIX)>0){
             isLatencyClient=true;
             zeroOLatencyOrdRrecvTimeNano = System.nanoTime();
         }else{
@@ -127,7 +130,7 @@ public class MatchingEngineVertxWrapper {
         String clientEntity = logon.getHeader().getString(49);
         _liveClientCompIDs.put(clientEntity, socket);
 
-        Message ackLogon = FIXMessageUtil.buildLogon(MatchingEngineFIXWrapper.serverCompID, clientEntity);
+        Message ackLogon = FIXMessageUtil.buildLogon(FIXConnector.serverCompID, clientEntity);
         Buffer buffer = Util.buildBuffer(ackLogon, vertxTCPDelimiter);
         socket.write(buffer);
     }
@@ -137,7 +140,7 @@ public class MatchingEngineVertxWrapper {
         String orderID = UniqIDGenerator.next();
 
         final TradeMessage.OriginalOrder originalOrder
-                = MatchingEngineFIXHelper.buildOriginalOrder(
+                = FIXHelper.buildOriginalOrder(
                     CommonMessage.ExternalSource.VertxTCP,
                     newSingleOrder,
                     orderID,
@@ -168,7 +171,7 @@ public class MatchingEngineVertxWrapper {
 
         _vertx.runOnContext((v)->{
 
-            Message fixER = MatchingEngineFIXHelper.translateSingeSideER(singleSideExecutionReport);
+            Message fixER = FIXHelper.translateSingeSideER(singleSideExecutionReport);
 
             log.debug("TX:{}", fixER);
 
@@ -182,7 +185,7 @@ public class MatchingEngineVertxWrapper {
     public void process(TradeMessage.MatchedExecutionReport matchedExecutionReport){
 
         List<Util.Tuple<Message,TradeMessage.OriginalOrder>> fixERs
-                = MatchingEngineFIXHelper.translateMatchedER(
+                = FIXHelper.translateMatchedER(
                         CommonMessage.ExternalSource.VertxTCP,
                         matchedExecutionReport);
 

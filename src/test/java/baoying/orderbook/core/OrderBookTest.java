@@ -1,17 +1,17 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
 import java.util.*;
 
-import baoying.orderbook.app.Util;
+import baoying.orderbook.util.Util;
 import org.junit.Assert;
 import org.junit.Test;
 
-import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.MarketDataMessage.OrderBookDelta;
-import baoying.orderbook.OrderBook.ExecutingOrder;
-import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
-import baoying.orderbook.TradeMessage.MatchedExecutionReport;
-import baoying.orderbook.TradeMessage.OriginalOrder;
+import baoying.orderbook.core.CommonMessage.Side;
+import baoying.orderbook.core.MarketDataMessage.OrderBookDelta;
+import baoying.orderbook.core.OrderBook.ExecutingOrder;
+import baoying.orderbook.core.OrderBook.MEExecutionReportMessageFlag;
+import baoying.orderbook.core.TradeMessage.MatchedExecutionReport;
+import baoying.orderbook.core.TradeMessage.OriginalOrder;
 
 public class OrderBookTest {
 

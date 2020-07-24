@@ -1,7 +1,7 @@
-package baoying.orderbook.app;
+package baoying.orderbook.marketdata;
 
 
-import baoying.orderbook.MarketDataMessage;
+import baoying.orderbook.core.MarketDataMessage;
 import com.google.common.eventbus.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,17 +19,17 @@ public class SimpleMarkderDataEngine {
     private Map<String, MarketDataMessage.DetailOrderBook> detailOrderbookBySymbol;
 
 
-    SimpleMarkderDataEngine(){
+    public SimpleMarkderDataEngine(){
 
         orderbookBySymbol = new ConcurrentHashMap<>();
         detailOrderbookBySymbol = new ConcurrentHashMap<>();
     }
 
-    MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
+    public MarketDataMessage.AggregatedOrderBook getOrderBookBySymbol(String symbol){
         return orderbookBySymbol.get(symbol);
     }
 
-    MarketDataMessage.DetailOrderBook getDetailOrderBookBySymbol(String symbol){
+    public MarketDataMessage.DetailOrderBook getDetailOrderBookBySymbol(String symbol){
         return detailOrderbookBySymbol.get(symbol);
     }
 

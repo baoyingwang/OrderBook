@@ -1,6 +1,6 @@
 package baoying.orderbook.testtool;
 
-import baoying.orderbook.app.Util;
+import baoying.orderbook.util.Util;
 import com.beust.jcommander.Parameter;
 
 import java.util.ArrayList;

@@ -1,6 +1,6 @@
 package baoying.orderbook.testtool;
 
-import baoying.orderbook.app.UniqIDGenerator;
+import baoying.orderbook.util.UniqIDGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.ConfigError;

@@ -1,10 +1,12 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
-import baoying.orderbook.CommonMessage.Side;
-import baoying.orderbook.MarketDataMessage.OrderBookDelta;
-import baoying.orderbook.OrderBook.ExecutingOrder;
-import baoying.orderbook.OrderBook.MEExecutionReportMessageFlag;
-import baoying.orderbook.TradeMessage.OriginalOrder;
+import baoying.orderbook.core.CommonMessage;
+import baoying.orderbook.core.CommonMessage.Side;
+import baoying.orderbook.core.MarketDataMessage.OrderBookDelta;
+import baoying.orderbook.core.OrderBook;
+import baoying.orderbook.core.OrderBook.ExecutingOrder;
+import baoying.orderbook.core.OrderBook.MEExecutionReportMessageFlag;
+import baoying.orderbook.core.TradeMessage.OriginalOrder;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -44,7 +46,7 @@ public class OrderBookPerfTest {
 		{
 			OriginalOrder o_140_1mio = new OriginalOrder( System.currentTimeMillis(), symbol, offer,CommonMessage.OrderType.LIMIT, 140.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_150_1mio = new OriginalOrder( System.currentTimeMillis(), symbol, offer,CommonMessage.OrderType.LIMIT, 150.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
-			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(), symbol, offer,CommonMessage.OrderType.LIMIT, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
+			OriginalOrder o_160_1mio_sysT1 = new OriginalOrder( System.currentTimeMillis(), symbol, offer, CommonMessage.OrderType.LIMIT, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			OriginalOrder o_160_1mio_sysT2 = new OriginalOrder( System.currentTimeMillis(), symbol, offer,CommonMessage.OrderType.LIMIT, 160.1, 1000_000, "orderID", "clientOrdID", "clientEntityID");
 			offerBook.add(new ExecutingOrder(o_140_1mio));
 			offerBook.add(new ExecutingOrder(o_150_1mio));

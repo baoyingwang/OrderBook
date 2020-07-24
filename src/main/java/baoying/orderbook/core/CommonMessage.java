@@ -1,4 +1,4 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
 public interface CommonMessage {
 

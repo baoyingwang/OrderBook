@@ -1,8 +1,8 @@
 package baoying.orderbook.testtool.qfj;
 
-import baoying.orderbook.app.MatchingEngineApp;
-import baoying.orderbook.app.MatchingEngineFIXWrapper;
-import baoying.orderbook.app.UniqIDGenerator;
+import baoying.orderbook.MatchingEngineApp;
+import baoying.orderbook.connector.FIXConnector;
+import baoying.orderbook.util.UniqIDGenerator;
 import baoying.orderbook.testtool.FIXMessageUtil;
 import baoying.orderbook.testtool.ScheduleBatchConfig;
 import baoying.orderbook.testtool.TestToolArgs;
@@ -79,7 +79,7 @@ public class FirstQFJClientBatch {
         _clientIDs = TestToolUtil.generateClientList(_testToolArgs.clientCompIDPrefix, _testToolArgs.numOfClients);
         clientSessionIDs = new ArrayList<>();
         for(String clientEntityID : _clientIDs){
-            SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, MatchingEngineFIXWrapper.serverCompID, "");
+            SessionID sessionID =  new SessionID("FIXT.1.1", clientEntityID, FIXConnector.serverCompID, "");
             clientSessionIDs.add(sessionID);
         }
         _orderInfoList = TestToolUtil.getOrderBriefList(_testToolArgs, _clientIDs);

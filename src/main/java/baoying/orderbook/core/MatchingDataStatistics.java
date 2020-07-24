@@ -1,4 +1,4 @@
-package baoying.orderbook;
+package baoying.orderbook.core;
 
 import com.google.common.collect.EvictingQueue;
 
@@ -18,7 +18,7 @@ public class MatchingDataStatistics {
 
     ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-    final CurrentPeriod _currentPeriod;
+    private CurrentPeriod _currentPeriod;
     final CurrentPeriod _theWholeLifeCycle;
 
 

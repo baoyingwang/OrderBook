@@ -1,10 +1,11 @@
-package baoying.orderbook.app;
+package baoying.orderbook.connector;
 
-import baoying.orderbook.*;
+import baoying.orderbook.marketdata.SimpleMarkderDataEngine;
+import baoying.orderbook.util.UniqIDGenerator;
+import baoying.orderbook.core.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,15 +14,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
-import java.time.Instant;
 import java.util.*;
 
 //https://www.java2blog.com/spring-boot-web-application-example/
 @RestController
 @RequestMapping("/matching")
-public class MatchingEngineWebWrapper {
+public class WebConnector {
 
-    private final static Logger log = LoggerFactory.getLogger(MatchingEngineWebWrapper.class);
+    private final static Logger log = LoggerFactory.getLogger(WebConnector.class);
 
     private final MatchingEngine _engine;
 
@@ -30,10 +30,10 @@ public class MatchingEngineWebWrapper {
     private final SimpleMarkderDataEngine _simpleMarkderDataEngine ;
 
 
-    MatchingEngineWebWrapper(MatchingEngine engine,
-                             Vertx vertx,
-                             SimpleOMSEngine simpleOMSEngine,
-                             SimpleMarkderDataEngine simpleMarkderDataEngine){
+    public WebConnector(MatchingEngine engine,
+                        Vertx vertx,
+                        SimpleOMSEngine simpleOMSEngine,
+                        SimpleMarkderDataEngine simpleMarkderDataEngine){
 
         _engine = engine;
         _vertx = vertx;
